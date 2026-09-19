@@ -318,13 +318,26 @@ function resetAiFilters() {
 function switchView(view, options = {}) {
   if (!VIEWS.includes(view)) return;
   state.view = view;
-  if (options.persist !== false) saveJson(VIEW_KEY, view);
+  if (options.persist !== false) {
+    saveJson(VIEW_KEY, view);
+    syncHashToView(view);
+  }
   const workspace = document.querySelector('.garden-workspace');
   if (workspace) workspace.dataset.view = view;
   document.querySelectorAll('.rail-tile[data-view]').forEach((tile) => {
     tile.classList.toggle('active', tile.dataset.view === view);
   });
   renderActiveView();
+}
+
+// The URL says which view you are on, so a reload lands where you were.
+// The default view carries no hash; replaceState keeps the back button out
+// of it and never fires hashchange back at us.
+function syncHashToView(view) {
+  if (ROUTE_VIEW || !window.history?.replaceState) return;
+  const wanted = view === 'all-ideas' ? '' : `#${view}`;
+  if (window.location.hash === wanted) return;
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${wanted}`);
 }
 
 function populateAllIdeasFilters() {
@@ -1407,8 +1420,11 @@ function renderActiveView() {
   } else {
     renderAllIdeas();
     renderInboxLane();
-    renderMonthRail();
   }
+  // The month rail lives in the sidebar and shows on every view, so it is
+  // drawn on every view too — otherwise opening straight to the shelf or
+  // settings leaves it on its empty placeholder.
+  renderMonthRail();
 }
 
 
@@ -2238,6 +2254,16 @@ function bindEvents() {
         switchView(view);
       }
     });
+  });
+
+  // A hash typed or pasted into an already-open page is the same front door.
+  // During setup there is nowhere else to go, so the hash is ignored.
+  window.addEventListener('hashchange', () => {
+    if (ROUTE_VIEW || state.setupRequired) return;
+    const view = window.location.hash.replace(/^#/, '') || 'all-ideas';
+    if (!VIEWS.includes(view) || view === state.view) return;
+    if (view === 'all-ideas') resetAiFilters();
+    switchView(view);
   });
 
 
