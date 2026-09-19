@@ -28,7 +28,7 @@ fi
 
 # If something already holds the port: reuse airdate, but never stop another program.
 if lsof -ti tcp:"$PORT" >/dev/null 2>&1; then
-  if curl -fsS "http://127.0.0.1:$PORT/healthz" 2>/dev/null | grep -q '"auth_required"'; then
+  if curl -fsS --max-time 2 "http://127.0.0.1:$PORT/healthz" 2>/dev/null | grep -q '"auth_required"'; then
     echo "airdate is already running at $URL"
     open "$URL" 2>/dev/null || true
     exit 0
