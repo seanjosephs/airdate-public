@@ -23,7 +23,8 @@ const GARDEN_WORK_KEY = 'air_date_garden_work_v1';
 const AI_FILTER_KEY = 'air_date_all_ideas_filters_v1';
 const VIEW_KEY = 'air_date_view_v1';
 const VIEWS = ['all-ideas', 'shelf', 'settings'];
-const STATUS_FILTER_VALUES = ['all', 'planted', 'needs-filing', 'writers-room', 'writers-likey', 'ready-for-air', 'live', 'publish-ready', 'needs-hero', 'metadata-gaps'];
+// A stored value from the longer, older list falls back to 'all'.
+const STATUS_FILTER_VALUES = window.AirdateFilters.STATE_FILTER_VALUES;
 const ROUTE_VIEWS = {};
 const DEFAULT_AI_FILTERS = { search: '', topic: 'all', totem: 'all', status: 'all', sort: 'touched' };
 const ROUTE_VIEW = viewForCurrentRoute();
@@ -1077,15 +1078,7 @@ function renderAllIdeas() {
   let essays = state.essays.filter((essay) => {
     if (f.topic !== 'all' && topicForEssay(essay) !== f.topic) return false;
     if (f.totem !== 'all' && essay.totem !== f.totem) return false;
-    if (status === 'planted' && !isPlanted(essay.id)) return false;
-    if (status === 'needs-filing' && !essay.needs_intake) return false;
-    if (status === 'writers-room' && essay.status !== 'Writers Room') return false;
-    if (status === 'writers-likey' && essay.status !== 'Writers Likey') return false;
-    if (status === 'ready-for-air' && essay.status !== 'Ready for Air') return false;
-    if (status === 'live' && essay.status !== 'Live') return false;
-    if (status === 'publish-ready' && !readinessForEssay(essay).ready_to_send) return false;
-    if (status === 'needs-hero' && !readinessForEssay(essay).ready_except_image) return false;
-    if (status === 'metadata-gaps' && readinessForEssay(essay).status !== 'metadata') return false;
+    if (!window.AirdateFilters.matchesState(essay, status)) return false;
     return matchesSearch(essay, f.search);
   });
   essays = [...essays].sort((a, b) => {

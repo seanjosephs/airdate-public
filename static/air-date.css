@@ -846,3 +846,6 @@ button.gc-slot[data-slot="unknown"] .gc-slot-label { font-size: 13px; }
 .totem-picker-status { font-size: 11px; color: var(--vs-fg-muted); padding: 0 8px; }
 .totem-picker-status:empty { display: none; }
 .totem-picker-status[data-kind="bad"] { color: var(--vs-danger); }
+
+/* One-line lifecycle legend under the catalog filters. */
+.state-legend { flex: 1 0 100%; font: 300 11px/1.4 var(--vs-font); color: var(--vs-fg-dim); }
