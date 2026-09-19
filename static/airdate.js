@@ -2017,6 +2017,12 @@ function bindSettingsEvents() {
     await renderSettings();
   });
 
+  document.getElementById('settings-replay-tour')?.addEventListener('click', () => {
+    // The tour's stops live on the essays view.
+    switchView('all-ideas');
+    requestAnimationFrame(() => window.AirdateTour?.replay());
+  });
+
   const setupForm = document.getElementById('setup-form');
   setupForm?.addEventListener('input', () => { setupForm.dataset.dirty = '1'; });
   setupForm?.addEventListener('submit', async (event) => {
@@ -2542,6 +2548,8 @@ async function finishFirstRun() {
   await loadEssays();
   switchView('all-ideas');
   await handleInitialEssayDeepLink();
+  // The wizard hands over to the tour. An existing install only gets it from settings.
+  window.AirdateTour?.start();
 }
 
 async function init() {
