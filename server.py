@@ -2125,8 +2125,12 @@ def setup_payload() -> dict[str, Any]:
             "publication": SUBSTACK_PUBLICATION,
             "publication_name": PUBLICATION_NAME,
             "publish_day": PUBLISH_DAY or "",
+            "category_mode": CATEGORY_MODE,
         },
         "paths_editable": EXPOSE_LOCAL_PATHS,
+        # The wizard is for a fresh install. A config.json that exists but
+        # needs fixing opens settings with its errors instead.
+        "wizard": bool(SETUP_REQUIRED and not CONFIG_FILE_EXISTS and not CONFIG_LOAD_ERROR),
     }
 
 
@@ -2216,13 +2220,56 @@ def save_settings(form: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "setup": setup_payload(), "config": ui_config_payload()}
 
 
-def create_essays_folder() -> dict[str, Any]:
+def candidate_config(form: dict[str, Any]) -> dict[str, Any]:
+    """The config a form would produce, with nothing saved."""
+    current, _, load_error = airdate_config.load_config(DATA_DIR)
+    if load_error:
+        raise ValueError(f"{load_error} Fix or remove the file, then try again.")
+    if not EXPOSE_LOCAL_PATHS:
+        form = {key: value for key, value in form.items() if key != "vault_path"}
+    return airdate_config.apply_env_overrides(airdate_config.settings_from_form(current, form))
+
+
+def check_settings(form: dict[str, Any]) -> dict[str, Any]:
+    """Validate a form without saving it: the wizard checks each step this
+    way, so config.json is written once, at finish."""
+    candidate = candidate_config(form)
+    vault = candidate["vault"]
+    raw_path = str(vault.get("path") or "").strip()
+    check = airdate_config.check_vault(candidate)
+    return {
+        "ok": True,
+        "errors": airdate_config.validate_config(candidate),
+        "vault_ok": bool(check.get("vault_ok")),
+        "essays_ok": bool(check.get("essays_ok")),
+        "vault_message": check.get("vault_message", ""),
+        "essays_message": check.get("essays_message", ""),
+        "vault_name": str(vault.get("name") or "").strip(),
+        "publication": str(candidate["substack"].get("publication") or ""),
+        "connector_folder": str(Path(raw_path).expanduser() / ".obsidian" / "plugins" / "airdate-connector")
+        if EXPOSE_LOCAL_PATHS and check.get("vault_ok") else "",
+    }
+
+
+def create_essays_folder(form: dict[str, Any] | None = None) -> dict[str, Any]:
     """The one vault write first run may make: an empty essays folder, inside
-    a folder already confirmed to be an Obsidian vault."""
-    if not VAULT_CHECK.get("vault_ok"):
-        raise ValueError(VAULT_CHECK.get("vault_message") or "Choose your Obsidian vault folder first.")
-    target = (VAULT_DIR / ESSAYS_FOLDER).resolve()
-    if VAULT_DIR.resolve() not in target.parents:
+    a folder already confirmed to be an Obsidian vault. A form names the
+    vault and folder before they are saved (the wizard); without one, the
+    saved settings are used."""
+    if form and ("vault_path" in form or "essays_folder" in form):
+        candidate = candidate_config(form)
+        errors = airdate_config.validate_config(candidate)
+        if errors:
+            raise ValueError(" ".join(errors))
+        check = airdate_config.check_vault(candidate)
+        vault_dir = Path(str(candidate["vault"].get("path") or "")).expanduser()
+        folder = str(candidate["vault"].get("essays_folder") or "")
+    else:
+        check, vault_dir, folder = VAULT_CHECK, VAULT_DIR, ESSAYS_FOLDER
+    if not check.get("vault_ok"):
+        raise ValueError(check.get("vault_message") or "Choose your Obsidian vault folder first.")
+    target = (vault_dir / folder).resolve()
+    if vault_dir.resolve() not in target.parents:
         raise ValueError("The essays folder must be inside the vault.")
     target.mkdir(parents=True, exist_ok=True)
     load_and_apply_config()
@@ -3157,8 +3204,11 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_settings(payload)
                 self.send_json(result, status=200 if result.get("ok") else 400)
                 return
+            if path == "/api/settings/check":
+                self.send_json(check_settings(payload))
+                return
             if path == "/api/settings/create-essays-folder":
-                self.send_json(create_essays_folder())
+                self.send_json(create_essays_folder(payload))
                 return
             if path == "/api/substack/connect":
                 result = connector_request("/connect", {})

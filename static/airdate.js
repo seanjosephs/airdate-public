@@ -1806,7 +1806,7 @@ function renderSetupPanel(status) {
   const pathField = document.getElementById('setup-vault-path-field');
   pathField?.classList.toggle('hidden', !setup.paths_editable);
   if (!form.dataset.dirty) {
-    for (const name of ['vault_path', 'essays_folder', 'vault_name', 'publication', 'publication_name', 'publish_day']) {
+    for (const name of ['vault_path', 'essays_folder', 'vault_name', 'publication', 'publication_name', 'publish_day', 'category_mode']) {
       if (form.elements[name]) form.elements[name].value = values[name] ?? '';
     }
     form.elements.totems_enabled.checked = Boolean(status.config?.totems?.enabled);
@@ -1850,6 +1850,7 @@ function setupFormPayload() {
     publication: form.elements.publication.value.trim(),
     publication_name: form.elements.publication_name.value.trim(),
     publish_day: form.elements.publish_day.value,
+    category_mode: form.elements.category_mode.value,
     totems_enabled: form.elements.totems_enabled.checked,
     totems: [...form.querySelectorAll('.setup-totem-row')].map((row) => ({
       key: row.dataset.totemKey,
@@ -1937,8 +1938,7 @@ function bindSettingsEvents() {
     await saveSetup();
   });
   setupForm?.elements.totems_enabled?.addEventListener('change', (event) => {
-    const fieldset = setupForm.querySelector('.setup-totems');
-    fieldset?.querySelector('.setup-totem-list')?.classList.toggle('is-off', !event.target.checked);
+    document.getElementById('setup-totem-list')?.classList.toggle('is-off', !event.target.checked);
   });
   document.getElementById('setup-create-essays')?.addEventListener('click', async () => {
     setSetupMessage('creating the essays folder...', '');
@@ -2449,13 +2449,26 @@ async function refreshAppStatus() {
   return status;
 }
 
+async function finishFirstRun() {
+  await refreshAppStatus();
+  state.shelfEssays = [];
+  await loadEssays();
+  switchView('all-ideas');
+  await handleInitialEssayDeepLink();
+}
+
 async function init() {
   const requestedView = window.location.hash.replace(/^#/, '');
   if (!ROUTE_VIEW && VIEWS.includes(requestedView)) state.view = requestedView;
   bindEvents();
-  await refreshAppStatus();
+  const status = await refreshAppStatus();
   if (state.setupRequired) {
     switchView('settings', { persist: false });
+    // A fresh install gets the wizard; a config.json that needs fixing gets
+    // settings with its errors.
+    if (status.setup?.wizard && window.AirdateWizard) {
+      window.AirdateWizard.open({ status, getJson, postJson, escapeHtml, onFinish: finishFirstRun });
+    }
     return;
   }
   switchView(state.view, { persist: !ROUTE_VIEW });
