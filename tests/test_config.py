@@ -143,6 +143,35 @@ class ConfigFileTests(unittest.TestCase):
         bad = airdate_config.settings_from_form(config, {"category_mode": "sometimes"})
         self.assertTrue(any("categories.mode" in e for e in airdate_config.validate_config(bad)))
 
+    def test_form_saves_tag_presets(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        out = airdate_config.settings_from_form(config, {"tag_presets": [
+            {"name": " Politics ", "color": "#112233", "tags": " power, elections ,, "},
+            {"name": "", "color": "#8092b0", "tags": []},
+            {"name": "Craft", "color": "", "tags": ["writing"]},
+            "not a preset",
+        ]})
+        self.assertEqual(out["tag_presets"], [
+            {"name": "Politics", "color": "#112233", "tags": ["power", "elections"]},
+            {"name": "Craft", "color": "", "tags": ["writing"]},
+        ])
+        self.assertEqual(airdate_config.validate_config(out), [])
+        # A form without the field leaves saved presets alone; an empty list clears them.
+        self.assertEqual(airdate_config.settings_from_form(out, {"publish_day": "monday"})["tag_presets"], out["tag_presets"])
+        self.assertEqual(airdate_config.settings_from_form(out, {"tag_presets": []})["tag_presets"], [])
+
+    def test_tag_preset_problems_are_reported(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        cases = {
+            "used twice": [{"name": "Craft", "tags": []}, {"name": "craft", "tags": []}],
+            "up to five": [{"name": "Big", "tags": "a,b,c,d,e,f"}],
+            "name is required": [{"name": "", "tags": "orphan"}],
+            "#a1b2c3": [{"name": "Hue", "color": "blue", "tags": []}],
+        }
+        for expected, presets in cases.items():
+            errors = airdate_config.validate_config(airdate_config.settings_from_form(config, {"tag_presets": presets}))
+            self.assertTrue(any(expected in e for e in errors), f"{expected}: {errors}")
+
     def test_wizard_output_is_a_valid_config(self):
         config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
         out = airdate_config.settings_from_form(config, {

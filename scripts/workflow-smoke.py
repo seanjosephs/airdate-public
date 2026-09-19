@@ -402,6 +402,16 @@ def main() -> int:
         assert_true(all(t["image"].startswith("/static/totems/placeholder-") for t in totem_slots), "placeholder totem icons missing")
         checks.append("first run: setup gate, vault validation, config.json written, placeholder totems on")
 
+        # Tag presets save through the settings form and come back in the UI config.
+        dup_status, _, dup = json_request(base, "/api/settings", {"tag_presets": [{"name": "Craft", "tags": "a"}, {"name": "craft", "tags": "b"}]})
+        assert_true(dup_status == 400 and any("used twice" in e for e in dup.get("errors", [])), f"duplicate preset names were accepted: {dup}")
+        preset_status, _, preset_result = json_request(base, "/api/settings", {"tag_presets": [{"name": "Craft", "color": "#112233", "tags": "writing, editing"}]})
+        assert_true(preset_status == 200 and preset_result.get("config", {}).get("tag_presets") == [{"name": "Craft", "color": "#112233", "tags": ["writing", "editing"]}],
+                    f"tag preset did not save: {preset_result}")
+        cleared_status, _, cleared = json_request(base, "/api/settings", {"tag_presets": []})
+        assert_true(cleared_status == 200 and cleared.get("config", {}).get("tag_presets") == [], f"tag presets did not clear: {cleared}")
+        checks.append("tag presets: duplicate names refused, save and clear through settings")
+
         essays = wait_for_index(base)
         checks.append(f"essay index warmed: {len(essays)} essays")
 

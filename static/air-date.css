@@ -822,3 +822,12 @@ body.wizard-open { overflow: hidden; }
 .wizard-summary dt { color: var(--vs-fg-dim); }
 .wizard-foot { display: flex; justify-content: space-between; gap: 12px; }
 .wizard-foot .wizard-next { margin-left: auto; border-color: var(--vs-orange); }
+
+/* Tag preset editor (settings and wizard). */
+.preset-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.preset-row { display: grid; grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1.6fr) auto; gap: 10px; align-items: center; }
+.preset-row input[type="color"] { padding: 2px; height: 34px; cursor: pointer; }
+@media (max-width: 720px) {
+  .preset-row { grid-template-columns: minmax(0, 1fr) 52px; }
+  .preset-row [name="preset_tags"] { grid-column: 1 / -1; }
+}

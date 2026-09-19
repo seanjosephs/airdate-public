@@ -31,6 +31,7 @@
         category_mode: f.category_mode.value,
         publish_day: f.publish_day.value,
         totems_enabled: f.totems_enabled.checked,
+        tag_presets: root.AirdatePresets.read(el('wizard-presets')),
         totems: [...form.querySelectorAll('.setup-totem-row')].map((row) => ({
           key: row.dataset.totemKey,
           label: row.querySelector('[name="totem_label"]').value.trim(),
@@ -56,6 +57,7 @@
         ['publication', p.publication || 'not set yet'],
         ['organize', p.category_mode === 'folders' ? 'topic folders' : 'no folders'],
         ['totems', p.totems_enabled ? p.totems.map((t) => t.label).join(', ') : 'off'],
+        ['tags', p.tag_presets.length ? p.tag_presets.map((t) => t.name).join(', ') : 'no presets yet'],
         ['calendar', p.publish_day ? `${p.publish_day}s` : 'off'],
       ];
       el('wizard-summary').innerHTML = rows
@@ -103,6 +105,9 @@
       (steps[index].querySelector('input:not([type="checkbox"]):not([type="radio"]), select') || el('wizard-next')).focus();
     }
 
+    // "tag_presets[0].name is required." reads better as "preset 1: name is required."
+    const presetMessage = (e) => e.replace(/^tag_presets\[(\d+)\]\./, (_, i) => `preset ${Number(i) + 1}: `);
+
     // Returns true when the current step may be left.
     async function checkStep() {
       const name = steps[index].dataset.step;
@@ -116,7 +121,8 @@
         if (!form.elements.vault_name.value.trim()) form.elements.vault_name.value = check.vault_name || '';
         return true;
       }
-      if (check.errors?.length) { setMessage(check.errors.join('\n'), 'bad'); return false; }
+      const errors = name === 'tags' ? (check.errors || []).map(presetMessage) : check.errors;
+      if (errors?.length) { setMessage(errors.join('\n'), 'bad'); return false; }
       return true;
     }
 
@@ -145,6 +151,8 @@
         if (await checkStep()) show(index + 1);
       });
     });
+    // A message describes the form as it was checked; editing makes it stale.
+    form.addEventListener('input', () => setMessage(''));
     el('wizard-back').addEventListener('click', () => show(index - 1));
     el('wizard-recheck').addEventListener('click', () => guarded(renderConnect));
     el('wizard-create-essays').addEventListener('click', () => guarded(async () => {
@@ -173,6 +181,8 @@
       <input name="totem_color" type="color" value="${escapeHtml(slot.color || '#8092b0')}" aria-label="Totem color">
       <input class="setup-totem-image" name="totem_image" value="${escapeHtml(slot.image_path || '')}" placeholder="icon: path in your vault, or blank for the placeholder" aria-label="Totem icon path" autocomplete="off" spellcheck="false">
     </div>`).join('');
+
+    root.AirdatePresets.mount(el('wizard-presets'), status.config?.tag_presets || []);
 
     wizard.classList.remove('hidden');
     document.body.classList.add('wizard-open');
