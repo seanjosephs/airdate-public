@@ -1420,8 +1420,11 @@ function renderActiveView() {
   } else {
     renderAllIdeas();
     renderInboxLane();
-    renderMonthRail();
   }
+  // The month rail lives in the sidebar and shows on every view, so it is
+  // drawn on every view too — otherwise opening straight to the shelf or
+  // settings leaves it on its empty placeholder.
+  renderMonthRail();
 }
 
 
