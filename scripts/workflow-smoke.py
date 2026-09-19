@@ -366,6 +366,17 @@ def main() -> int:
         blocked_status, _, blocked_payload = json_request(base, "/api/essays")
         assert_true(blocked_status == 409 and blocked_payload.get("error_kind") == "setup_required",
                     f"essay API answered before setup: {blocked_status} {blocked_payload}")
+        # The wizard checks each step without saving, and may create the essays folder.
+        assert_true(first_status["setup"].get("wizard") is True, f"fresh install did not offer the wizard: {first_status['setup']}")
+        check_status, _, checked = json_request(base, "/api/settings/check", {"vault_path": str(vault_dir), "essays_folder": "Wizard Essays", "category_mode": "off"})
+        assert_true(check_status == 200 and checked.get("vault_ok") is True and checked.get("essays_ok") is False and not checked.get("errors"),
+                    f"wizard check misjudged a vault without its essays folder: {checked}")
+        created_status, _, _ = json_request(base, "/api/settings/create-essays-folder", {"vault_path": str(vault_dir), "essays_folder": "Wizard Essays"})
+        assert_true(created_status == 200 and (vault_dir / "Wizard Essays").is_dir(), "wizard did not create the essays folder")
+        (vault_dir / "Wizard Essays").rmdir()
+        assert_true(not (runtime_dir / "config.json").exists(), "a wizard step wrote config.json before finish")
+        checks.append("wizard: steps checked without saving, essays folder created on request")
+
         not_vault_status, _, not_vault = json_request(base, "/api/settings", {"vault_path": str(essays_dir / "Smoke"), "essays_folder": "Essays"})
         assert_true(not_vault_status == 200 and not_vault.get("setup", {}).get("required") is True
                     and "not an Obsidian vault" in not_vault.get("setup", {}).get("vault_message", ""),

@@ -346,6 +346,9 @@ def settings_from_form(current: dict[str, Any], form: dict[str, Any]) -> dict[st
         out["calendar"]["publish_day"] = day or None
     if "totems_enabled" in form:
         out["totems"]["enabled"] = bool(form.get("totems_enabled"))
+    if "category_mode" in form:
+        # Validated with the rest of the file, so a bad value is reported, not dropped.
+        out["categories"]["mode"] = str(form.get("category_mode") or "").strip().lower()
     if isinstance(form.get("totems"), list):
         # Keys stay fixed: notes store the key in frontmatter, so a relabel
         # must never orphan them. Label, color and icon are the writer's.

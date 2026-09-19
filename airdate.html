@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>AirDate: essay catalog</title>
     <link rel="stylesheet" href="/static/tokens.css?v=2">
-    <link rel="stylesheet" href="/static/air-date.css?v=13">
+    <link rel="stylesheet" href="/static/air-date.css?v=14">
   </head>
   <body>
     <div class="app-shell">
@@ -133,36 +133,71 @@
 
           <div class="settings-grid">
             <section class="wi-panel settings-panel settings-panel--wide setup-panel" id="setup-panel" aria-labelledby="setup-title">
-              <h3 class="panel-title" id="setup-title">your vault and publication</h3>
+              <h3 class="panel-title" id="setup-title">your setup</h3>
               <p class="setup-intro" id="setup-intro">AirDate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes.</p>
               <form class="setup-form" id="setup-form" novalidate>
-                <div class="setup-fields">
-                  <label class="setup-field" id="setup-vault-path-field">
+                <fieldset class="setup-group">
+                  <legend>your vault</legend>
+                  <p class="setup-note">The Obsidian vault and the folder inside it that holds your essays.</p>
+                  <div class="setup-fields">
+                    <label class="setup-field" id="setup-vault-path-field">
                     <span>obsidian vault folder</span>
                     <small>the full path to the folder that contains <code>.obsidian</code></small>
                     <input name="vault_path" autocomplete="off" spellcheck="false" placeholder="/Users/you/Documents/My Vault">
                   </label>
-                  <label class="setup-field">
+                    <label class="setup-field">
                     <span>essays folder</span>
                     <small>inside the vault; every note under it is an essay. Use . if your essays sit at the vault root</small>
                     <input name="essays_folder" autocomplete="off" spellcheck="false" placeholder="Essays">
                   </label>
-                  <label class="setup-field">
+                    <label class="setup-field">
                     <span>vault name</span>
                     <small>as Obsidian shows it; used for "open in Obsidian" links</small>
                     <input name="vault_name" autocomplete="off" spellcheck="false">
                   </label>
-                  <label class="setup-field">
+                  </div>
+                </fieldset>
+                <fieldset class="setup-group">
+                  <legend>your publication</legend>
+                  <p class="setup-note">Where your drafts go on Substack.</p>
+                  <div class="setup-fields">
+                    <label class="setup-field">
                     <span>substack publication</span>
                     <small>for example yourname.substack.com or your custom domain</small>
                     <input name="publication" autocomplete="off" spellcheck="false" placeholder="yourname.substack.com">
                   </label>
-                  <label class="setup-field">
+                    <label class="setup-field">
                     <span>publication name</span>
                     <small>used in the thumbnail prompt</small>
                     <input name="publication_name" autocomplete="off">
                   </label>
-                  <label class="setup-field">
+                  </div>
+                </fieldset>
+                <fieldset class="setup-group">
+                  <legend>how you organize</legend>
+                  <p class="setup-note">With folders on, each folder inside your essays folder is a category and loose essays ask to be filed.</p>
+                  <div class="setup-fields">
+                    <label class="setup-field">
+                      <span>topic folders</span>
+                      <small>off hides categories and filing</small>
+                      <select name="category_mode">
+                        <option value="folders">essays live in topic folders</option>
+                        <option value="off">no folders</option>
+                      </select>
+                    </label>
+                  </div>
+                </fieldset>
+                <fieldset class="setup-group">
+                  <legend>your totems</legend>
+                  <p class="setup-note">Five marks for telling your kinds of work apart. Rename them, pick a color, and swap the icon for any image in your vault.</p>
+                  <label class="setup-toggle"><input type="checkbox" name="totems_enabled"> <span>use totems to mark essays</span></label>
+                  <div class="setup-totem-list" id="setup-totem-list"></div>
+                </fieldset>
+                <fieldset class="setup-group">
+                  <legend>your calendar</legend>
+                  <p class="setup-note">One calendar slot per week on your publish day.</p>
+                  <div class="setup-fields">
+                    <label class="setup-field">
                     <span>publish day</span>
                     <small>one calendar slot per week on this day; none hides the calendar</small>
                     <select name="publish_day">
@@ -176,12 +211,7 @@
                       <option value="sunday">sunday</option>
                     </select>
                   </label>
-                </div>
-                <fieldset class="setup-totems">
-                  <legend>totems</legend>
-                  <label class="setup-toggle"><input type="checkbox" name="totems_enabled"> <span>use totems to mark essays</span></label>
-                  <p class="setup-note">Five slots for telling your work apart. Rename them, pick a color, and swap the icon for any image in your vault.</p>
-                  <div class="setup-totem-list" id="setup-totem-list"></div>
+                  </div>
                 </fieldset>
                 <p class="setup-messages" id="setup-messages" role="status" aria-live="polite"></p>
                 <div class="settings-actions">
@@ -243,7 +273,8 @@
             </section>
 
             <section class="wi-panel settings-panel">
-              <h3 class="panel-title">publishing</h3>
+              <h3 class="panel-title">connect Substack</h3>
+              <p class="setup-note">The Obsidian connector holds your Substack session. AirDate only ever creates drafts.</p>
               <div class="session-control">
                 <button class="settings-button" id="settings-refresh-substack" type="button">connect Substack</button>
                 <div>
@@ -265,6 +296,123 @@
           </div>
         </section>
       </main>
+    </div>
+
+    <div class="wizard hidden" id="wizard" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
+      <form class="wizard-shell" id="wizard-form" novalidate>
+        <header class="wizard-head">
+          <div class="brand-mark">Air<span class="accent">Date</span></div>
+          <ol class="wizard-steps" id="wizard-steps" aria-label="Setup steps"></ol>
+        </header>
+
+        <section class="wizard-step" data-step="welcome" data-label="welcome">
+          <h2 class="wizard-title">welcome to AirDate</h2>
+          <p>AirDate is a catalog for the essays in your Obsidian vault.</p>
+          <p>It walks each one from first draft to ready, and gives it a day on your calendar.</p>
+          <p>It creates Substack drafts. It never publishes, schedules or emails.</p>
+          <details class="wizard-disclosure">
+            <summary>how AirDate talks to Substack</summary>
+            <p>Substack has no official API for drafts, so AirDate uses an unofficial client. Your Substack session stays inside Obsidian, in the AirDate connector; AirDate never sees your password. <a href="https://github.com/seanjosephs/airdate-public/blob/main/SETUP.md" target="_blank" rel="noopener">SETUP.md</a> has the details.</p>
+          </details>
+        </section>
+
+        <section class="wizard-step" data-step="vault" data-label="vault">
+          <h2 class="wizard-title">your vault</h2>
+          <p>AirDate reads essays from a folder in your Obsidian vault.</p>
+          <label class="setup-field" id="wizard-vault-path-field">
+            <span>obsidian vault folder</span>
+            <small>the full path to the folder that contains <code>.obsidian</code></small>
+            <input name="vault_path" autocomplete="off" spellcheck="false" placeholder="/Users/you/Documents/My Vault">
+          </label>
+          <p class="setup-note hidden" id="wizard-vault-path-note">The vault folder is set in config.json on the machine running AirDate.</p>
+          <label class="setup-field">
+            <span>essays folder</span>
+            <small>inside the vault; every note under it is an essay</small>
+            <input name="essays_folder" autocomplete="off" spellcheck="false" placeholder="Essays">
+          </label>
+          <label class="setup-toggle"><input type="checkbox" name="essays_at_root"> <span>my essays are at the vault root</span></label>
+          <label class="setup-field">
+            <span>vault name</span>
+            <small>as Obsidian shows it; used for "open in Obsidian" links. Blank uses the folder's name</small>
+            <input name="vault_name" autocomplete="off" spellcheck="false">
+          </label>
+          <div class="settings-actions">
+            <button class="settings-button hidden" id="wizard-create-essays" type="button">create the essays folder</button>
+          </div>
+        </section>
+
+        <section class="wizard-step" data-step="publication" data-label="publication">
+          <h2 class="wizard-title">your publication</h2>
+          <p>Where your drafts go. You can fill this in later; sending stays blocked until it is set.</p>
+          <label class="setup-field">
+            <span>substack publication</span>
+            <small>for example yourname.substack.com or your custom domain</small>
+            <input name="publication" autocomplete="off" spellcheck="false" placeholder="yourname.substack.com">
+          </label>
+          <label class="setup-field">
+            <span>publication name</span>
+            <small>used in the thumbnail prompt</small>
+            <input name="publication_name" autocomplete="off">
+          </label>
+        </section>
+
+        <section class="wizard-step" data-step="organize" data-label="organize">
+          <h2 class="wizard-title">how you organize</h2>
+          <p>Do you keep essays in topic folders?</p>
+          <label class="wizard-choice"><input type="radio" name="category_mode" value="folders" checked>
+            <span><strong>yes, in folders</strong><small>Each folder inside your essays folder is a category. An essay sitting outside any folder shows up as needing filing, and AirDate can move it for you.</small></span></label>
+          <label class="wizard-choice"><input type="radio" name="category_mode" value="off">
+            <span><strong>no folders</strong><small>Categories are off. Nothing asks to be filed.</small></span></label>
+        </section>
+
+        <section class="wizard-step" data-step="totems" data-label="totems">
+          <h2 class="wizard-title">your totems</h2>
+          <p>Five marks for telling your kinds of work apart at a glance. Rename them, pick a color, and swap the icon for any image in your vault.</p>
+          <label class="setup-toggle"><input type="checkbox" name="totems_enabled" checked> <span>use totems to mark essays</span></label>
+          <div class="setup-totem-list" id="wizard-totem-list"></div>
+        </section>
+
+        <section class="wizard-step" data-step="calendar" data-label="calendar">
+          <h2 class="wizard-title">your calendar</h2>
+          <p>Pick the day you publish. The calendar gives you one slot per week on that day.</p>
+          <label class="setup-field">
+            <span>publish day</span>
+            <small>none hides the calendar</small>
+            <select name="publish_day">
+                <option value="monday">monday</option>
+                <option value="tuesday">tuesday</option>
+                <option value="wednesday">wednesday</option>
+                <option value="thursday">thursday</option>
+                <option value="friday">friday</option>
+                <option value="saturday">saturday</option>
+                <option value="sunday">sunday</option>
+                <option value="">none</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="wizard-step" data-step="connect" data-label="connect">
+          <h2 class="wizard-title">connect Substack</h2>
+          <p>Three steps in Obsidian. You can do this later; sending stays blocked until it is done.</p>
+          <ol class="wizard-checks" id="wizard-checks"></ol>
+          <p class="setup-note" id="wizard-connector-folder"></p>
+          <div class="settings-actions">
+            <button class="settings-button" id="wizard-recheck" type="button">check again</button>
+          </div>
+        </section>
+
+        <section class="wizard-step" data-step="finish" data-label="finish">
+          <h2 class="wizard-title">ready</h2>
+          <p>Finish saves these choices to config.json. Everything here can be changed in settings.</p>
+          <dl class="wizard-summary" id="wizard-summary"></dl>
+        </section>
+
+        <p class="setup-messages" id="wizard-messages" role="status" aria-live="polite"></p>
+        <footer class="wizard-foot">
+          <button class="settings-button" id="wizard-back" type="button">back</button>
+          <button class="settings-button wizard-next" id="wizard-next" type="submit">next</button>
+        </footer>
+      </form>
     </div>
 
     <div class="editor-overlay hidden" id="editor-overlay" aria-hidden="true">
@@ -525,6 +673,7 @@
     </div>
 
     <script src="/static/airdate-deep-link.js?v=2"></script>
-    <script src="/static/airdate.js?v=39"></script>
+    <script src="/static/airdate-wizard.js?v=1"></script>
+    <script src="/static/airdate.js?v=40"></script>
   </body>
 </html>

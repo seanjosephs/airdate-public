@@ -9,6 +9,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -134,6 +135,25 @@ class ConfigFileTests(unittest.TestCase):
         config["vault"]["path"] = str(self.data)
         self.assertIn("not an Obsidian vault", airdate_config.check_vault(config)["vault_message"])
 
+    def test_form_sets_category_mode(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        out = airdate_config.settings_from_form(config, {"category_mode": "off"})
+        self.assertEqual(out["categories"]["mode"], "off")
+        self.assertEqual(airdate_config.validate_config(out), [])
+        bad = airdate_config.settings_from_form(config, {"category_mode": "sometimes"})
+        self.assertTrue(any("categories.mode" in e for e in airdate_config.validate_config(bad)))
+
+    def test_wizard_output_is_a_valid_config(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        out = airdate_config.settings_from_form(config, {
+            "vault_path": "/tmp/Some Vault", "essays_folder": ".", "category_mode": "off",
+            "totems_enabled": False, "publish_day": "monday", "publication": "",
+        })
+        self.assertEqual(airdate_config.validate_config(out), [])
+        self.assertEqual((out["categories"]["mode"], out["totems"]["enabled"], out["calendar"]["publish_day"]),
+                         ("off", False, "monday"))
+        self.assertIsNone(airdate_config.DEFAULT_CONFIG["calendar"]["publish_day"])
+
 
 class ServerSettingsTests(unittest.TestCase):
     """Drive server.apply_config directly; restores the module afterwards."""
@@ -169,6 +189,62 @@ class ServerSettingsTests(unittest.TestCase):
             target[leaf] = value
         self.server.apply_config(config, True)
         return self.server
+
+    def fresh_install(self):
+        """A data dir with no config.json, as the wizard finds it."""
+        data = Path(tempfile.mkdtemp(dir=self.root))
+        patcher = mock.patch.object(self.server, "DATA_DIR", data)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.server.load_and_apply_config()
+        return data
+
+    def test_fresh_install_gets_the_wizard(self):
+        self.fresh_install()
+        self.assertTrue(self.server.setup_payload()["wizard"])
+        self.configure()
+        self.assertFalse(self.server.setup_payload()["wizard"])
+        # A config.json that exists but needs fixing opens settings, not the wizard.
+        self.server.apply_config(copy.deepcopy(airdate_config.DEFAULT_CONFIG), True)
+        self.assertTrue(self.server.SETUP_REQUIRED)
+        self.assertFalse(self.server.setup_payload()["wizard"])
+
+    def test_check_settings_saves_nothing(self):
+        data = self.fresh_install()
+        with mock.patch.object(self.server, "EXPOSE_LOCAL_PATHS", True):
+            good = self.server.check_settings({"vault_path": str(self.vault), "essays_folder": "Writing/Essays"})
+            missing = self.server.check_settings({"vault_path": str(self.vault), "essays_folder": "Nope"})
+            not_vault = self.server.check_settings({"vault_path": str(self.root), "essays_folder": "Essays"})
+            bad_day = self.server.check_settings({"vault_path": str(self.vault), "publish_day": "someday"})
+        self.assertTrue(good["vault_ok"] and good["essays_ok"] and not good["errors"])
+        self.assertEqual(good["vault_name"], "My Vault")
+        self.assertTrue(good["connector_folder"].endswith(".obsidian/plugins/airdate-connector"))
+        self.assertTrue(missing["vault_ok"] and not missing["essays_ok"])
+        self.assertIn("not an Obsidian vault", not_vault["vault_message"])
+        self.assertEqual(not_vault["connector_folder"], "")
+        self.assertTrue(bad_day["errors"])
+        self.assertFalse((data / "config.json").exists())
+        self.assertTrue(self.server.SETUP_REQUIRED)
+
+    def test_check_settings_hides_paths_when_they_are_not_exposed(self):
+        self.fresh_install()
+        with mock.patch.object(self.server, "EXPOSE_LOCAL_PATHS", False):
+            result = self.server.check_settings({"vault_path": str(self.vault), "essays_folder": "Writing/Essays"})
+        self.assertFalse(result["vault_ok"])
+        self.assertEqual(result["connector_folder"], "")
+
+    def test_wizard_creates_the_essays_folder_before_saving(self):
+        data = self.fresh_install()
+        with mock.patch.object(self.server, "EXPOSE_LOCAL_PATHS", True):
+            self.server.create_essays_folder({"vault_path": str(self.vault), "essays_folder": "Fresh/Essays"})
+            self.assertTrue((self.vault / "Fresh" / "Essays").is_dir())
+            with self.assertRaises(ValueError):
+                self.server.create_essays_folder({"vault_path": str(self.root), "essays_folder": "Essays"})
+            with self.assertRaises(ValueError):
+                self.server.create_essays_folder({"vault_path": str(self.vault), "essays_folder": "../Outside"})
+        self.assertFalse((self.root / "Essays").exists())
+        self.assertFalse((self.root / "Outside").exists())
+        self.assertFalse((data / "config.json").exists())
 
     def test_configured_vault_is_ready(self):
         server = self.configure()
