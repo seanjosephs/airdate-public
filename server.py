@@ -1578,6 +1578,16 @@ def normalize_status(value: Any) -> str:
     return lower_map.get(raw.lower(), "Writers Room")
 
 
+# The totem picker's "none". The editor sends "" for "unchanged", so clearing
+# needs its own word.
+CLEAR_TOTEM = "none"
+
+
+def raw_totem(frontmatter: dict[str, Any]) -> str:
+    """The note's own totem value, untouched by inference."""
+    return str(frontmatter.get("totem") or frontmatter.get("element") or "").strip()
+
+
 def infer_totem(
     explicit_value: Any,
     relative_path: str,
@@ -1792,6 +1802,7 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
             )
             touched_days = days_since(touched)
             totem = infer_totem(frontmatter.get("totem") or frontmatter.get("element"), relative, title, tags, body)
+            totem_raw = raw_totem(frontmatter)
             status = effective_status(relative, frontmatter)
 
             subtitle = str(frontmatter.get("subtitle") or "").strip()
@@ -1859,6 +1870,9 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
                     "summary": summary,
                     "themes": themes,
                     "totem": totem,
+                    # What the note itself says, for the card's totem slot:
+                    # "" is unassigned, and a value outside the five is kept visible.
+                    "totem_raw": totem_raw,
                     "status": status,
                     "collection": collection,
                     "category": category,
@@ -2453,6 +2467,9 @@ def sanitize_updates(updates: dict[str, Any]) -> dict[str, Any]:
         totem_value = str(cleaned.get("totem") or "").strip().lower()
         if TOTEMS_ENABLED and totem_value in TOTEM_ITEMS:
             cleaned["totem"] = totem_value
+        elif TOTEMS_ENABLED and cleaned.get("totem") == CLEAR_TOTEM:
+            # The writer picked "none": apply_updates removes a blank key.
+            cleaned["totem"] = ""
         else:
             cleaned.pop("totem")
     if "status" in cleaned and cleaned.get("status"):

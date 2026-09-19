@@ -415,6 +415,27 @@ def main() -> int:
         essays = wait_for_index(base)
         checks.append(f"essay index warmed: {len(essays)} essays")
 
+        # The card's totem picker: read the file state, then save through the normal path.
+        assert_true(all("totem_raw" in e for e in essays), "essay cards do not carry the note's own totem value")
+        pick = essays[0]
+        _, _, pick_detail = json_request(base, f"/api/essays/{pick['id']}")
+        pick_status, _, _ = json_request(base, f"/api/essays/{pick['id']}/save", {
+            "updates": {"totem": "star"}, "expected_mtime": pick_detail["mtime"], "expected_content_hash": pick_detail["content_hash"]})
+        _, _, picked = json_request(base, f"/api/essays/{pick['id']}")
+        assert_true(pick_status == 200 and picked["frontmatter"].get("totem") == "star", f"totem pick did not save: {picked.get('frontmatter')}")
+        stale_status, _, _ = json_request(base, f"/api/essays/{pick['id']}/save", {
+            "updates": {"totem": "circle"}, "expected_mtime": pick_detail["mtime"], "expected_content_hash": pick_detail["content_hash"]})
+        assert_true(stale_status == 409, f"a totem pick with a stale file state was accepted: {stale_status}")
+        none_status, _, _ = json_request(base, f"/api/essays/{pick['id']}/save", {
+            "updates": {"totem": "none"}, "expected_mtime": picked["mtime"], "expected_content_hash": picked["content_hash"]})
+        _, _, cleared_pick = json_request(base, f"/api/essays/{pick['id']}")
+        assert_true(none_status == 200 and "totem" not in cleared_pick["frontmatter"], f"picking none did not clear the totem: {cleared_pick.get('frontmatter')}")
+        if pick.get("totem_raw"):
+            # Later checks read this fixture's own totem; put it back.
+            restore_status, _, _ = json_request(base, f"/api/essays/{pick['id']}/save", {"updates": {"totem": pick["totem_raw"]}})
+            assert_true(restore_status == 200, "could not restore the fixture's totem")
+        checks.append("totem picker: assign via save, stale state refused, none clears")
+
         status, headers, body = request(base, "/airdate")
         assert_true(status == 200 and "text/html" in content_type(headers), "/airdate did not serve HTML")
         assert_true(b"<title>airdate" in body.lower(), "/airdate HTML missing the airdate title")

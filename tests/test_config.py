@@ -275,6 +275,49 @@ class ServerSettingsTests(unittest.TestCase):
         self.assertFalse((self.root / "Outside").exists())
         self.assertFalse((data / "config.json").exists())
 
+    def totem_note(self, name, frontmatter):
+        server = self.configure()
+        note = self.vault / "Writing" / "Essays" / "Politics" / name
+        note.write_text(f"---\ntitle: {name}\n{frontmatter}---\nbody\n", encoding="utf-8")
+        self.addCleanup(note.unlink)
+        essay_id = server.essay_id_for(f"Politics/{name}")
+        return server, note, essay_id
+
+    @staticmethod
+    def note_totem(server, note):
+        return server.split_frontmatter(note.read_text(encoding="utf-8"))[0].get("totem")
+
+    def test_totem_pick_writes_through_the_save_path(self):
+        server, note, essay_id = self.totem_note("Pick.md", "")
+        state = server.file_state(note)
+        server.save_essay_updates(essay_id, {"totem": "Triangle"}, None, state["mtime"], state["content_hash"])
+        self.assertEqual(self.note_totem(server, note), "triangle")
+        essays, _ = server.discover_essays()
+        self.assertEqual(next(e for e in essays if e["relative_path"] == "Politics/Pick.md")["totem_raw"], "triangle")
+        # A stale file state refuses, as it does for the editor.
+        with self.assertRaises(server.EssayConflictError):
+            server.save_essay_updates(essay_id, {"totem": "star"}, None, state["mtime"], state["content_hash"])
+        self.assertEqual(self.note_totem(server, note), "triangle")
+
+    def test_unknown_totem_is_shown_and_kept_until_the_writer_picks(self):
+        server, note, essay_id = self.totem_note("Foreign.md", "totem: elephant\n")
+        essays, _ = server.discover_essays()
+        card = next(e for e in essays if e["relative_path"] == "Politics/Foreign.md")
+        self.assertEqual(card["totem_raw"], "elephant")
+        # A save that does not pick one of the five leaves the value alone.
+        server.save_essay_updates(essay_id, {"totem": "giraffe", "subtitle": "s"})
+        server.save_essay_updates(essay_id, {"totem": ""})
+        self.assertEqual(self.note_totem(server, note), "elephant")
+        server.save_essay_updates(essay_id, {"totem": "none"})
+        self.assertIsNone(self.note_totem(server, note))
+
+    def test_totem_pick_is_ignored_when_totems_are_off(self):
+        server, note, essay_id = self.totem_note("Off.md", "totem: circle\n")
+        self.configure(totems__enabled=False)
+        server.save_essay_updates(essay_id, {"totem": "none"})
+        server.save_essay_updates(essay_id, {"totem": "star"})
+        self.assertEqual(self.note_totem(server, note), "circle")
+
     def test_configured_vault_is_ready(self):
         server = self.configure()
         self.assertFalse(server.SETUP_REQUIRED)

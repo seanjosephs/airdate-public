@@ -154,8 +154,94 @@ function totemStyle(totem, fallbackColor) {
   return `--accent:${color};${totem?.asset ? ` --totem-art:url('${totem.asset}');` : ''}`;
 }
 
-function totemPortraitMarkup(totem) {
-  return totem?.asset ? `<div class="gc-portrait" aria-hidden="true"><img src="${escapeHtml(totem.asset)}" alt=""></div>` : '';
+// The totem slot on a card shows what the note itself says (totem_raw), never
+// a guess: one of the writer's totems, empty, or a value from another setup.
+function totemPortraitMarkup(totem, essay) {
+  if (!APP_CONFIG.totemsEnabled || !essay) return '';
+  const raw = String(essay.totem_raw || '').trim();
+  const assigned = TOTEMS[raw.toLowerCase()];
+  let kind = 'empty';
+  let inner = '<span class="gc-slot-label">totem</span>';
+  let label = 'Choose a totem';
+  if (assigned) {
+    kind = 'assigned';
+    inner = `<img src="${escapeHtml(assigned.asset)}" alt="">`;
+    label = `Totem: ${assigned.label}. Change it`;
+  } else if (raw) {
+    kind = 'unknown';
+    inner = '<span class="gc-slot-label">?</span>';
+    label = `Totem "${raw}" is not one of yours. Choose one`;
+  }
+  return `<button type="button" class="gc-portrait gc-slot" data-slot="${kind}" data-totem-slot="${essay.id}" title="${escapeHtml(kind === 'unknown' ? raw : label)}" aria-label="${escapeHtml(label)}" aria-haspopup="true">${inner}</button>`;
+}
+
+function closeTotemPicker() {
+  document.getElementById('totem-picker')?.remove();
+  document.removeEventListener('click', onTotemPickerOutside, true);
+  document.removeEventListener('keydown', onTotemPickerKey, true);
+}
+
+function onTotemPickerOutside(event) {
+  if (!event.target.closest('#totem-picker')) closeTotemPicker();
+}
+
+function onTotemPickerKey(event) {
+  if (event.key !== 'Escape') return;
+  const slot = document.querySelector(`[data-totem-slot="${document.getElementById('totem-picker')?.dataset.essayId}"]`);
+  closeTotemPicker();
+  slot?.focus();
+}
+
+function openTotemPicker(slot) {
+  closeTotemPicker();
+  const essayId = slot.dataset.totemSlot;
+  const picker = document.createElement('div');
+  picker.id = 'totem-picker';
+  picker.className = 'totem-picker';
+  picker.dataset.essayId = essayId;
+  picker.setAttribute('role', 'menu');
+  picker.setAttribute('aria-label', 'Choose a totem');
+  picker.innerHTML = Object.entries(TOTEMS).map(([key, t]) => `<button type="button" role="menuitem" data-pick="${escapeHtml(key)}" style="--accent:${escapeHtml(t.color)}">
+      <img src="${escapeHtml(t.asset)}" alt=""><span>${escapeHtml(t.label.toLowerCase())}</span></button>`).join('')
+    + '<button type="button" role="menuitem" data-pick="none"><span class="totem-picker-none" aria-hidden="true"></span><span>none</span></button>'
+    + '<p class="totem-picker-status" role="status"></p>';
+  document.body.append(picker);
+  const box = slot.getBoundingClientRect();
+  picker.style.top = `${Math.min(box.bottom + 6 + window.scrollY, window.scrollY + window.innerHeight - picker.offsetHeight - 8)}px`;
+  picker.style.left = `${Math.max(8, Math.min(box.left + window.scrollX, window.innerWidth - picker.offsetWidth - 8))}px`;
+  picker.addEventListener('click', (event) => {
+    const choice = event.target.closest('[data-pick]');
+    if (choice) assignTotem(essayId, choice.dataset.pick, picker);
+  });
+  picker.querySelector('[data-pick]')?.focus();
+  document.addEventListener('click', onTotemPickerOutside, true);
+  document.addEventListener('keydown', onTotemPickerKey, true);
+}
+
+// Writes `totem` through the normal save path. The file state is read first so
+// the save refuses if the note changed underneath.
+async function assignTotem(essayId, key, picker) {
+  const status = picker.querySelector('.totem-picker-status');
+  picker.querySelectorAll('[data-pick]').forEach((button) => { button.disabled = true; });
+  status.textContent = 'saving...';
+  try {
+    const essay = await getJson(`/api/essays/${essayId}`);
+    await postJson(`/api/essays/${essayId}/save`, {
+      updates: { totem: key },
+      expected_mtime: essay.mtime,
+      expected_content_hash: essay.content_hash,
+    });
+    closeTotemPicker();
+    await loadEssays();
+    if (state.view === 'shelf') { state.shelfEssays = []; renderAll(); }
+    document.querySelector(`[data-totem-slot="${essayId}"]`)?.focus();
+  } catch (err) {
+    status.textContent = err.status === 409
+      ? 'This note changed in Obsidian just now. Try again.'
+      : `could not save: ${err.message}`;
+    status.dataset.kind = 'bad';
+    picker.querySelectorAll('[data-pick]').forEach((button) => { button.disabled = false; });
+  }
 }
 
 function renderRailLinks() {
@@ -697,6 +783,9 @@ function wireCardInteractions(container) {
   container.querySelectorAll('[data-open-id]').forEach((button) => {
     button.addEventListener('click', (event) => { event.stopPropagation(); openEditor(button.dataset.openId); });
   });
+  container.querySelectorAll('[data-totem-slot]').forEach((slot) => {
+    slot.addEventListener('click', (event) => { event.stopPropagation(); openTotemPicker(slot); });
+  });
   container.querySelectorAll('[data-create-draft-id]').forEach((button) => {
     button.addEventListener('click', async (event) => {
       event.stopPropagation();
@@ -964,7 +1053,7 @@ function gardenCardMarkup(essay, opts = {}) {
     data-totem="${escapeHtml(essay.totem || '')}" data-topic="${escapeHtml(topic)}" data-archetype="" data-source-role="${essay.source_role || 'standalone'}" draggable="true"
     data-essay-id="${essay.id}" data-open-id="${essay.id}"
     style="${totemStyle(totem, accent)} --topic-color:${accent};${area}" title="${escapeHtml(essay.title)}">
-    ${totemPortraitMarkup(totem)}
+    ${totemPortraitMarkup(totem, essay)}
     ${actions}
     <div class="gc-content">
       <div class="gc-badges">${roleBadgesMarkup(essay, 'gc-badge')}${readinessBadgeMarkup(essay, 'gc-badge')}</div>
@@ -1151,7 +1240,7 @@ function shelfCardMarkup(essay) {
     : '<span class="shelf-link shelf-link--missing">no live url yet</span>';
   return `<article class="garden-card shelf-card" data-totem="${escapeHtml(essay.totem || '')}" data-essay-id="${essay.id}" data-open-id="${essay.id}"
     style="${totemStyle(totem)}" title="${escapeHtml(essay.title)}">
-    ${totemPortraitMarkup(totem)}
+    ${totemPortraitMarkup(totem, essay)}
     <div class="gc-content">
       <div class="gc-badges"><span class="gc-badge" data-readiness="ready">published${published ? ` · ${published}` : ''}</span></div>
       <h3 class="gc-title">${escapeHtml(essay.title)}</h3>
