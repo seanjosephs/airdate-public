@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Copy the airdate connector into your Obsidian vault.
+
+Reads the vault folder from airdate's config.json (set on first run), copies
+main.js and manifest.json into <vault>/.obsidian/plugins/airdate-connector/,
+and prints the steps left to do inside Obsidian. Re-run it to update the
+connector after pulling a new airdate.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+import airdate_config  # noqa: E402
+
+
+def main() -> int:
+    data_dir = Path(os.environ.get("AIR_DATE_DATA_DIR") or ROOT / ".airdate-data").expanduser().resolve()
+    config, exists, error = airdate_config.load_config(data_dir)
+    config = airdate_config.apply_env_overrides(config)
+    if error:
+        print(error)
+        return 1
+    if not exists and not config["vault"]["path"]:
+        print("Run airdate once first (./run-airdate.command) and choose your vault in settings.")
+        return 1
+    check = airdate_config.check_vault(config)
+    if not check["vault_ok"]:
+        print(f"Vault problem: {check['vault_message']}")
+        return 1
+    vault = Path(config["vault"]["path"]).expanduser()
+    target = vault / ".obsidian" / "plugins" / "airdate-connector"
+    target.mkdir(parents=True, exist_ok=True)
+    source = ROOT / "obsidian-airdate-connector"
+    for name in ("main.js", "manifest.json"):
+        shutil.copy2(source / name, target / name)
+    print(f"Copied the airdate connector into {target}")
+    print()
+    print("In Obsidian:")
+    print("  1. Settings > Community plugins: turn off Restricted mode if it is on.")
+    print("  2. Enable 'airdate connector' (reload plugins or restart Obsidian if it is not listed).")
+    print("  3. Command palette: 'Pair with airdate'. Enter this folder:")
+    print(f"       {ROOT}")
+    print("  4. Command palette: 'Connect Substack for airdate', then sign in to Substack.")
+    print("Then reload airdate's settings page; it should say connected through Obsidian.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

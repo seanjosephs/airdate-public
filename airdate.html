@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Air Date — essay catalog</title>
+    <link rel="stylesheet" href="/static/tokens.css?v=2">
+    <link rel="stylesheet" href="/static/air-date.css?v=13">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="nav-rail" aria-label="Primary navigation">
+        <div class="brand-block">
+          <div class="brand-mark">air <span class="accent">date</span></div>
+          <div class="brand-sub">essay catalog</div>
+        </div>
+
+        <aside class="month-rail" id="month-rail" aria-label="Air-date calendar">
+          <header class="month-rail-head">
+            <button type="button" id="month-prev" class="month-nav" aria-label="Previous month">‹</button>
+            <h3 id="month-rail-title">month</h3>
+            <button type="button" id="month-next" class="month-nav" aria-label="Next month">›</button>
+          </header>
+          <button type="button" id="month-today" class="month-today">today</button>
+          <div class="month-grid" id="month-grid"></div>
+          <p class="month-rail-note" id="month-rail-note">one slot per week · drag an essay to schedule it</p>
+        </aside>
+
+        <nav class="rail-tiles" aria-label="Workspace">
+          <a class="rail-tile active" href="/airdate" data-view="all-ideas">
+            <span class="tile-art" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"><rect x="5" y="6" width="9" height="9"/><rect x="18" y="6" width="9" height="9"/><rect x="5" y="17" width="9" height="9"/><rect x="18" y="17" width="9" height="9"/></svg>
+            </span>
+            <span class="tile-label">essays</span>
+          </a>
+          <a class="rail-tile" href="#" id="nav-shelf" data-view="shelf">
+            <span class="tile-art" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"><path d="M5 6h22"/><path d="M5 16h22"/><path d="M5 26h22"/><rect x="8" y="9" width="4" height="7"/><rect x="14" y="11" width="4" height="5"/><rect x="20" y="19" width="4" height="7"/></svg>
+            </span>
+            <span class="tile-label">the shelf</span>
+          </a>
+          <a class="rail-tile" href="#" id="nav-settings" data-view="settings">
+            <span class="tile-art" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"><circle cx="16" cy="16" r="3"/><path d="M16 4v3M16 25v3M4 16h3M25 16h3M8 8l2 2M22 22l2 2M8 24l2-2M22 10l2-2"/></svg>
+            </span>
+            <span class="tile-label">settings</span>
+          </a>
+        </nav>
+
+        <div class="rail-spacer"></div>
+        <div class="rail-foot" id="rail-links"></div>
+      </aside>
+
+      <main class="garden-workspace" data-view="all-ideas">
+        <p class="deep-link-notice" id="deep-link-notice" role="status" aria-live="polite"></p>
+        <section class="all-ideas-view" id="all-ideas-view" aria-label="All essays">
+          <header class="all-ideas-head">
+            <div>
+              <div class="section-kicker">catalog</div>
+              <h2>essays <span class="all-ideas-count" id="all-ideas-count"></span></h2>
+            </div>
+            <p class="all-ideas-sub">your full catalog. search across titles, summaries, tags, and frontmatter.</p>
+          </header>
+          <section class="all-ideas-controls" aria-label="Catalog controls">
+            <label class="search-box">
+              <span>search</span>
+              <input id="ai-search" type="search" placeholder="search across all frontmatter...">
+            </label>
+            <label class="select-box">
+              <span>topic</span>
+              <select id="ai-topic"><option value="all">all topics</option></select>
+            </label>
+            <label class="select-box">
+              <span>totem</span>
+              <select id="ai-totem"><option value="all">all totems</option></select>
+            </label>
+            <label class="select-box">
+              <span>state</span>
+              <select id="ai-status">
+                <option value="all">all states</option>
+                <option value="planted">on calendar</option>
+                <option value="needs-filing">needs filing</option>
+                <option value="writers-room">writers room</option>
+                <option value="writers-likey">writers likey</option>
+                <option value="ready-for-air">ready for air</option>
+                <option value="live">live</option>
+                <option value="publish-ready">ready to send</option>
+                <option value="needs-hero">needs hero</option>
+                <option value="metadata-gaps">metadata gaps</option>
+              </select>
+            </label>
+            <label class="select-box">
+              <span>sort</span>
+              <select id="ai-sort">
+                <option value="touched">last touched</option>
+                <option value="words">longest</option>
+                <option value="title">title</option>
+              </select>
+            </label>
+            <button class="tool-button" id="ai-clear" type="button">clear</button>
+          </section>
+          <section class="inbox-lane" id="inbox-lane" aria-label="Essays needing intake" hidden>
+            <header class="inbox-lane-head">
+              <h3>needs filing</h3>
+              <p>new essays without frontmatter or a category. confirm a home for each.</p>
+            </header>
+            <div class="inbox-lane-items" id="inbox-lane-items"></div>
+          </section>
+          <div class="all-ideas-body">
+            <section class="essay-cards all-ideas-cards" id="all-ideas-cards" aria-label="Essay catalog"></section>
+          </div>
+        </section>
+
+        <section class="shelf-view" id="shelf-view" aria-label="Published essays">
+          <header class="all-ideas-head">
+            <div>
+              <div class="section-kicker">published</div>
+              <h2>the shelf <span class="all-ideas-count" id="shelf-count"></span></h2>
+            </div>
+            <p class="all-ideas-sub">everything that made it out the door. click through to the live post, or pull one back to the writers room.</p>
+          </header>
+          <section class="essay-cards shelf-cards" id="shelf-cards" aria-label="Published essays"></section>
+        </section>
+
+        <section class="settings-view" id="settings-view" aria-label="Settings">
+          <header class="settings-head">
+            <div>
+              <div class="section-kicker">control</div>
+              <h2>settings</h2>
+            </div>
+            <p class="settings-status" id="settings-action-status" aria-live="polite"></p>
+          </header>
+
+          <div class="settings-grid">
+            <section class="wi-panel settings-panel settings-panel--wide setup-panel" id="setup-panel" aria-labelledby="setup-title">
+              <h3 class="panel-title" id="setup-title">your vault and publication</h3>
+              <p class="setup-intro" id="setup-intro">airdate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes.</p>
+              <form class="setup-form" id="setup-form" novalidate>
+                <div class="setup-fields">
+                  <label class="setup-field" id="setup-vault-path-field">
+                    <span>obsidian vault folder</span>
+                    <small>the full path to the folder that contains <code>.obsidian</code></small>
+                    <input name="vault_path" autocomplete="off" spellcheck="false" placeholder="/Users/you/Documents/My Vault">
+                  </label>
+                  <label class="setup-field">
+                    <span>essays folder</span>
+                    <small>inside the vault; every note under it is an essay</small>
+                    <input name="essays_folder" autocomplete="off" spellcheck="false" placeholder="Essays">
+                  </label>
+                  <label class="setup-field">
+                    <span>vault name</span>
+                    <small>as Obsidian shows it; used for "open in Obsidian" links</small>
+                    <input name="vault_name" autocomplete="off" spellcheck="false">
+                  </label>
+                  <label class="setup-field">
+                    <span>substack publication</span>
+                    <small>for example yourname.substack.com or your custom domain</small>
+                    <input name="publication" autocomplete="off" spellcheck="false" placeholder="yourname.substack.com">
+                  </label>
+                  <label class="setup-field">
+                    <span>publication name</span>
+                    <small>used in the thumbnail prompt</small>
+                    <input name="publication_name" autocomplete="off">
+                  </label>
+                  <label class="setup-field">
+                    <span>publish day</span>
+                    <small>one calendar slot per week on this day; none hides the calendar</small>
+                    <select name="publish_day">
+                      <option value="">none</option>
+                      <option value="monday">monday</option>
+                      <option value="tuesday">tuesday</option>
+                      <option value="wednesday">wednesday</option>
+                      <option value="thursday">thursday</option>
+                      <option value="friday">friday</option>
+                      <option value="saturday">saturday</option>
+                      <option value="sunday">sunday</option>
+                    </select>
+                  </label>
+                </div>
+                <fieldset class="setup-totems">
+                  <legend>totems</legend>
+                  <label class="setup-toggle"><input type="checkbox" name="totems_enabled"> <span>use totems to mark essays</span></label>
+                  <p class="setup-note">Five slots for telling your work apart. Rename them, pick a color, and swap the icon for any image in your vault.</p>
+                  <div class="setup-totem-list" id="setup-totem-list"></div>
+                </fieldset>
+                <p class="setup-messages" id="setup-messages" role="status" aria-live="polite"></p>
+                <div class="settings-actions">
+                  <button class="settings-button" id="setup-save" type="submit">save settings</button>
+                  <button class="settings-button hidden" id="setup-create-essays" type="button">create the essays folder</button>
+                </div>
+              </form>
+            </section>
+
+            <section class="wi-panel settings-panel settings-panel--wide">
+              <h3 class="panel-title">local app</h3>
+              <div class="settings-rows">
+                <div class="settings-row">
+                  <span>app url</span>
+                  <strong id="settings-app-url">checking...</strong>
+                </div>
+                <div class="settings-row">
+                  <span>port</span>
+                  <strong id="settings-port">checking...</strong>
+                </div>
+                <div class="settings-row">
+                  <span>auth</span>
+                  <strong id="settings-auth">checking...</strong>
+                </div>
+                <div class="settings-row">
+                  <span>local paths</span>
+                  <strong id="settings-paths-visible">checking...</strong>
+                </div>
+              </div>
+              <div class="settings-actions">
+                <button class="settings-button" id="settings-copy-url" type="button">copy url</button>
+                <button class="settings-button" id="settings-open-app" type="button">open app</button>
+              </div>
+            </section>
+
+            <section class="wi-panel settings-panel">
+              <h3 class="panel-title">library</h3>
+              <div class="settings-rows">
+                <div class="settings-row settings-row--path">
+                  <span>vault</span>
+                  <strong id="settings-obsidian-dir">checking...</strong>
+                </div>
+                <div class="settings-row settings-row--path">
+                  <span>runtime data</span>
+                  <strong id="settings-data-dir">checking...</strong>
+                </div>
+                <div class="settings-row settings-row--path">
+                  <span>drafts</span>
+                  <strong id="settings-drafts-dir">checking...</strong>
+                </div>
+                <div class="settings-row">
+                  <span>essay index</span>
+                  <strong id="settings-index">checking...</strong>
+                </div>
+              </div>
+              <div class="settings-actions">
+                <button class="settings-button" id="settings-refresh-essays" type="button">reload essay index</button>
+              </div>
+            </section>
+
+            <section class="wi-panel settings-panel">
+              <h3 class="panel-title">publishing</h3>
+              <div class="session-control">
+                <button class="settings-button" id="settings-refresh-substack" type="button">connect Substack</button>
+                <div>
+                  <span>Obsidian connection</span>
+                  <strong id="settings-substack-cookie">checking...</strong>
+                </div>
+              </div>
+              <div class="settings-rows">
+                <div class="settings-row">
+                  <span>substack session</span>
+                  <strong id="settings-substack-session">checking...</strong>
+                </div>
+                <div class="settings-row">
+                  <span>publication</span>
+                  <strong id="settings-publication">checking...</strong>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="editor-overlay hidden" id="editor-overlay" aria-hidden="true">
+      <div class="editor-shell" id="editor-shell" role="dialog" aria-modal="true" aria-labelledby="editor-title" tabindex="-1">
+        <div class="editor-header">
+          <h2 id="editor-title">essay editor</h2>
+          <button id="editor-close" type="button">close</button>
+        </div>
+        <div class="editor-context" id="editor-context"></div>
+        <div class="editor-grid">
+          <form id="essay-editor-form" class="editor-form">
+            <input type="hidden" name="source_role">
+            <input type="hidden" name="draft_of">
+            <section class="editor-section">
+              <h3>required</h3>
+              <div class="editor-grid-two">
+                <label>
+                  <span>publication</span>
+                  <small>defaults to the publication in settings.</small>
+                  <input name="publication" placeholder="yourpublication.substack.com">
+                </label>
+                <label>
+                  <span>title</span>
+                  <small>shown in editor, inbox, and post page.</small>
+                  <input name="title">
+                </label>
+              </div>
+              <label>
+                <span>subtitle</span>
+                <small>short deck below the title.</small>
+                <input name="subtitle">
+              </label>
+              <label>
+                <span>summary</span>
+                <small>card summary and excerpt copy.</small>
+                <textarea name="summary" rows="3"></textarea>
+              </label>
+              <label>
+                <span>source note</span>
+                <small>relationship or editorial notes saved in frontmatter.</small>
+                <textarea name="source_note" rows="4"></textarea>
+              </label>
+            </section>
+
+            <section class="editor-section editor-section--body">
+              <h3>markdown body</h3>
+              <label>
+                <span>essay text</span>
+                <small>saved directly back to the Obsidian Markdown file.</small>
+                <textarea name="body" class="editor-body-textarea" rows="24" spellcheck="true"></textarea>
+              </label>
+            </section>
+
+            <section class="editor-section">
+              <h3>post settings</h3>
+              <div class="editor-grid-two">
+                <label>
+                  <span>post type</span>
+                  <select name="post_type">
+                    <option value="text">text essay</option>
+                    <option value="podcast">podcast</option>
+                    <option value="video">video</option>
+                    <option value="thread">thread</option>
+                    <option value="note">note</option>
+                  </select>
+                </label>
+                <label>
+                  <span>hero image path</span>
+                  <small>drop an image or enter a path.</small>
+                  <span class="drop-field" data-target="hero_image">
+                    <input name="hero_image" placeholder="./images/hero.png">
+                    <span class="drop-hint">drop hero image</span>
+                  </span>
+                </label>
+                <label>
+                  <span>slug</span>
+                  <small>leave blank to derive from title.</small>
+                  <input name="slug">
+                </label>
+                <label>
+                  <span>tags</span>
+                  <small>comma-separated. use preset below to add.</small>
+                  <input name="tags" list="editor-tag-options" placeholder="essay, identity, philosophy">
+                  <datalist id="editor-tag-options"></datalist>
+                </label>
+                <label>
+                  <span>section</span>
+                  <input name="section">
+                </label>
+                <label>
+                  <span>status</span>
+                  <select name="status">
+                    <option value="">(unchanged)</option>
+                    <option value="Writers Room">writers room</option>
+                    <option value="Ready for Air">ready for air</option>
+                    <option value="Live">live</option>
+                    <option value="Published">published</option>
+                    <option value="Archived">archived</option>
+                  </select>
+                </label>
+                <label id="editor-totem-field">
+                  <span>totem</span>
+                  <select name="totem">
+                    <option value="">(unchanged)</option>
+                  </select>
+                </label>
+              </div>
+              <div class="tag-tools">
+                <label>
+                  <span>topic preset</span>
+                  <small>your tag presets from config.json.</small>
+                  <select id="editor-topic-preset"><option value="">choose a topic...</option></select>
+                </label>
+                <button type="button" id="editor-add-preset-tags">add preset tags</button>
+                <button type="button" id="editor-clear-tags">clear tags</button>
+              </div>
+              <div class="active-tags" id="editor-active-tags" aria-live="polite">
+                <p>no active tags yet.</p>
+              </div>
+              <fieldset class="inline-options">
+                <legend>audience and delivery</legend>
+                <label><input type="radio" name="audience" value="everyone" checked><span>everyone</span></label>
+                <label><input type="radio" name="audience" value="free"><span>free subscribers</span></label>
+                <label><input type="radio" name="audience" value="paid"><span>paid subscribers</span></label>
+                <label><input type="radio" name="audience" value="founding"><span>founding members</span></label>
+                <label><input type="checkbox" name="publish_on_web" checked><span>post on website</span></label>
+                <label><input type="checkbox" name="send_email" checked><span>send email/app inbox</span></label>
+                <label><input type="checkbox" name="free_preview"><span>add free preview</span></label>
+              </fieldset>
+            </section>
+
+            <section class="editor-section">
+              <h3>email, comments, and schedule</h3>
+              <div class="editor-grid-two">
+                <label>
+                  <span>email subject</span>
+                  <small>required. saved to the Substack draft.</small>
+                  <input name="email_subject">
+                </label>
+                <label>
+                  <span>email preview text</span>
+                  <small>preheader line in email clients.</small>
+                  <input name="email_preview_text">
+                </label>
+                <label>
+                  <span>test email recipients</span>
+                  <small>comma-separated addresses for pre-send checks.</small>
+                  <input name="test_email_recipients" placeholder="you@example.com, editor@example.com">
+                </label>
+                <label>
+                  <span>comment permissions</span>
+                  <select name="comment_permissions">
+                    <option value="everyone">everyone</option>
+                    <option value="subscribers">subscribers</option>
+                    <option value="paid">paid subscribers</option>
+                    <option value="none">no comments</option>
+                  </select>
+                </label>
+                <label>
+                  <span>scheduled publish time</span>
+                  <small>blank = unscheduled draft.</small>
+                  <input type="datetime-local" name="scheduled_at">
+                </label>
+                <label>
+                  <span>free unlock time</span>
+                  <small>for paid posts releasing later.</small>
+                  <input type="datetime-local" name="free_unlock_at">
+                </label>
+              </div>
+            </section>
+
+            <section class="editor-section">
+              <h3>seo and social</h3>
+              <div class="editor-grid-two">
+                <label>
+                  <span>canonical url</span>
+                  <small>use when first published elsewhere.</small>
+                  <input name="canonical_url">
+                </label>
+                <label>
+                  <span>published date</span>
+                  <small>stamped by the publish button.</small>
+                  <input name="published_date" placeholder="2026-07-21">
+                </label>
+                <label>
+                  <span>live post url</span>
+                  <small>the real Substack link, captured on publish.</small>
+                  <input name="substack_url" placeholder="https://.../p/your-post">
+                </label>
+                <label>
+                  <span>seo title</span>
+                  <input name="seo_title">
+                </label>
+                <label>
+                  <span>seo description</span>
+                  <textarea name="seo_description" rows="2"></textarea>
+                </label>
+                <label>
+                  <span>social title</span>
+                  <input name="social_title">
+                </label>
+                <label>
+                  <span>social description</span>
+                  <textarea name="social_description" rows="2"></textarea>
+                </label>
+                <label>
+                  <span>social image path</span>
+                  <small>drop or path. defaults to hero if blank.</small>
+                  <span class="drop-field" data-target="social_image">
+                    <input name="social_image" placeholder="./images/social-card.png">
+                    <span class="drop-hint">drop social image</span>
+                  </span>
+                </label>
+              </div>
+              <label>
+                <span>internal notes</span>
+                <small>saved as an html comment in the markdown.</small>
+                <textarea name="notes" rows="3"></textarea>
+              </label>
+              <label>
+                <span>thumbnail prompt / notes</span>
+                <textarea name="thumbnail_prompt" rows="3"></textarea>
+              </label>
+              <label>
+                <span>thumbnail alt text</span>
+                <small>used when the generated image is inserted into the Substack draft.</small>
+                <input name="thumbnail_alt">
+              </label>
+            </section>
+          </form>
+
+          <aside class="editor-side">
+            <div class="editor-connection">
+              <button id="editor-refresh-substack" type="button">connect Substack</button>
+              <div>
+                <span>Obsidian Substack connection</span>
+                <strong id="editor-substack-session">checking...</strong>
+              </div>
+            </div>
+            <div class="editor-actions">
+              <button id="editor-create-draft" type="button">create linked draft</button>
+              <button id="editor-attach-hero" type="button">attach hero</button>
+              <button id="editor-thumbnail-prompt" type="button">copy thumbnail prompt</button>
+              <button id="editor-preflight" type="button">check readiness</button>
+              <button id="editor-preview" type="button">preview markdown</button>
+              <button id="editor-save" type="button">save to obsidian</button>
+              <button id="editor-send" class="primary" type="button">send to substack</button>
+            </div>
+            <div class="editor-status" id="editor-status" aria-live="polite"></div>
+            <a class="editor-draft-link" id="editor-draft-link" target="_blank" rel="noopener" hidden>open Substack draft ↗</a>
+            <div class="editor-output">
+              <h3>preview / suggestions</h3>
+              <pre id="editor-output">no preview yet.</pre>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/airdate-deep-link.js?v=2"></script>
+    <script src="/static/airdate.js?v=39"></script>
+  </body>
+</html>

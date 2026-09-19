@@ -1,0 +1,14 @@
+# The Substack venv (.venv-substack). Only substack_draft.py runs in it, and
+# only when the paired Obsidian connector starts it for one send.
+#
+# python-substack is an unofficial, cookie-based client (MIT license). Pinned
+# exactly: when Substack changes something and a newer version breaks, this
+# known-good set is what you roll back to. Needs Python 3.10 or newer.
+python-substack==0.1.22
+PyYAML==6.0.3
+requests==2.34.2
+python-dotenv==1.2.2
+certifi==2026.5.20
+charset-normalizer==3.4.7
+idna==3.17
+urllib3==2.7.0

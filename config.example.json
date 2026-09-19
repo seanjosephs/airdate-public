@@ -1,0 +1,125 @@
+{
+  "config_version": 1,
+  "vault": {
+    "path": "/Users/you/Documents/My Vault",
+    "name": "My Vault",
+    "essays_folder": "Essays",
+    "hidden": {
+      "filename_prefixes": [
+        "!"
+      ],
+      "title_contains": [
+        "moc"
+      ],
+      "toplevel_title_contains": []
+    }
+  },
+  "substack": {
+    "publication": "https://yourname.substack.com",
+    "publication_name": "Your Publication"
+  },
+  "connector": {
+    "port": 17777
+  },
+  "calendar": {
+    "publish_day": "tuesday"
+  },
+  "thumbnail": {
+    "style_prompt": "Create a text-free Substack essay thumbnail for {publication_name}. Use a refined editorial illustration style, high-contrast enough for small previews, no lettering, no captions, no logos. Favor a single strong visual metaphor over a collage."
+  },
+  "totems": {
+    "enabled": true,
+    "default": null,
+    "items": [
+      {
+        "key": "circle",
+        "label": "Argument",
+        "color": "#8f79ff",
+        "role": "",
+        "image": "Essays/_assets/airdate/totems/argument.png",
+        "keywords": {
+          "debate": 3,
+          "critique": 2
+        }
+      },
+      {
+        "key": "triangle",
+        "label": "Triangle",
+        "color": "#d9653b",
+        "role": "",
+        "image": "",
+        "keywords": {}
+      },
+      {
+        "key": "square",
+        "label": "Square",
+        "color": "#3f9a6e",
+        "role": "",
+        "image": "",
+        "keywords": {}
+      },
+      {
+        "key": "diamond",
+        "label": "Diamond",
+        "color": "#3a7bd5",
+        "role": "",
+        "image": "",
+        "keywords": {}
+      },
+      {
+        "key": "star",
+        "label": "Star",
+        "color": "#d4a017",
+        "role": "",
+        "image": "",
+        "keywords": {}
+      }
+    ]
+  },
+  "categories": {
+    "mode": "folders",
+    "items": [
+      {
+        "name": "Craft",
+        "keywords": {
+          "writing": 3,
+          "editing": 2
+        }
+      },
+      {
+        "name": "Culture",
+        "keywords": {
+          "film": 3,
+          "music": 3,
+          "books": 2
+        }
+      }
+    ]
+  },
+  "tag_presets": [
+    {
+      "name": "Craft",
+      "color": "#3a7bd5",
+      "tags": [
+        "writing",
+        "process",
+        "editing"
+      ]
+    },
+    {
+      "name": "Culture",
+      "color": "#d9653b",
+      "tags": [
+        "film",
+        "music",
+        "books"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "label": "my dashboard",
+      "url": "http://127.0.0.1:9000/"
+    }
+  ]
+}

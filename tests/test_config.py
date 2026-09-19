@@ -1,0 +1,252 @@
+"""Settings: config.json loading, validation, env precedence, and how the
+server behaves when the writer's taxonomy is on, off or custom."""
+
+from __future__ import annotations
+
+import copy
+import json
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+import airdate_config  # noqa: E402
+
+ENV_KEYS = (
+    "OBSIDIAN_ESSAYS_DIR",
+    "AIRDATE_VAULT_DIR",
+    "AIRDATE_ESSAYS_FOLDER",
+    "OBSIDIAN_VAULT_NAME",
+    "SUBSTACK_PUB",
+    "AIRDATE_CONNECTOR_PORT",
+)
+
+
+class CleanEnv:
+    """Hide the settings env vars for the duration of a test."""
+
+    def __enter__(self):
+        self.saved = {key: os.environ.pop(key) for key in ENV_KEYS if key in os.environ}
+        return self
+
+    def __exit__(self, *exc):
+        for key in ENV_KEYS:
+            os.environ.pop(key, None)
+        os.environ.update(self.saved)
+
+
+def make_vault(root: Path, essays: str = "Essays") -> Path:
+    vault = root / "My Vault"
+    (vault / ".obsidian").mkdir(parents=True)
+    (vault / essays).mkdir(parents=True)
+    return vault
+
+
+class ConfigFileTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.data = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_defaults_are_neutral_and_valid(self):
+        config, exists, error = airdate_config.load_config(self.data)
+        self.assertFalse(exists)
+        self.assertEqual(error, "")
+        self.assertEqual(airdate_config.validate_config(config), [])
+        self.assertEqual(config["vault"]["path"], "")
+        self.assertEqual(config["substack"]["publication"], "")
+        self.assertIsNone(config["calendar"]["publish_day"])
+        self.assertEqual(config["tag_presets"], [])
+        self.assertEqual(config["links"], [])
+        self.assertTrue(config["totems"]["enabled"])
+        self.assertEqual(len(config["totems"]["items"]), 5)
+
+    def test_unreadable_file_is_reported_not_raised(self):
+        airdate_config.config_path(self.data).write_text("{nope", encoding="utf-8")
+        config, exists, error = airdate_config.load_config(self.data)
+        self.assertTrue(exists)
+        self.assertIn("could not be read", error)
+        self.assertEqual(config["vault"]["path"], "")
+
+    def test_partial_file_keeps_default_shape(self):
+        airdate_config.config_path(self.data).write_text(json.dumps({"calendar": {"publish_day": "friday"}}), encoding="utf-8")
+        config, _, _ = airdate_config.load_config(self.data)
+        self.assertEqual(config["calendar"]["publish_day"], "friday")
+        self.assertEqual(config["vault"]["essays_folder"], "Essays")
+
+    def test_save_is_private(self):
+        path = airdate_config.save_config(self.data, airdate_config.DEFAULT_CONFIG)
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_validation_names_each_problem(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        config["vault"]["essays_folder"] = "../outside"
+        config["calendar"]["publish_day"] = "Funday"
+        config["totems"]["items"][0]["color"] = "red"
+        config["totems"]["default"] = "nope"
+        config["categories"]["items"] = [{"name": "Published"}, {"name": "a/b"}]
+        config["tag_presets"] = [{"name": "Too many", "tags": ["a", "b", "c", "d", "e", "f"]}]
+        config["links"] = [{"label": "x", "url": "javascript:alert(1)"}]
+        errors = " ".join(airdate_config.validate_config(config))
+        for fragment in ("essays_folder", "publish_day", "color", "totems.default", "reserved", "plain folder name",
+                         "up to five", "links[0].url"):
+            self.assertIn(fragment, errors)
+
+    def test_env_overrides_file(self):
+        with CleanEnv():
+            os.environ["SUBSTACK_PUB"] = "https://env.substack.com"
+            os.environ["OBSIDIAN_ESSAYS_DIR"] = "/tmp/Vault/Writing/Essays"
+            os.environ["AIRDATE_VAULT_DIR"] = "/tmp/Vault"
+            config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+            config["substack"]["publication"] = "https://file.substack.com"
+            out = airdate_config.apply_env_overrides(config)
+        self.assertEqual(out["substack"]["publication"], "https://env.substack.com")
+        self.assertEqual(out["vault"]["essays_folder"], "Writing/Essays")
+
+    def test_form_keeps_totem_keys_fixed(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        out = airdate_config.settings_from_form(config, {
+            "totems": [{"key": "circle", "label": "Politics", "color": "#112233", "image": "/Essays/_assets/p.png"},
+                       {"key": "not-a-slot", "label": "ignored"}],
+            "totems_enabled": False,
+            "publication": "me.substack.com/",
+            "vault_path": "/tmp/Some Vault",
+        })
+        first = out["totems"]["items"][0]
+        self.assertEqual((first["key"], first["label"], first["color"], first["image"]),
+                         ("circle", "Politics", "#112233", "Essays/_assets/p.png"))
+        self.assertEqual([t["key"] for t in out["totems"]["items"]], ["circle", "triangle", "square", "diamond", "star"])
+        self.assertFalse(out["totems"]["enabled"])
+        self.assertEqual(out["substack"]["publication"], "https://me.substack.com")
+        self.assertEqual(out["vault"]["name"], "Some Vault")
+
+    def test_check_vault(self):
+        vault = make_vault(self.data)
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        config["vault"]["path"] = str(vault)
+        self.assertTrue(airdate_config.check_vault(config)["essays_ok"])
+        config["vault"]["path"] = str(self.data)
+        self.assertIn("not an Obsidian vault", airdate_config.check_vault(config)["vault_message"])
+
+
+class ServerSettingsTests(unittest.TestCase):
+    """Drive server.apply_config directly; restores the module afterwards."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        cls.vault = make_vault(cls.root, "Writing/Essays")
+        (cls.vault / "Writing" / "Essays" / "Politics").mkdir()
+        (cls.vault / "Writing" / "Essays" / "_assets").mkdir()
+        (cls.vault / "Writing" / "Essays" / "Published").mkdir()
+        cls.env = CleanEnv().__enter__()
+        os.environ["AIR_DATE_DATA_DIR"] = str(cls.root / "runtime")
+        import server  # noqa: PLC0415
+        cls.server = server
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.env.__exit__(None, None, None)
+        cls.server.load_and_apply_config()
+        cls.tmp.cleanup()
+
+    def configure(self, **changes):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        config["vault"]["path"] = str(self.vault)
+        config["vault"]["essays_folder"] = "Writing/Essays"
+        for dotted, value in changes.items():
+            target = config
+            *parents, leaf = dotted.split("__")
+            for part in parents:
+                target = target[part]
+            target[leaf] = value
+        self.server.apply_config(config, True)
+        return self.server
+
+    def test_configured_vault_is_ready(self):
+        server = self.configure()
+        self.assertFalse(server.SETUP_REQUIRED)
+        self.assertEqual(server.OBSIDIAN_VAULT_NAME, "My Vault")
+
+    def test_obsidian_link_uses_the_real_essays_folder(self):
+        server = self.configure()
+        url = server.obsidian_url_for("Politics/Note.md")
+        self.assertIn("vault=My%20Vault", url)
+        self.assertIn("file=Writing%2FEssays%2FPolitics%2FNote.md", url)
+
+    def test_hidden_rules_are_opt_in(self):
+        server = self.configure()
+        self.assertEqual(server.classify_essay("My essay on hubs.md", "My essay on hubs", {}), "active")
+        self.assertEqual(server.classify_essay("!Index.md", "Index", {}), "active")
+        server = self.configure(vault__hidden={"filename_prefixes": ["!"], "title_contains": ["moc"],
+                                               "toplevel_title_contains": ["essay"]})
+        self.assertEqual(server.classify_essay("!Index.md", "Index", {}), "hidden")
+        self.assertEqual(server.classify_essay("Topics MOC.md", "Topics MOC", {}), "hidden")
+        self.assertEqual(server.classify_essay("My essay.md", "My essay", {}), "hidden")
+        self.assertEqual(server.classify_essay("Politics/My essay.md", "My essay", {}), "active")
+        self.assertEqual(server.classify_essay("Politics/Note.md", "Note", {"type": "research"}), "hidden")
+
+    def test_totems_off_preserve_frontmatter(self):
+        server = self.configure(totems__enabled=False)
+        self.assertEqual(server.ensure_totem("circle"), "")
+        self.assertEqual(server.infer_totem("circle", "a.md", "t", [], ""), "")
+        self.assertNotIn("totem", server.sanitize_updates({"totem": "circle", "title": "x"}))
+        self.assertEqual(server.ui_config_payload()["totems"]["items"], [])
+
+    def test_placeholder_totems_are_explicit_only(self):
+        server = self.configure()
+        self.assertEqual(server.infer_totem("", "a.md", "Grief", ["love"], "body"), "")
+        self.assertEqual(server.infer_totem("Star", "a.md", "t", [], ""), "star")
+        self.assertEqual(server.sanitize_updates({"totem": "star"})["totem"], "star")
+        self.assertNotIn("totem", server.sanitize_updates({"totem": "fox"}))
+        icons = [t["image"] for t in server.ui_config_payload()["totems"]["items"]]
+        self.assertEqual(icons[0], "/static/totems/placeholder-1.svg")
+
+    def test_custom_totems_infer_from_keywords_and_default(self):
+        items = [
+            {"key": "fire", "label": "Fire", "color": "#cc0000", "image": "Writing/Essays/_assets/fire.png", "keywords": {"debate": 3}},
+            {"key": "water", "label": "Water", "color": "#0000cc", "image": "", "keywords": {"love": 3}},
+        ]
+        server = self.configure(totems__items=items, totems__default="water")
+        self.assertEqual(server.infer_totem("", "a.md", "A debate", [], ""), "fire")
+        self.assertEqual(server.infer_totem("", "a.md", "Nothing here", [], ""), "water")
+        self.assertEqual(server.ui_config_payload()["totems"]["items"][0]["image"], "/vault-asset/Writing/Essays/_assets/fire.png")
+
+    def test_categories_from_folders_and_config(self):
+        server = self.configure(categories__items=[{"name": "Craft", "keywords": {"writing": 3}}])
+        self.assertEqual(server.category_folders(), ["Craft", "Politics"])
+        self.assertEqual(server.suggest_category("a.md", "On writing", [], "")[0], "Craft")
+        server = self.configure(categories__mode="off")
+        self.assertEqual(server.category_folders(), [])
+
+    def test_thumbnail_prompt_uses_the_writers_publication(self):
+        server = self.configure(substack__publication_name="The Weekly Thing")
+        prompt = server.build_thumbnail_prompt({"title": "T", "summary": "S"}, {"title": "T", "totem": "circle"})
+        self.assertIn("thumbnail for The Weekly Thing.", prompt)
+        self.assertIn("Totem lens: Circle.", prompt)
+
+    def test_vault_asset_stays_inside_the_vault(self):
+        image = self.vault / "Writing" / "Essays" / "_assets" / "icon.png"
+        image.write_bytes(b"\x89PNG")
+        (self.vault / ".obsidian" / "secret.png").write_bytes(b"x")
+        server = self.configure()
+        self.assertEqual(server.resolve_vault_asset("Writing/Essays/_assets/icon.png"), image.resolve())
+        self.assertIsNone(server.resolve_vault_asset("../runtime/config.json"))
+        self.assertIsNone(server.resolve_vault_asset(".obsidian/secret.png"))
+        self.assertIsNone(server.resolve_vault_asset("Writing/Essays/Politics"))
+
+    def test_missing_vault_requires_setup(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        self.server.apply_config(config, False)
+        self.assertTrue(self.server.SETUP_REQUIRED)
+
+
+if __name__ == "__main__":
+    unittest.main()
