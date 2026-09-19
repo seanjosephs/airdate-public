@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>AirDate: essay catalog</title>
     <link rel="stylesheet" href="/static/tokens.css?v=2">
-    <link rel="stylesheet" href="/static/air-date.css?v=14">
+    <link rel="stylesheet" href="/static/air-date.css?v=15">
   </head>
   <body>
     <div class="app-shell">
@@ -194,6 +194,11 @@
                   <div class="setup-totem-list" id="setup-totem-list"></div>
                 </fieldset>
                 <fieldset class="setup-group">
+                  <legend>your tags</legend>
+                  <p class="setup-note">Tag presets: a name, a color and up to five tags. The editor adds a preset's tags in one click.</p>
+                  <div class="preset-editor" id="setup-presets"></div>
+                </fieldset>
+                <fieldset class="setup-group">
                   <legend>your calendar</legend>
                   <p class="setup-note">One calendar slot per week on your publish day.</p>
                   <div class="setup-fields">
@@ -372,6 +377,12 @@
           <div class="setup-totem-list" id="wizard-totem-list"></div>
         </section>
 
+        <section class="wizard-step" data-step="tags" data-label="tags">
+          <h2 class="wizard-title">your tags</h2>
+          <p>Optional. A tag preset is a name, a color and up to five tags you reach for often. The editor adds them in one click. Skip this and add them later in settings.</p>
+          <div class="preset-editor" id="wizard-presets"></div>
+        </section>
+
         <section class="wizard-step" data-step="calendar" data-label="calendar">
           <h2 class="wizard-title">your calendar</h2>
           <p>Pick the day you publish. The calendar gives you one slot per week on that day.</p>
@@ -523,7 +534,7 @@
               <div class="tag-tools">
                 <label>
                   <span>topic preset</span>
-                  <small>your tag presets from config.json.</small>
+                  <small>your tag presets from settings.</small>
                   <select id="editor-topic-preset"><option value="">choose a topic...</option></select>
                 </label>
                 <button type="button" id="editor-add-preset-tags">add preset tags</button>
@@ -673,7 +684,8 @@
     </div>
 
     <script src="/static/airdate-deep-link.js?v=2"></script>
-    <script src="/static/airdate-wizard.js?v=1"></script>
-    <script src="/static/airdate.js?v=40"></script>
+    <script src="/static/airdate-presets.js?v=1"></script>
+    <script src="/static/airdate-wizard.js?v=2"></script>
+    <script src="/static/airdate.js?v=41"></script>
   </body>
 </html>

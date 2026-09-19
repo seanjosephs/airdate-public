@@ -1738,7 +1738,9 @@ function populateEditorTagControls() {
   }
   if (editorTagDatalistEl) {
     editorTagDatalistEl.innerHTML = '';
-    for (const tag of EDITOR_ALL_TAGS) {
+    // Suggestions are the writer's own: preset tags plus tags already on their notes.
+    const noteTags = (state.essays || []).flatMap((essay) => essay.tags || []).map((t) => String(t).trim()).filter(Boolean);
+    for (const tag of [...new Set([...EDITOR_ALL_TAGS, ...noteTags])].sort()) {
       const opt = document.createElement('option');
       opt.value = tag;
       editorTagDatalistEl.append(opt);
@@ -1811,6 +1813,7 @@ function renderSetupPanel(status) {
     }
     form.elements.totems_enabled.checked = Boolean(status.config?.totems?.enabled);
     renderSetupTotemRows(status.config?.totems?.slots || []);
+    window.AirdatePresets?.mount(document.getElementById('setup-presets'), status.config?.tag_presets || []);
     document.getElementById('setup-totem-list')?.classList.toggle('is-off', !form.elements.totems_enabled.checked);
   }
   const intro = document.getElementById('setup-intro');
@@ -1852,6 +1855,7 @@ function setupFormPayload() {
     publish_day: form.elements.publish_day.value,
     category_mode: form.elements.category_mode.value,
     totems_enabled: form.elements.totems_enabled.checked,
+    tag_presets: window.AirdatePresets ? window.AirdatePresets.read(document.getElementById('setup-presets')) : undefined,
     totems: [...form.querySelectorAll('.setup-totem-row')].map((row) => ({
       key: row.dataset.totemKey,
       label: row.querySelector('[name="totem_label"]').value.trim(),
@@ -2094,6 +2098,7 @@ async function loadEssays() {
   state.essays = payload.essays || [];
   migrateHashIdsToUid();
   renderAll();
+  populateEditorTagControls();
 }
 
 function setDeepLinkNotice(message, kind = '') {

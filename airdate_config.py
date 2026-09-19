@@ -253,11 +253,17 @@ def validate_config(config: dict[str, Any]) -> list[str]:
     if not isinstance(presets, list):
         errors.append("tag_presets must be a list.")
         presets = []
+    seen_names: set[str] = set()
     for index, preset in enumerate(presets):
         where = f"tag_presets[{index}]"
         if not isinstance(preset, dict) or not isinstance(preset.get("name"), str) or not preset["name"].strip():
             errors.append(f"{where}.name is required.")
             continue
+        # Presets are picked by name, so a repeat would hide the first one.
+        folded = preset["name"].strip().lower()
+        if folded in seen_names:
+            errors.append(f"{where}.name \"{preset['name'].strip()}\" is used twice. Give each preset its own name.")
+        seen_names.add(folded)
         color = preset.get("color", "")
         if color and not (isinstance(color, str) and HEX_COLOR_RE.match(color)):
             errors.append(f"{where}.color must look like #a1b2c3.")
@@ -346,6 +352,20 @@ def settings_from_form(current: dict[str, Any], form: dict[str, Any]) -> dict[st
         out["calendar"]["publish_day"] = day or None
     if "totems_enabled" in form:
         out["totems"]["enabled"] = bool(form.get("totems_enabled"))
+    if isinstance(form.get("tag_presets"), list):
+        presets = []
+        for edit in form["tag_presets"]:
+            if not isinstance(edit, dict):
+                continue
+            raw_tags = edit.get("tags")
+            if isinstance(raw_tags, str):
+                raw_tags = raw_tags.split(",")
+            tags = [str(t).strip() for t in raw_tags or [] if str(t).strip()]
+            name = str(edit.get("name") or "").strip()
+            if not name and not tags:
+                continue
+            presets.append({"name": name, "color": str(edit.get("color") or "").strip(), "tags": tags})
+        out["tag_presets"] = presets
     if "category_mode" in form:
         # Validated with the rest of the file, so a bad value is reported, not dropped.
         out["categories"]["mode"] = str(form.get("category_mode") or "").strip().lower()
