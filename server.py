@@ -50,7 +50,7 @@ def env_flag_first(*names: str, default: bool = False) -> bool:
 
 DATA_DIR = Path(env_first("AIR_DATE_DATA_DIR", default=ROOT / ".airdate-data")).expanduser().resolve()
 # Drafts always live in the app folder: the paired Obsidian connector only
-# runs substack_draft.py on files under <airdate>/drafts/.
+# runs substack_draft.py on files under <AirDate>/drafts/.
 DRAFTS = ROOT / "drafts"
 SECRET_DIR = DATA_DIR / "secrets"
 STATE_DIR = DATA_DIR / "state"
@@ -73,8 +73,8 @@ CONTENT_TYPES = {
 VAULT_ASSET_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 UPLOADS = DRAFTS / "assets"
 CONTACT_LOG = STATE_DIR / "creative_contact.json"
-# Written by the connector's "Pair with airdate" command: {port, token}. The
-# token is the only capability airdate holds; the Substack session itself
+# Written by the connector's "Pair with AirDate" command: {port, token}. The
+# token is the only capability AirDate holds; the Substack session itself
 # stays in Obsidian's secret storage.
 CONNECTOR_PAIRING_FILE = SECRET_DIR / "connector.json"
 
@@ -268,7 +268,7 @@ load_and_apply_config()
 
 
 def connector_pairing() -> dict[str, Any]:
-    """The pairing the connector wrote into airdate's secrets folder:
+    """The pairing the connector wrote into AirDate's secrets folder:
     {port, token}. Never the Substack session itself."""
     try:
         payload = json.loads(CONNECTOR_PAIRING_FILE.read_text(encoding="utf-8"))
@@ -320,7 +320,7 @@ def connector_request(path: str, payload: dict[str, Any] | None = None, timeout:
             "connected": False,
             "paired": False,
             "error_kind": "transport",
-            "error": "The Obsidian connector is not paired. In Obsidian, run \"Pair with airdate\".",
+            "error": "The Obsidian connector is not paired. In Obsidian, run \"Pair with AirDate\".",
         }
     request = urllib.request.Request(
         f"{connector_url()}{path}",
@@ -354,7 +354,7 @@ def connector_status() -> dict[str, Any]:
 
 # A complete Substack draft is a property of the canonical Obsidian note, not
 # of a temporarily filled browser form. These keys must therefore exist on disk
-# before airdate allows a send. `section` is intentionally absent: publications
+# before AirDate allows a send. `section` is intentionally absent: publications
 # without sections have no meaningful value to persist there.
 PERSISTED_DRAFT_FIELDS = (
     "title",
@@ -882,7 +882,7 @@ def preflight_publish_payload(publish_payload: dict[str, Any]) -> dict[str, Any]
         "Obsidian connector",
         bool(connector.get("ok")),
         "",
-        "Install the airdate connector in Obsidian and run \"Pair with airdate\".",
+        "Install the AirDate connector in Obsidian and run \"Pair with AirDate\".",
     )
     add_check("substack_session", "Substack session", bool(connector.get("connected")), "", "Connect Substack through Obsidian before sending.")
 
@@ -1222,7 +1222,7 @@ def publish_draft(payload: dict[str, Any]) -> dict[str, Any]:
             "ok": False,
             "saved": saved_public_path,
             "error_kind": "auth" if connector.get("ok") else "transport",
-            "message": "Saved locally. Connect Substack through the Obsidian airdate connector to create a draft.",
+            "message": "Saved locally. Connect Substack through the Obsidian AirDate connector to create a draft.",
         }
     # 125s: the connector's own kill deadline is 120s, so its verdict arrives
     # before this socket gives up.
@@ -1538,7 +1538,7 @@ def normalize_status(value: Any) -> str:
     # pool you drag onto the calendar. Ready for Air = scheduled + on the
     # calendar (set by the Ready for Air button/drag); Live = draft sent to
     # Substack; Published = the writer pressed publish there. Archived sits outside the
-    # flow. "airdate" is the tool's name, never a status: the old working status
+    # flow. "AirDate" is the tool's name, never a status: the old working status
     # "Air Date" aliases to "Ready for Air".
     if not value:
         return "Writers Room"
@@ -1678,7 +1678,8 @@ def days_since(dt: datetime) -> int:
 
 
 def obsidian_url_for(relative_from_essays: str) -> str:
-    vault_file = f"{ESSAYS_FOLDER}/{relative_from_essays}".replace("\\", "/")
+    prefix = "" if ESSAYS_FOLDER == "." else f"{ESSAYS_FOLDER}/"
+    vault_file = f"{prefix}{relative_from_essays}".replace("\\", "/")
     return (
         "obsidian://open?vault="
         + urllib_parse_quote(OBSIDIAN_VAULT_NAME)
@@ -1736,6 +1737,10 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
         return essays, id_map
 
     for path in sorted(OBSIDIAN_ESSAYS_DIR.rglob("*.md")):
+        # Dot folders (.obsidian, .trash, .git) are never essays, which matters
+        # most when the essays folder is the vault root.
+        if any(part.startswith(".") for part in path.relative_to(OBSIDIAN_ESSAYS_DIR).parts[:-1]):
+            continue
         try:
             relative = path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix()
             legacy_path_id = essay_id_for(relative)
@@ -1765,7 +1770,7 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
                         uid = ""
                     note = f"duplicate {UID_KEY}; newer copy falls back to its path id"
                     failures.append({"file": public_path(loser_path), "error": note})
-                    sys.stderr.write(f"[airdate] {note}: {public_path(loser_path)}\n")
+                    sys.stderr.write(f"[AirDate] {note}: {public_path(loser_path)}\n")
             essay_id = uid or legacy_path_id
             tags = frontmatter.get("tags", [])
             if isinstance(tags, str):
@@ -1888,7 +1893,7 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
             # but record + log it so the failure is visible, not silent (the old
             # bare `continue` is exactly how a parser bug once hid files).
             failures.append({"file": public_path(path), "error": str(exc)})
-            sys.stderr.write(f"[airdate] skipped unparseable essay {public_path(path)}: {exc}\n")
+            sys.stderr.write(f"[AirDate] skipped unparseable essay {public_path(path)}: {exc}\n")
             continue
 
     _LAST_SCAN_FAILURES = failures
@@ -2062,13 +2067,13 @@ def substack_status_payload() -> dict[str, Any]:
                 "key": "connector_paired",
                 "label": "Obsidian connector paired",
                 "ok": paired,
-                "message": "" if paired else "Install the airdate connector in Obsidian and run \"Pair with airdate\".",
+                "message": "" if paired else "Install the AirDate connector in Obsidian and run \"Pair with AirDate\".",
             },
             {
                 "key": "substack_command",
                 "label": "Obsidian connector running",
                 "ok": available,
-                "message": "" if available else "Open Obsidian with the airdate connector enabled.",
+                "message": "" if available else "Open Obsidian with the AirDate connector enabled.",
             },
             {
                 "key": "substack_session",
@@ -2168,7 +2173,7 @@ def app_status_payload() -> dict[str, Any]:
     counts = collection_counts(essays)
     return {
         "ok": True,
-        "app_name": "airdate",
+        "app_name": "AirDate",
         "host": HOST,
         "port": PORT,
         "base_url": local_app_url(),
@@ -2269,7 +2274,7 @@ def conflict_payload(essay_id: str, path: Path, text: str | None = None) -> dict
     return {
         "ok": False,
         "reason": "file_changed",
-        "message": "This essay changed in Obsidian after airdate loaded it. Reload before saving.",
+        "message": "This essay changed in Obsidian after AirDate loaded it. Reload before saving.",
         "essay_id": essay_id,
         "path": public_path(path),
         "current_frontmatter": frontmatter,
@@ -2653,7 +2658,7 @@ def publish_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 def category_folders() -> list[str]:
     """Categories are the essays folder's top-level folders plus any named in
-    config, minus airdate's reserved folders and `_` folders. Empty when
+    config, minus AirDate's reserved folders and `_` folders. Empty when
     categories are off."""
     if CATEGORY_MODE != "folders":
         return []
@@ -2726,7 +2731,7 @@ def intake_apply(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not category or "/" in category or "\\" in category or category.startswith((".", "_")):
             raise ValueError("category must be a plain folder name")
         if category.lower() in airdate_config.RESERVED_FOLDERS:
-            raise ValueError(f"{category} is a folder airdate manages; pick a category folder.")
+            raise ValueError(f"{category} is a folder AirDate manages; pick a category folder.")
     path = resolve_essay_path(essay_id)
     text = path.read_text(encoding="utf-8", errors="ignore")
     frontmatter, _ = split_frontmatter(text)
@@ -2883,7 +2888,7 @@ def send_essay_to_substack(
     expected_mtime: Any = None,
     expected_content_hash: Any = None,
 ) -> dict[str, Any]:
-    """Persist airdate changes, then send only the canonical saved note."""
+    """Persist AirDate changes, then send only the canonical saved note."""
     saved_state: dict[str, Any] | None = None
     if updates or body is not None:
         saved_state = save_essay_updates(essay_id, updates, body, expected_mtime, expected_content_hash)
@@ -2898,7 +2903,7 @@ def send_essay_to_substack(
         return {key: saved_state.get(key) for key in ("old_id", "new_id", "mtime", "mtime_iso", "content_hash")}
 
     # A send must never be licensed by values that exist only in the browser
-    # request. The save above is the atomic airdate -> Obsidian handoff; reload
+    # request. The save above is the atomic AirDate -> Obsidian handoff; reload
     # that canonical note for both readiness and transport.
     preflight = preflight_essay_for_substack(essay_id)
     if not preflight["ready"]:
@@ -3022,7 +3027,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.is_authenticated():
             return True
         self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="airdate"')
+        self.send_header("WWW-Authenticate", 'Basic realm="AirDate"')
         self.send_header("content-type", "text/plain; charset=utf-8")
         self.send_security_headers(no_store=True)
         self.end_headers()
@@ -3122,7 +3127,7 @@ class Handler(BaseHTTPRequestHandler):
         except BrokenPipeError:
             pass  # client hung up mid-response; nothing to send
         except Exception as exc:  # noqa: BLE001
-            sys.stderr.write(f"[airdate] GET {path} failed: {exc}\n")
+            sys.stderr.write(f"[AirDate] GET {path} failed: {exc}\n")
             self.send_json({"error": "Internal server error"}, status=500)
 
     def do_POST(self) -> None:
@@ -3362,7 +3367,7 @@ if __name__ == "__main__":
     sanity_check_paths()
     cached_count = None if SETUP_REQUIRED else warm_essay_index()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"airdate running at http://{HOST}:{PORT}/airdate")
+    print(f"AirDate running at http://{HOST}:{PORT}/airdate")
     if SETUP_REQUIRED:
         print("First run: open the link above to choose your Obsidian vault and essays folder.")
     else:

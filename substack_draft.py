@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """substack_draft.py: last-mile CLI that turns a saved draft .md into a Substack DRAFT.
 
-airdate saves the essay to drafts/<slug>.md and asks the paired Obsidian
+AirDate saves the essay to drafts/<slug>.md and asks the paired Obsidian
 connector to send it. The connector runs this script with its pinned Python,
 on that one file, and hands it the Substack session in SUBSTACK_COOKIES for
-the length of this one process. airdate itself never holds the session.
+the length of this one process. AirDate itself never holds the session.
 
 DRAFT ONLY, by design. This script creates a Substack draft and STOPS. It never
 calls prepublish, publish or schedule, so nothing is ever emailed to
@@ -19,7 +19,7 @@ Output: a JSON object on stdout: {ok, draft_id, edit_url, title, message} on
 success, {ok: false, error_kind, message} on failure. Exit 0 on success,
 non-zero on failure.
 
-error_kind is the typed failure class airdate reads instead of matching the
+error_kind is the typed failure class AirDate reads instead of matching the
 message text. This CLI knows two of them: `auth` when there is no session or
 Substack refuses the one it was given, `transport` for everything else.
 """
@@ -171,7 +171,7 @@ def main() -> None:
 
     cookies_string = resolve_cookie()
     if not cookies_string:
-        fail("No Substack session. Connect Substack through the airdate connector in Obsidian.",
+        fail("No Substack session. Connect Substack through the AirDate connector in Obsidian.",
              error_kind="auth")
 
     text = path.read_text(encoding="utf-8", errors="ignore")
@@ -204,7 +204,7 @@ def main() -> None:
             audience=normalize_audience(str(front.get("audience") or "everyone")),
             write_comment_permissions=normalize_comments(str(front.get("comment_permissions") or "everyone")),
         )
-        # These values are part of airdate's draft-ready frontmatter contract.
+        # These values are part of AirDate's draft-ready frontmatter contract.
         # python-substack serializes Post attributes verbatim in get_draft().
         post.email_subject = str(front.get("email_subject") or title).strip()
         post.email_preview_text = str(front.get("email_preview_text") or front.get("summary") or "").strip()
@@ -326,7 +326,7 @@ def main() -> None:
         hint = ""
         error_kind = "transport"
         if any(k in msg.lower() for k in ("401", "403", "unauthor", "forbidden", "login", "cookie")):
-            hint = " (Substack refused the session; it may have expired. Run \"Connect Substack for airdate\" in Obsidian and send again.)"
+            hint = " (Substack refused the session; it may have expired. Run \"Connect Substack for AirDate\" in Obsidian and send again.)"
             error_kind = "auth"
         fail(f"Substack draft creation failed: {msg}{hint}", error_kind=error_kind)
 

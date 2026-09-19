@@ -32,6 +32,7 @@ const out = {
   draftSymlink: c.resolveDraftFile(root, path.join(root, "drafts", "link.md")).ok,
   draftNotMd: c.resolveDraftFile(root, path.join(root, "drafts", "note.txt")).ok,
   unpaired: c.resolveDraftFile("", draft).ok,
+  ports: [c.parsePort("17778"), c.parsePort(" 17777 "), c.parsePort("80"), c.parsePort("abc"), c.parsePort("70000")],
 };
 const file = c.writePairingFile(path.join(root, ".airdate-data"), 17777, "t0ken");
 out.pairingMode = (fs.statSync(file).mode & 0o777).toString(8);
@@ -68,6 +69,7 @@ class ConnectorPairingTests(unittest.TestCase):
                         "draftTraversal", "draftSymlink", "draftNotMd", "unpaired"):
             self.assertFalse(out[refused], refused)
         self.assertTrue(out["draftOk"])
+        self.assertEqual(out["ports"], [17778, 17777, 0, 0, 0])
         self.assertEqual(out["pairingMode"], "600")
         self.assertEqual(out["pairing"], {"port": 17777, "token": "t0ken"})
 

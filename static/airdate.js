@@ -1454,7 +1454,7 @@ function showEditorConflict(error) {
   const compact = {
     ok: false,
     reason: payload.reason || 'file_changed',
-    message: payload.message || 'This essay changed in Obsidian after airdate loaded it.',
+    message: payload.message || 'This essay changed in Obsidian after AirDate loaded it.',
     path: payload.path,
     current_mtime_iso: payload.current_mtime_iso,
     current_content_hash: payload.current_content_hash,
@@ -1816,15 +1816,15 @@ function renderSetupPanel(status) {
   const intro = document.getElementById('setup-intro');
   if (intro) {
     intro.textContent = setup.required
-      ? 'Welcome. airdate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes. Point it at your vault to begin.'
-      : 'airdate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes.';
+      ? 'Welcome. AirDate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes. Point it at your vault to begin.'
+      : 'AirDate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes.';
   }
   const problems = [
     setup.load_error,
     ...(setup.errors || []),
     setup.vault_message,
     setup.essays_message,
-    setup.paths_editable ? '' : 'The vault folder is set in config.json on the machine running airdate.',
+    setup.paths_editable ? '' : 'The vault folder is set in config.json on the machine running AirDate.',
   ].filter(Boolean);
   document.getElementById('setup-create-essays')?.classList.toggle('hidden', !(setup.vault_ok && !setup.essays_ok));
   if (problems.length) setSetupMessage(problems.join('\n'), setup.required ? 'bad' : '');
@@ -2368,7 +2368,7 @@ function bindEvents() {
 
       // The server persists changed fields before it evaluates readiness. A
       // client-side preflight here would inspect the previous file state and
-      // reject a complete editor form before airdate has had a chance to save
+      // reject a complete editor form before AirDate has had a chance to save
       // it to its canonical Obsidian note.
       setEditorStatus('saving to Obsidian and checking readiness...', 'pending');
       let result = await postJson(`/api/essays/${state.selectedId}/send`, {
