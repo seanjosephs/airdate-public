@@ -1,9 +1,9 @@
 {
   "id": "airdate-connector",
-  "name": "AirDate connector",
+  "name": "airdate connector",
   "version": "0.2.0",
   "minAppVersion": "1.11.4",
-  "description": "Local Substack sign-in and draft bridge for AirDate. Creates drafts only; never publishes.",
-  "author": "AirDate",
+  "description": "Local Substack sign-in and draft bridge for airdate. Creates drafts only; never publishes.",
+  "author": "airdate",
   "isDesktopOnly": true
 }

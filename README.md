@@ -1,4 +1,4 @@
-# AirDate
+# airdate
 
 A local essay manager for writers who keep their essays in **Obsidian** and
 publish on **Substack**.
@@ -15,9 +15,9 @@ publish on **Substack**.
   schedules, or emails subscribers.** You press publish in Substack yourself.
 
 Both Obsidian and Substack are required. Your Substack sign-in lives in a small
-Obsidian plugin (the AirDate connector), never in AirDate.
+Obsidian plugin (the airdate connector), never in airdate.
 
-AirDate is for technical writers: setup takes a terminal, Python 3.10+, and a
+airdate is for technical writers: setup takes a terminal, Python 3.10+, and a
 few minutes. The Substack client it uses is unofficial and cookie-based.
 **Read [SETUP.md](SETUP.md) before installing**; it explains exactly what that
 means.
@@ -31,7 +31,7 @@ scripts/setup
 ./run-airdate.command
 ```
 
-Then follow [SETUP.md](SETUP.md) to point AirDate at your vault and connect
+Then follow [SETUP.md](SETUP.md) to point airdate at your vault and connect
 Substack through Obsidian.
 
 ## What is in here
@@ -49,5 +49,5 @@ Substack through Obsidian.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). The Substack client AirDate installs,
+MIT. See [LICENSE](LICENSE). The Substack client airdate installs,
 [python-substack](https://pypi.org/project/python-substack/), is also MIT.

@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AirDate: essay catalog</title>
+    <title>airdate: essay catalog</title>
     <link rel="stylesheet" href="/static/tokens.css?v=2">
-    <link rel="stylesheet" href="/static/air-date.css?v=18">
+    <link rel="stylesheet" href="/static/air-date.css?v=19">
   </head>
   <body>
     <div class="app-shell">
       <aside class="nav-rail" aria-label="Primary navigation">
         <div class="brand-block">
-          <div class="brand-mark">Air<span class="accent">Date</span></div>
+          <div class="brand-mark">air<span class="accent">date</span></div>
           <div class="brand-sub">essay catalog</div>
         </div>
 
@@ -132,7 +132,7 @@
           <div class="settings-grid">
             <section class="wi-panel settings-panel settings-panel--wide setup-panel" id="setup-panel" aria-labelledby="setup-title">
               <h3 class="panel-title" id="setup-title">your setup</h3>
-              <p class="setup-intro" id="setup-intro">AirDate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes.</p>
+              <p class="setup-intro" id="setup-intro">airdate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes.</p>
               <form class="setup-form" id="setup-form" novalidate>
                 <fieldset class="setup-group">
                   <legend>your vault</legend>
@@ -277,7 +277,7 @@
 
             <section class="wi-panel settings-panel">
               <h3 class="panel-title">connect Substack</h3>
-              <p class="setup-note">The Obsidian connector holds your Substack session. AirDate only ever creates drafts.</p>
+              <p class="setup-note">The Obsidian connector holds your Substack session. airdate only ever creates drafts.</p>
               <div class="session-control">
                 <button class="settings-button" id="settings-refresh-substack" type="button">connect Substack</button>
                 <div>
@@ -304,30 +304,30 @@
     <div class="wizard hidden" id="wizard" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
       <form class="wizard-shell" id="wizard-form" novalidate>
         <header class="wizard-head">
-          <div class="brand-mark">Air<span class="accent">Date</span></div>
+          <div class="brand-mark">air<span class="accent">date</span></div>
           <ol class="wizard-steps" id="wizard-steps" aria-label="Setup steps"></ol>
         </header>
 
         <section class="wizard-step" data-step="welcome" data-label="welcome">
-          <h2 class="wizard-title">welcome to AirDate</h2>
-          <p>AirDate is a catalog for the essays in your Obsidian vault.</p>
+          <h2 class="wizard-title">welcome to airdate</h2>
+          <p>airdate is a catalog for the essays in your Obsidian vault.</p>
           <p>It walks each one from first draft to ready, and gives it a day on your calendar.</p>
           <p>It creates Substack drafts. It never publishes, schedules or emails.</p>
           <details class="wizard-disclosure">
-            <summary>how AirDate talks to Substack</summary>
-            <p>Substack has no official API for drafts, so AirDate uses an unofficial client. Your Substack session stays inside Obsidian, in the AirDate connector; AirDate never sees your password. <a href="https://github.com/seanjosephs/airdate-public/blob/main/SETUP.md" target="_blank" rel="noopener">SETUP.md</a> has the details.</p>
+            <summary>how airdate talks to Substack</summary>
+            <p>Substack has no official API for drafts, so airdate uses an unofficial client. Your Substack session stays inside Obsidian, in the airdate connector; airdate never sees your password. <a href="https://github.com/seanjosephs/airdate-public/blob/main/SETUP.md" target="_blank" rel="noopener">SETUP.md</a> has the details.</p>
           </details>
         </section>
 
         <section class="wizard-step" data-step="vault" data-label="vault">
           <h2 class="wizard-title">your vault</h2>
-          <p>AirDate reads essays from a folder in your Obsidian vault.</p>
+          <p>airdate reads essays from a folder in your Obsidian vault.</p>
           <label class="setup-field" id="wizard-vault-path-field">
             <span>obsidian vault folder</span>
             <small>the full path to the folder that contains <code>.obsidian</code></small>
             <input name="vault_path" autocomplete="off" spellcheck="false" placeholder="/Users/you/Documents/My Vault">
           </label>
-          <p class="setup-note hidden" id="wizard-vault-path-note">The vault folder is set in config.json on the machine running AirDate.</p>
+          <p class="setup-note hidden" id="wizard-vault-path-note">The vault folder is set in config.json on the machine running airdate.</p>
           <label class="setup-field">
             <span>essays folder</span>
             <small>inside the vault; every note under it is an essay</small>
@@ -363,7 +363,7 @@
           <h2 class="wizard-title">how you organize</h2>
           <p>Do you keep essays in topic folders?</p>
           <label class="wizard-choice"><input type="radio" name="category_mode" value="folders" checked>
-            <span><strong>yes, in folders</strong><small>Each folder inside your essays folder is a category. An essay sitting outside any folder shows up as needing filing, and AirDate can move it for you.</small></span></label>
+            <span><strong>yes, in folders</strong><small>Each folder inside your essays folder is a category. An essay sitting outside any folder shows up as needing filing, and airdate can move it for you.</small></span></label>
           <label class="wizard-choice"><input type="radio" name="category_mode" value="off">
             <span><strong>no folders</strong><small>Categories are off. Nothing asks to be filed.</small></span></label>
         </section>
@@ -681,11 +681,11 @@
       </div>
     </div>
 
-    <script src="/static/airdate-deep-link.js?v=2"></script>
+    <script src="/static/airdate-deep-link.js?v=3"></script>
     <script src="/static/airdate-filters.js?v=1"></script>
     <script src="/static/airdate-tour.js?v=2"></script>
     <script src="/static/airdate-presets.js?v=1"></script>
-    <script src="/static/airdate-wizard.js?v=2"></script>
-    <script src="/static/airdate.js?v=47"></script>
+    <script src="/static/airdate-wizard.js?v=3"></script>
+    <script src="/static/airdate.js?v=48"></script>
   </body>
 </html>

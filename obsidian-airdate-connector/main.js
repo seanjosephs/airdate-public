@@ -1,14 +1,14 @@
 /*
- * AirDate connector. A deliberately small, desktop-only Obsidian companion.
+ * airdate connector. A deliberately small, desktop-only Obsidian companion.
  * It owns the authenticated Substack session and exposes only authenticated
  * loopback status/connect/draft endpoints. It never returns session material.
  *
  * Trust model:
  * - The Substack session lives in Obsidian's secret storage on this device.
  * - The bridge token also lives in secret storage, never in data.json, so it
- *   does not travel with a synced or committed vault. "Pair with AirDate"
- *   writes the token into AirDate's own secrets folder, the only other copy.
- * - Pairing pins the AirDate folder and the Python that runs its
+ *   does not travel with a synced or committed vault. "Pair with airdate"
+ *   writes the token into airdate's own secrets folder, the only other copy.
+ * - Pairing pins the airdate folder and the Python that runs its
  *   substack_draft.py. /draft ignores any path a caller sends except the one
  *   draft file, which must sit inside the pinned folder's drafts/ directory.
  */
@@ -26,7 +26,7 @@ const SESSION_SECRET = "airdate-substack-session";
 const TOKEN_SECRET = "airdate-bridge-token";
 const DRAFT_TIMEOUT_MS = 120000;
 
-// What AirDate learns from the draft subprocess. execFile's timeout kills the
+// What airdate learns from the draft subprocess. execFile's timeout kills the
 // child with SIGTERM and reports no exit code; that used to come back as
 // returncode 0 with empty stdout, which read as success with no draft id.
 // A kill is a `timeout` here because this is the layer that sees it; the
@@ -60,15 +60,15 @@ function classifyDraftResult(error, stdout, stderr) {
 // Check a pairing before pinning it. Returns {ok, message, airdateRoot, python}.
 function validatePairing(airdateRoot, python) {
   const root = String(airdateRoot || "").trim();
-  if (!root || !path.isAbsolute(root)) return { ok: false, message: "Enter the full path to your AirDate folder." };
+  if (!root || !path.isAbsolute(root)) return { ok: false, message: "Enter the full path to your airdate folder." };
   let realRoot;
-  try { realRoot = fs.realpathSync(root); } catch { return { ok: false, message: "That AirDate folder does not exist." }; }
+  try { realRoot = fs.realpathSync(root); } catch { return { ok: false, message: "That airdate folder does not exist." }; }
   if (!fs.existsSync(path.join(realRoot, "substack_draft.py")) || !fs.existsSync(path.join(realRoot, "server.py"))) {
-    return { ok: false, message: "That folder does not look like AirDate (no server.py and substack_draft.py)." };
+    return { ok: false, message: "That folder does not look like airdate (no server.py and substack_draft.py)." };
   }
   const py = String(python || "").trim() || path.join(realRoot, ".venv-substack", "bin", "python");
   if (!path.isAbsolute(py) || !fs.existsSync(py)) {
-    return { ok: false, message: `Python not found at ${py}. Run AirDate's scripts/setup first.` };
+    return { ok: false, message: `Python not found at ${py}. Run airdate's scripts/setup first.` };
   }
   return { ok: true, message: "", airdateRoot: realRoot, python: py };
 }
@@ -76,12 +76,12 @@ function validatePairing(airdateRoot, python) {
 // The one draft file a /draft call may name: a .md file inside the pinned
 // folder's drafts/ directory, after resolving symlinks.
 function resolveDraftFile(airdateRoot, file) {
-  if (!airdateRoot) return { ok: false, message: "Pair with AirDate first (command: Pair with AirDate)." };
+  if (!airdateRoot) return { ok: false, message: "Pair with airdate first (command: Pair with airdate)." };
   let realFile;
   try { realFile = fs.realpathSync(String(file || "")); } catch { return { ok: false, message: "Draft file not found." }; }
   const draftsDir = path.join(airdateRoot, "drafts") + path.sep;
   if (!realFile.startsWith(draftsDir) || path.extname(realFile) !== ".md") {
-    return { ok: false, message: "Draft path is outside AirDate's drafts folder." };
+    return { ok: false, message: "Draft path is outside airdate's drafts folder." };
   }
   return { ok: true, file: realFile };
 }
@@ -130,13 +130,13 @@ class PairModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: "Pair with AirDate" });
+    contentEl.createEl("h3", { text: "Pair with airdate" });
     contentEl.createEl("p", { text: "The connector will only ever run substack_draft.py from this folder, with this Python. It creates drafts and never publishes." });
-    new Setting(contentEl).setName("AirDate folder").setDesc("Full path to the folder with server.py")
+    new Setting(contentEl).setName("airdate folder").setDesc("Full path to the folder with server.py")
       .addText((text) => text.setValue(this.values.airdateRoot).onChange((v) => { this.values.airdateRoot = v; }));
-    new Setting(contentEl).setName("Python").setDesc("Leave blank for <AirDate folder>/.venv-substack/bin/python")
+    new Setting(contentEl).setName("Python").setDesc("Leave blank for <airdate folder>/.venv-substack/bin/python")
       .addText((text) => text.setValue(this.values.python).onChange((v) => { this.values.python = v; }));
-    new Setting(contentEl).setName("AirDate data folder").setDesc("Leave blank for <AirDate folder>/.airdate-data")
+    new Setting(contentEl).setName("airdate data folder").setDesc("Leave blank for <airdate folder>/.airdate-data")
       .addText((text) => text.setValue(this.values.dataDir).onChange((v) => { this.values.dataDir = v; }));
     new Setting(contentEl).setName("Port").setDesc(`Change only if ${DEFAULT_PORT} is taken, for example by the connector in another vault`)
       .addText((text) => text.setValue(this.values.port).onChange((v) => { this.values.port = v; }));
@@ -160,9 +160,9 @@ class AirdateConnector extends Plugin {
       delete this.settings.bridgeToken;
       await this.saveData(this.settings);
     }
-    this.addCommand({ id: "pair-airdate", name: "Pair with AirDate", callback: () => new PairModal(this.app, this).open() });
-    this.addCommand({ id: "connect-substack", name: "Connect Substack for AirDate", callback: () => this.openLogin() });
-    this.addCommand({ id: "disconnect-substack", name: "Disconnect Substack for AirDate", callback: () => this.disconnect() });
+    this.addCommand({ id: "pair-airdate", name: "Pair with airdate", callback: () => new PairModal(this.app, this).open() });
+    this.addCommand({ id: "connect-substack", name: "Connect Substack for airdate", callback: () => this.openLogin() });
+    this.addCommand({ id: "disconnect-substack", name: "Disconnect Substack for airdate", callback: () => this.disconnect() });
     this.listen();
   }
 
@@ -170,8 +170,8 @@ class AirdateConnector extends Plugin {
     if (this.server) this.server.close();
     const port = this.settings.port;
     this.server = http.createServer((req, res) => { void this.handle(req, res); });
-    this.server.on("error", (error) => new Notice(`AirDate connector could not start on port ${port}: ${error.message}. Run "Pair with AirDate" and choose another port.`));
-    this.server.listen(port, "127.0.0.1", () => new Notice(`AirDate connector ready on localhost:${port}`));
+    this.server.on("error", (error) => new Notice(`airdate connector could not start on port ${port}: ${error.message}. Run "Pair with airdate" and choose another port.`));
+    this.server.listen(port, "127.0.0.1", () => new Notice(`airdate connector ready on localhost:${port}`));
   }
 
   onunload() { if (this.server) this.server.close(); }
@@ -205,7 +205,7 @@ class AirdateConnector extends Plugin {
     Object.assign(this.settings, { airdateRoot: checked.airdateRoot, python: checked.python, dataDir, port });
     await this.saveData(this.settings);
     if (portChanged) this.listen();
-    return { ok: true, message: "Paired with AirDate. Reload AirDate's settings to see the connection." };
+    return { ok: true, message: "Paired with airdate. Reload airdate's settings to see the connection." };
   }
 
   async handle(req, res) {
@@ -230,7 +230,7 @@ class AirdateConnector extends Plugin {
       const electron = window.require("electron");
       const remote = electron.remote || electron;
       const authSession = remote.session.fromPartition("persist:airdate-substack-auth");
-      const authWindow = new remote.BrowserWindow({ width: 520, height: 760, title: "Connect Substack to AirDate", webPreferences: { nodeIntegration: false, contextIsolation: true, session: authSession } });
+      const authWindow = new remote.BrowserWindow({ width: 520, height: 760, title: "Connect Substack to airdate", webPreferences: { nodeIntegration: false, contextIsolation: true, session: authSession } });
       authWindow.setMenuBarVisibility(false);
       let captured = false;
       const capture = async () => {
@@ -243,7 +243,7 @@ class AirdateConnector extends Plugin {
         this.app.secretStorage.setSecret(SESSION_SECRET, parts.join("; "));
         this.settings.connectedAt = new Date().toISOString();
         await this.saveData(this.settings);
-        new Notice("Substack connected to AirDate.");
+        new Notice("Substack connected to airdate.");
         authWindow.close();
         return true;
       };
@@ -264,7 +264,7 @@ class AirdateConnector extends Plugin {
     this.app.secretStorage.setSecret(SESSION_SECRET, "");
     this.settings.connectedAt = "";
     await this.saveData(this.settings);
-    new Notice("Substack disconnected from AirDate.");
+    new Notice("Substack disconnected from airdate.");
   }
 
   async sendDraft(payload) {
@@ -272,7 +272,7 @@ class AirdateConnector extends Plugin {
     if (!draft.ok) throw new Error(draft.message);
     const session = this.app.secretStorage.getSecret(SESSION_SECRET);
     if (!session) {
-      const missing = new Error("Connect Substack in Obsidian before sending from AirDate.");
+      const missing = new Error("Connect Substack in Obsidian before sending from airdate.");
       missing.error_kind = "auth";
       throw missing;
     }

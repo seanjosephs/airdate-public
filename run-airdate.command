@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Start AirDate from this folder and open it in your browser. Double-click in
+# Start airdate from this folder and open it in your browser. Double-click in
 # Finder, or run ./run-airdate.command. Stop it with Control-C.
 #
 # The Obsidian connector owns the Substack sign-in; this launcher never reads
@@ -26,19 +26,19 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-# If something already holds the port: reuse AirDate, but never stop another program.
+# If something already holds the port: reuse airdate, but never stop another program.
 if lsof -ti tcp:"$PORT" >/dev/null 2>&1; then
   if curl -fsS --max-time 2 "http://127.0.0.1:$PORT/healthz" 2>/dev/null | grep -q '"auth_required"'; then
-    echo "AirDate is already running at $URL"
+    echo "airdate is already running at $URL"
     open "$URL" 2>/dev/null || true
     exit 0
   fi
   echo "Port $PORT is in use by another program:"
   lsof -nP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true
-  echo "Stop it, or start AirDate on another port: AIR_DATE_PORT=8788 ./run-airdate.command"
+  echo "Stop it, or start airdate on another port: AIR_DATE_PORT=8788 ./run-airdate.command"
   exit 1
 fi
 
-echo "Starting AirDate at $URL"
+echo "Starting airdate at $URL"
 ( sleep 1.5; open "$URL" 2>/dev/null || true ) &
 exec python3 server.py

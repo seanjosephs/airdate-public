@@ -68,7 +68,7 @@
       const list = el('wizard-checks');
       list.innerHTML = '<li>checking...</li>';
       const names = {
-        connector_paired: 'install the AirDate connector and run "Pair with AirDate"',
+        connector_paired: 'install the airdate connector and run "Pair with airdate"',
         substack_command: 'keep Obsidian open with the connector enabled',
         substack_session: 'run "Connect Substack" in Obsidian',
       };
@@ -84,8 +84,8 @@
         const allDone = (substack.setup_checks || []).filter((item) => names[item.key]).every((item) => item.ok);
         if (steps[index].dataset.step === 'connect') el('wizard-next').textContent = allDone ? 'next' : "I'll do this later";
         el('wizard-connector-folder').innerHTML = check.connector_folder
-          ? `From the AirDate folder, <code>python3 scripts/install-connector</code> copies the connector to:<br><code>${escapeHtml(check.connector_folder)}</code>`
-          : 'From the AirDate folder on the machine running it, <code>python3 scripts/install-connector</code> copies the connector into your vault.';
+          ? `From the airdate folder, <code>python3 scripts/install-connector</code> copies the connector to:<br><code>${escapeHtml(check.connector_folder)}</code>`
+          : 'From the airdate folder on the machine running it, <code>python3 scripts/install-connector</code> copies the connector into your vault.';
       } catch (err) {
         list.innerHTML = '';
         setMessage(`could not check the connection: ${err.message}`, 'bad');

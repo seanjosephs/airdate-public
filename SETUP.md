@@ -1,13 +1,13 @@
-# Setting up AirDate
+# Setting up airdate
 
-AirDate is a local essay manager for writers who keep their essays in Obsidian
+airdate is a local essay manager for writers who keep their essays in Obsidian
 and publish on Substack. It reads a folder of Markdown notes in your vault,
 tracks each essay from first draft to published, and sends a finished essay to
 Substack as a **draft**.
 
 ## The promise: drafts only
 
-AirDate creates Substack drafts and stops. It cannot publish, schedule, or
+airdate creates Substack drafts and stops. It cannot publish, schedule, or
 email your subscribers. There is no setting that changes this. You open the
 draft in Substack, look it over, and press publish yourself.
 
@@ -19,9 +19,9 @@ a way to publish, schedule, or send email. Run it yourself:
 python3 -m unittest tests.test_draft_only
 ```
 
-## The honest part: how AirDate talks to Substack
+## The honest part: how airdate talks to Substack
 
-- **The Substack client is unofficial.** AirDate uses
+- **The Substack client is unofficial.** airdate uses
   [python-substack](https://pypi.org/project/python-substack/) (MIT license),
   a community library that drives the same private endpoints Substack's web
   editor uses. It is not made or supported by Substack.
@@ -39,19 +39,19 @@ python3 -m unittest tests.test_draft_only
 
 ## Where your Substack session lives
 
-- The session cookie is captured by the **AirDate connector**, a small Obsidian
+- The session cookie is captured by the **airdate connector**, a small Obsidian
   plugin, when you sign in to Substack in a window it opens. It is stored in
   Obsidian's secret storage on this computer.
-- AirDate itself never sees or stores it. It is not in AirDate's files, not in
+- airdate itself never sees or stores it. It is not in airdate's files, not in
   your vault's files, and not in git.
 - When you press send, the connector starts `substack_draft.py` with the
   session in that one process's environment, for the length of that one send.
-- AirDate and the connector trust each other through a **bridge token** created
+- airdate and the connector trust each other through a **bridge token** created
   when you pair them. It lives in Obsidian's secret storage and in
   `.airdate-data/secrets/connector.json` (readable only by you). It is never
   written into the vault, so syncing or committing your vault does not carry it.
-- The connector only runs `substack_draft.py` from the AirDate folder you
-  paired, with the Python you paired, on files inside AirDate's `drafts/`
+- The connector only runs `substack_draft.py` from the airdate folder you
+  paired, with the Python you paired, on files inside airdate's `drafts/`
   folder. Nothing a caller sends can change that.
 
 ## Requirements
@@ -59,7 +59,7 @@ python3 -m unittest tests.test_draft_only
 - macOS. (Linux may work but is untested; Windows is not supported.)
 - Obsidian desktop 1.11.4 or newer, with a vault.
 - Python 3.10 or newer for the Substack client. macOS's built-in `python3` is
-  3.9, which runs the AirDate server but not the client; install a newer one,
+  3.9, which runs the airdate server but not the client; install a newer one,
   for example `brew install python@3.12`.
 - A Substack account you can sign in to.
 
@@ -73,26 +73,26 @@ scripts/setup
 ```
 
 `scripts/setup` creates `.venv-substack` from the pinned requirements and a
-private `.airdate-data` folder. It changes nothing outside the AirDate folder
+private `.airdate-data` folder. It changes nothing outside the airdate folder
 and is safe to run again.
 
-`run-airdate.command` starts AirDate on port 8787 and opens
+`run-airdate.command` starts airdate on port 8787 and opens
 `http://127.0.0.1:8787/airdate`. Double-clicking it in Finder works too. Stop
 it with Control-C. To use another port: `AIR_DATE_PORT=8788 ./run-airdate.command`.
 
 ## First run
 
-The first time AirDate opens, a setup wizard walks you through it one step at
+The first time airdate opens, a setup wizard walks you through it one step at
 a time, with back and next. Nothing is saved until you press finish, with one
 exception noted in step 2.
 
-1. **Welcome**: what AirDate does, and the promise that it only ever creates
+1. **Welcome**: what airdate does, and the promise that it only ever creates
    drafts.
 2. **Your vault**: the full path to the folder that contains `.obsidian`; the
    essays folder inside it (default `Essays`), or tick "my essays are at the
    vault root"; and the vault name, filled in from the folder name and used
    for "open in Obsidian" links. If the essays folder does not exist yet,
-   AirDate offers to create it. That empty folder is the only thing first run
+   airdate offers to create it. That empty folder is the only thing first run
    ever writes to your vault, and the only thing written before finish.
 3. **Your publication**: for example `yourname.substack.com` or your custom
    domain, and a display name for thumbnail prompts. You can leave it for
@@ -121,7 +121,7 @@ Skip it whenever you like, and replay it from the top of settings.
 
 Everything from the wizard stays editable in settings, under the same
 headings. If `config.json` already exists but needs fixing (a moved vault,
-say), AirDate opens settings with the problem named instead of the wizard.
+say), airdate opens settings with the problem named instead of the wizard.
 
 ## Connect Substack through Obsidian
 
@@ -137,31 +137,31 @@ The connector is not in Obsidian's community plugin directory, so Obsidian
 treats it like any plugin you install by hand. Then, in Obsidian:
 
 1. Settings, Community plugins: turn off Restricted mode if it is on, then
-   enable **AirDate connector**.
-2. Command palette: **Pair with AirDate**. Enter the full path to your AirDate
+   enable **airdate connector**.
+2. Command palette: **Pair with airdate**. Enter the full path to your airdate
    folder. Leave Python and the data folder blank unless you moved them. Leave
    the port at 17777 unless something else uses it, such as the connector in
    another vault; if it does, pick another number here.
-3. Command palette: **Connect Substack for AirDate**, and sign in to Substack
+3. Command palette: **Connect Substack for airdate**, and sign in to Substack
    in the window that opens (Google sign-in works).
 
-Reload AirDate's settings page. It should say it is connected through
+Reload airdate's settings page. It should say it is connected through
 Obsidian. Obsidian has to be open for sending to work.
 
 To sign out, or to switch to a different Substack account, run **Disconnect
-Substack for AirDate**, then **Connect Substack for AirDate** again.
+Substack for airdate**, then **Connect Substack for airdate** again.
 
-After updating AirDate, run `python3 scripts/install-connector` again and
+After updating airdate, run `python3 scripts/install-connector` again and
 reload the plugin.
 
-## What AirDate expects in your vault
+## What airdate expects in your vault
 
 - **Every `.md` file under the essays folder is an essay**, except notes
   whose frontmatter `type` (or a tag) is `index`, `moc`, `meta`, or
   `research`. You can hide more by filename prefix or title word in
   `config.json` (`vault.hidden`).
-- **Two folders belong to AirDate**, directly inside the essays folder:
-  `Published/` and `Archive/`. AirDate moves an essay there when you mark it
+- **Two folders belong to airdate**, directly inside the essays folder:
+  `Published/` and `Archive/`. airdate moves an essay there when you mark it
   published or archived, and moves it back out if you change your mind. A
   file in one of those folders is published or archived, whatever its
   frontmatter says.
@@ -172,10 +172,10 @@ reload the plugin.
   folder in the vault counts as a category, so turning categories off is
   usually the better fit.
 - **Totems.** Every card has a totem slot. Click it to pick one of your five
-  or none; the choice is saved to the note's `totem` key. A value AirDate does
+  or none; the choice is saved to the note's `totem` key. A value airdate does
   not recognize shows as "?" and is left alone until you pick.
 - **Images you attach** are written to `<essays folder>/_assets/substack/`.
-- **Frontmatter.** AirDate reads and writes these keys and keeps every other
+- **Frontmatter.** airdate reads and writes these keys and keeps every other
   key you have exactly as it was: `title`, `subtitle`, `summary`, `status`,
   `totem`, `category`, `published_date`, `substack_url`, `substack_draft_id`,
   `substack_draft_url`, `source_role`, `draft_of`, `publication`, `slug`,
@@ -187,11 +187,11 @@ reload the plugin.
   `hero_image`, `source_note`, `thumbnail_prompt`, `thumbnail_alt`, `notes`,
   `airdate_uid`. A note with no frontmatter is fine; it gets some the first
   time you file or save it.
-- **`airdate_uid`** is a 32-character id AirDate stamps on a note the first
+- **`airdate_uid`** is a 32-character id airdate stamps on a note the first
   time it writes to it. It keeps the essay's identity when you move or rename
   the file. Do not edit it or copy it into another note. If two notes ever
   share one, the older file keeps it and the other gets a new one.
-- **What AirDate never does:** delete a note, or touch anything outside the
+- **What airdate never does:** delete a note, or touch anything outside the
   essays folder (besides reading totem images you point it at).
 
 ## The lifecycle
@@ -209,7 +209,7 @@ image.
 
 ## Thumbnails
 
-AirDate has no AI inside it. "Copy thumbnail prompt" puts a styled prompt on
+airdate has no AI inside it. "Copy thumbnail prompt" puts a styled prompt on
 your clipboard and opens ChatGPT; you generate the image there and drag it onto
 the hero field. Change the prompt's style line in `config.json`
 (`thumbnail.style_prompt`; `{publication_name}` is filled in for you).
@@ -223,18 +223,18 @@ the hero field. Change the prompt's style line in `config.json`
   that match nothing.
 - `categories.items`: category folders with keywords for filing suggestions.
 - `links`: extra links in the sidebar.
-- `connector.port`: the port AirDate expects before pairing. After
-  pairing, AirDate uses the port you chose in **Pair with AirDate**.
+- `connector.port`: the port airdate expects before pairing. After
+  pairing, airdate uses the port you chose in **Pair with airdate**.
 
-Restart AirDate after editing the file by hand.
+Restart airdate after editing the file by hand.
 
 ## Running on another machine or port
 
-AirDate binds to `127.0.0.1` and needs no password there. To reach it from
+airdate binds to `127.0.0.1` and needs no password there. To reach it from
 elsewhere, set `HOST`, `AIR_DATE_AUTH_USER`, and `AIR_DATE_AUTH_PASSWORD`
 (for example in `.env.local`, which the launcher reads). To require the
 password on this computer too, set `AIR_DATE_AUTH_REQUIRED=true`. Whenever a
-password is required, local folder paths are hidden from the browser. AirDate refuses to
+password is required, local folder paths are hidden from the browser. airdate refuses to
 bind beyond loopback without a password, and in that mode the vault folder can
 only be set in `config.json`, not from the browser. Put HTTPS in front of it
 before using it over a network.
@@ -242,15 +242,15 @@ before using it over a network.
 ## Troubleshooting
 
 - **"Obsidian connector is not paired"**: run `scripts/install-connector`,
-  enable the plugin, then run **Pair with AirDate** in Obsidian.
-- **"Open Obsidian with the AirDate connector enabled"**: Obsidian is closed,
+  enable the plugin, then run **Pair with airdate** in Obsidian.
+- **"Open Obsidian with the airdate connector enabled"**: Obsidian is closed,
   or the plugin is off.
 - **Send fails with an auth error**: the Substack session expired. Run
-  **Connect Substack for AirDate** again.
-- **Wrong Substack account**: run **Disconnect Substack for AirDate**, then
-  **Connect Substack for AirDate** and sign in with the right one.
+  **Connect Substack for airdate** again.
+- **Wrong Substack account**: run **Disconnect Substack for airdate**, then
+  **Connect Substack for airdate** and sign in with the right one.
 - **"python-substack not importable"**: run `scripts/setup`.
-- **Port in use**: another program has 8787. Start AirDate with
+- **Port in use**: another program has 8787. Start airdate with
   `AIR_DATE_PORT=8788 ./run-airdate.command`.
 - **A send timed out**: check Substack for the draft before sending again; it
   may have been created.
@@ -264,5 +264,5 @@ python3 scripts/frontmatter-roundtrip-test.py
 python3 scripts/obsidian-fidelity-test.py
 ```
 
-None of them touch the network or your vault. The smoke test starts AirDate
+None of them touch the network or your vault. The smoke test starts airdate
 against a throwaway vault and a fake connector.

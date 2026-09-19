@@ -1552,7 +1552,7 @@ function showEditorConflict(error) {
   const compact = {
     ok: false,
     reason: payload.reason || 'file_changed',
-    message: payload.message || 'This essay changed in Obsidian after AirDate loaded it.',
+    message: payload.message || 'This essay changed in Obsidian after airdate loaded it.',
     path: payload.path,
     current_mtime_iso: payload.current_mtime_iso,
     current_content_hash: payload.current_content_hash,
@@ -1917,15 +1917,15 @@ function renderSetupPanel(status) {
   const intro = document.getElementById('setup-intro');
   if (intro) {
     intro.textContent = setup.required
-      ? 'Welcome. AirDate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes. Point it at your vault to begin.'
-      : 'AirDate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes.';
+      ? 'Welcome. airdate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes. Point it at your vault to begin.'
+      : 'airdate reads essays from a folder in your Obsidian vault and sends them to Substack as drafts. It never publishes.';
   }
   const problems = [
     setup.load_error,
     ...(setup.errors || []),
     setup.vault_message,
     setup.essays_message,
-    setup.paths_editable ? '' : 'The vault folder is set in config.json on the machine running AirDate.',
+    setup.paths_editable ? '' : 'The vault folder is set in config.json on the machine running airdate.',
   ].filter(Boolean);
   document.getElementById('setup-create-essays')?.classList.toggle('hidden', !(setup.vault_ok && !setup.essays_ok));
   if (problems.length) setSetupMessage(problems.join('\n'), setup.required ? 'bad' : '');
@@ -2418,7 +2418,7 @@ function bindEvents() {
   // the transport, so a failed send may still have rewritten the note. Adopt
   // the file state that save produced, or the next send (and the auth retry)
   // posts the pre-save mtime and 409s as "Obsidian changed this file" when
-  // Air Date itself changed it (AD-014). Success with a Live flip adopts the
+  // airdate itself changed it (AD-014). Success with a Live flip adopts the
   // later Live-save state instead, in reportSendResult.
   function adoptFailedSendSaveState(result) {
     const saved = result?.saved_state;
@@ -2487,7 +2487,7 @@ function bindEvents() {
 
       // The server persists changed fields before it evaluates readiness. A
       // client-side preflight here would inspect the previous file state and
-      // reject a complete editor form before AirDate has had a chance to save
+      // reject a complete editor form before airdate has had a chance to save
       // it to its canonical Obsidian note.
       setEditorStatus('saving to Obsidian and checking readiness...', 'pending');
       let result = await postJson(`/api/essays/${state.selectedId}/send`, {
@@ -2501,7 +2501,7 @@ function bindEvents() {
       // created the draft, and a blind retry is the duplicate-draft path.
       if (!result.ok && result.error_kind === 'auth') {
         // The refused send already saved the form; the retry must carry that
-        // file state or it 409s against Air Date's own write.
+        // file state or it 409s against airdate's own write.
         adoptFailedSendSaveState(result);
         const reconnected = await connectSubstack('Your Substack session looks expired.');
         if (!reconnected) {
