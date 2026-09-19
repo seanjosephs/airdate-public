@@ -1,4 +1,4 @@
-"""airdate settings: one JSON file in the data dir, neutral defaults, env overrides.
+"""AirDate settings: one JSON file in the data dir, neutral defaults, env overrides.
 
 Precedence for every value: environment variable, then config.json, then the
 neutral default below. Nothing here assumes who the writer is; a writer's own
@@ -22,7 +22,7 @@ WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", 
 CATEGORY_MODES = ("folders", "off")
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
-# Folder names airdate owns directly under the essays folder. A category can
+# Folder names AirDate owns directly under the essays folder. A category can
 # never be one of these.
 RESERVED_FOLDERS = ("published", "archive")
 
@@ -180,7 +180,7 @@ def validate_config(config: dict[str, Any]) -> list[str]:
     essays_folder = str(vault.get("essays_folder") or "").strip()
     if not essays_folder:
         errors.append("vault.essays_folder is required.")
-    elif essays_folder.startswith("/") or ".." in Path(essays_folder).parts:
+    elif essays_folder != "." and (essays_folder.startswith("/") or ".." in Path(essays_folder).parts):
         errors.append("vault.essays_folder must be a folder inside the vault, written relative to it.")
     hidden = vault.get("hidden", {})
     for key in ("filename_prefixes", "title_contains", "toplevel_title_contains"):
@@ -245,7 +245,7 @@ def validate_config(config: dict[str, Any]) -> list[str]:
         if not isinstance(name, str) or not name.strip() or "/" in name or "\\" in name or name.startswith((".", "_")):
             errors.append(f"{where}.name must be a plain folder name.")
         elif name.strip().lower() in RESERVED_FOLDERS:
-            errors.append(f"{where}.name '{name}' is reserved by airdate.")
+            errors.append(f"{where}.name '{name}' is reserved by AirDate.")
         if isinstance(item, dict):
             _check_keywords(item.get("keywords"), where, errors)
 
@@ -329,7 +329,9 @@ def settings_from_form(current: dict[str, Any], form: dict[str, Any]) -> dict[st
     if "vault_path" in form:
         vault["path"] = str(form.get("vault_path") or "").strip()
     if "essays_folder" in form:
-        vault["essays_folder"] = str(form.get("essays_folder") or "").strip().strip("/")
+        folder = str(form.get("essays_folder") or "").strip().strip("/")
+        # "." (or "/") means the essays are at the vault root.
+        vault["essays_folder"] = "." if folder in ("", ".") and str(form.get("essays_folder") or "").strip() in (".", "/") else folder
     if "vault_name" in form:
         vault["name"] = str(form.get("vault_name") or "").strip()
     # The name follows the folder unless the writer set a different one.

@@ -11,7 +11,7 @@
     if (!essayId) {
       return {
         kind: 'blank',
-        notice: 'The airdate link did not include a durable essay ID. The catalog is open so you can choose an essay.',
+        notice: 'The AirDate link did not include a durable essay ID. The catalog is open so you can choose an essay.',
       };
     }
 

@@ -215,7 +215,7 @@ def start_fake_connector(port: int, expected_token: str):
                 auth_stdout = json.dumps({
                     "ok": False,
                     "error_kind": "auth",
-                    "message": "Substack draft creation failed: 401 Unauthorized (Auth likely failed — your session cookie may be expired. Grab a fresh one and update the env.)",
+                    "message": "Substack draft creation failed: 401 Unauthorized (Substack refused the session; it may have expired. Run \"Connect Substack for airdate\" in Obsidian and send again.)",
                 })
                 self.reply(200, {
                     "ok": False,
@@ -396,7 +396,7 @@ def main() -> int:
 
         status, headers, body = request(base, "/airdate")
         assert_true(status == 200 and "text/html" in content_type(headers), "/airdate did not serve HTML")
-        assert_true(b"air date" in body.lower(), "/airdate HTML missing Air Date brand")
+        assert_true(b"<title>airdate" in body.lower(), "/airdate HTML missing the airdate title")
         assert_true(b'data-view="settings"' in body and b'id="settings-view"' in body, "/airdate HTML missing settings view")
         assert_true(b'data-view="all-ideas"' in body and b'id="all-ideas-view"' in body, "/airdate HTML missing essay catalog view")
         assert_true(b'id="month-grid"' in body and b'id="month-rail"' in body, "/airdate HTML missing the essays-page month rail")
@@ -408,7 +408,7 @@ def main() -> int:
         status, headers, body = request(base, "/", follow_redirects=False)
         assert_true(status == 302 and header_value(headers, "Location") == "/airdate", "/ did not redirect to /airdate")
         status, headers, body = request(base, "/")
-        assert_true(status == 200 and b"air date" in body.lower(), "/ redirect did not land on the catalog")
+        assert_true(status == 200 and b"<title>airdate" in body.lower(), "/ redirect did not land on the catalog")
         checks.append("/ redirects to /airdate")
 
         for retired in ("/calendar", "/hub", "/airdate-styleboard", "/assets/anything.webp"):

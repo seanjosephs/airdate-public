@@ -242,6 +242,24 @@ class ServerSettingsTests(unittest.TestCase):
         self.assertIsNone(server.resolve_vault_asset(".obsidian/secret.png"))
         self.assertIsNone(server.resolve_vault_asset("Writing/Essays/Politics"))
 
+    def test_vault_root_as_essays_folder(self):
+        root_vault = self.root / "Root Vault"
+        (root_vault / ".obsidian").mkdir(parents=True)
+        (root_vault / ".trash").mkdir()
+        (root_vault / "Take Back the Pen.md").write_text("---\ntitle: T\n---\nx\n", encoding="utf-8")
+        (root_vault / ".trash" / "Deleted.md").write_text("gone\n", encoding="utf-8")
+        (root_vault / ".obsidian" / "Stray.md").write_text("config\n", encoding="utf-8")
+        form = airdate_config.settings_from_form(copy.deepcopy(airdate_config.DEFAULT_CONFIG),
+                                                 {"vault_path": str(root_vault), "essays_folder": "."})
+        self.assertEqual(form["vault"]["essays_folder"], ".")
+        self.assertEqual(airdate_config.validate_config(form), [])
+        self.server.apply_config(form, True)
+        self.assertFalse(self.server.SETUP_REQUIRED)
+        essays, _ = self.server.discover_essays()
+        self.assertEqual([e["relative_path"] for e in essays], ["Take Back the Pen.md"])
+        self.assertIn("file=Take%20Back%20the%20Pen.md", self.server.obsidian_url_for("Take Back the Pen.md"))
+        self.assertIn("vault=Root%20Vault", self.server.obsidian_url_for("Take Back the Pen.md"))
+
     def test_missing_vault_requires_setup(self):
         config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
         self.server.apply_config(config, False)
