@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+*.pyc
+.env
+.env.local
+.venv-substack/
+.airdate-data/
+.server.pid
+drafts/*.md
+drafts/assets/*
+!drafts/.gitkeep
+!drafts/assets/.gitkeep
