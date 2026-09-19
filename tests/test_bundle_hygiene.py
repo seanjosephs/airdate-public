@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SELF = Path(__file__).resolve()
 
 BANNED = [
-    (re.compile(r"seanjosephs", re.I), "a personal account name"),
+    # This repository's own address is the one allowed mention of the account.
+    (re.compile(r"seanjosephs(?!/airdate-public\b)", re.I), "a personal account name"),
     (re.compile(r"andheresmysecret|here'?s my secret|\bahms\b", re.I), "a personal publication"),
     (re.compile(r"airdate-private", re.I), "the private repository"),
     (re.compile(r"\b8790\b"), "a personal tool's port"),

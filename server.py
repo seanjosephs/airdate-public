@@ -2269,7 +2269,7 @@ def conflict_payload(essay_id: str, path: Path, text: str | None = None) -> dict
     return {
         "ok": False,
         "reason": "file_changed",
-        "message": "This essay changed in Obsidian after Air Date loaded it. Reload before saving.",
+        "message": "This essay changed in Obsidian after airdate loaded it. Reload before saving.",
         "essay_id": essay_id,
         "path": public_path(path),
         "current_frontmatter": frontmatter,
@@ -3022,7 +3022,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.is_authenticated():
             return True
         self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="Air Date"')
+        self.send_header("WWW-Authenticate", 'Basic realm="airdate"')
         self.send_header("content-type", "text/plain; charset=utf-8")
         self.send_security_headers(no_store=True)
         self.end_headers()

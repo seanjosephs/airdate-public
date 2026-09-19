@@ -326,7 +326,7 @@ def main() -> None:
         hint = ""
         error_kind = "transport"
         if any(k in msg.lower() for k in ("401", "403", "unauthor", "forbidden", "login", "cookie")):
-            hint = " (Auth likely failed — your session cookie may be expired. Grab a fresh one and update the env.)"
+            hint = " (Substack refused the session; it may have expired. Run \"Connect Substack for airdate\" in Obsidian and send again.)"
             error_kind = "auth"
         fail(f"Substack draft creation failed: {msg}{hint}", error_kind=error_kind)
 

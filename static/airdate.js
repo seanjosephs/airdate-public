@@ -741,15 +741,15 @@ function lifecycleControlsMarkup(essay, cls = 'card-lifecycle') {
   const btns = [];
   if (current === 'Writers Room') {
     // Writing done → move to the schedulable pool (no date yet).
-    btns.push(`<button class="lifecycle-btn likey-btn" type="button" data-likey-id="${essay.id}" title="Mark done and ready to schedule — moves it to Writers Likey">ready to schedule</button>`);
+    btns.push(`<button class="lifecycle-btn likey-btn" type="button" data-likey-id="${essay.id}" title="Mark done and ready to schedule; moves it to Writers Likey">ready to schedule</button>`);
   } else if (current === 'Writers Likey') {
     // In the pool: give it a date (or drag it onto a calendar week).
-    btns.push(`<button class="lifecycle-btn rfa-btn" type="button" data-rfa-id="${essay.id}" title="Set an air date — schedules it on the calendar and unlocks send">ready for air</button>`);
+    btns.push(`<button class="lifecycle-btn rfa-btn" type="button" data-rfa-id="${essay.id}" title="Set an air date; schedules it on the calendar and unlocks send">ready for air</button>`);
     btns.push(`<button class="lifecycle-btn back-btn" type="button" data-room-id="${essay.id}" title="Back to the writers room">back to room</button>`);
   } else if (current === 'Ready for Air') {
     const when = essay.scheduled_at ? ` <span class="rfa-when">${escapeHtml(formatPublishedDate(essay.scheduled_at) || essay.scheduled_at)}</span>` : '';
     btns.push(`<button class="lifecycle-btn rfa-btn" type="button" data-rfa-id="${essay.id}" title="Change the air date">reschedule${when}</button>`);
-    btns.push(`<button class="lifecycle-btn back-btn" type="button" data-unschedule-id="${essay.id}" title="Clear the air date — back to the schedulable pool">unschedule</button>`);
+    btns.push(`<button class="lifecycle-btn back-btn" type="button" data-unschedule-id="${essay.id}" title="Clear the air date and move it back to Writers Likey">unschedule</button>`);
   } else if (current === 'Live') {
     // Publish is the record-a-Substack-publish action; it only makes sense once
     // the draft has actually gone out (Live).
@@ -768,7 +768,7 @@ async function readyForAirFlow(essayId) {
   const essay = state.essays.find((e) => String(e.id) === String(essayId));
   const fallback = essay?.scheduled_at ? String(essay.scheduled_at).slice(0, 10) : todayIso();
   const when = window.prompt(
-    `Air date for “${essay?.title || 'this essay'}” (YYYY-MM-DD) — schedules it on the calendar and unlocks send:`,
+    `Air date for “${essay?.title || 'this essay'}” (YYYY-MM-DD). This schedules it on the calendar and unlocks send:`,
     fallback,
   );
   if (when === null) return;
@@ -779,7 +779,7 @@ async function readyForAirFlow(essayId) {
   }
   try {
     const result = await postJson(`/api/essays/${essayId}/ready-for-air`, { scheduled_at: date });
-    await handleLifecycleResult(result, `ready for air — scheduled ${date}`);
+    await handleLifecycleResult(result, `ready for air, scheduled ${date}`);
   } catch (err) {
     showRailSoonStatus(`ready for air failed: ${err.message}`);
     await loadEssays();
@@ -818,7 +818,7 @@ async function handleLifecycleResult(result, message) {
   if (result?.old_id && result?.new_id && result.old_id !== result.new_id) {
     remapEssayId(result.old_id, result.new_id);
   }
-  const note = result?.warning ? `${message} — ${result.warning}` : message;
+  const note = result?.warning ? `${message}. ${result.warning}` : message;
   showRailSoonStatus(note);
   await loadEssays();
   if (state.view === 'shelf') await renderShelf({ refresh: true });
@@ -828,7 +828,7 @@ async function publishEssayFlow(essayId) {
   const essay = state.essays.find((e) => String(e.id) === String(essayId))
     || state.shelfEssays.find((e) => String(e.id) === String(essayId));
   const url = window.prompt(
-    `Live Substack URL for “${essay?.title || 'this essay'}” — paste the real post link:`,
+    `Live Substack URL for “${essay?.title || 'this essay'}”. Paste the real post link:`,
     essay?.substack_url || (APP_CONFIG.publication ? `${APP_CONFIG.publication.replace(/\/+$/, '')}/p/` : 'https://'),
   );
   if (!url || !/^https?:\/\//.test(url.trim()) || url.trim().endsWith('/p/')) {
@@ -837,7 +837,7 @@ async function publishEssayFlow(essayId) {
   }
   try {
     const result = await postJson(`/api/essays/${essayId}/publish`, { substack_url: url.trim() });
-    await handleLifecycleResult(result, 'published — moved to the shelf');
+    await handleLifecycleResult(result, 'published and moved to the shelf');
   } catch (err) {
     showRailSoonStatus(`publish failed: ${err.message}`);
   }
@@ -1120,7 +1120,7 @@ async function unscheduleEssayFlow(essayId) {
   // Clear the air date and drop back to the schedulable pool (Writers Likey).
   try {
     const result = await postJson(`/api/essays/${essayId}/unschedule`, {});
-    await handleLifecycleResult(result, 'unscheduled — back to writers likey');
+    await handleLifecycleResult(result, 'unscheduled, back to writers likey');
   } catch (err) {
     showRailSoonStatus(`unschedule failed: ${err.message}`);
     await loadEssays();
@@ -1454,7 +1454,7 @@ function showEditorConflict(error) {
   const compact = {
     ok: false,
     reason: payload.reason || 'file_changed',
-    message: payload.message || 'This essay changed in Obsidian after Air Date loaded it.',
+    message: payload.message || 'This essay changed in Obsidian after airdate loaded it.',
     path: payload.path,
     current_mtime_iso: payload.current_mtime_iso,
     current_content_hash: payload.current_content_hash,
@@ -1994,7 +1994,7 @@ async function openEditor(essayId) {
   if (returnFocus && returnFocus !== document.body) state.editorReturnFocus = returnFocus;
   state.selectedId = essayId;
   recordGardenAccess(essayId);
-  editorTitle.textContent = `expanded essay editor — ${essay.title}`;
+  editorTitle.textContent = `expanded essay editor: ${essay.title}`;
   editorForm.reset();
   fillForm(essay);
   updateEditorContext(essay);
@@ -2274,7 +2274,7 @@ function bindEvents() {
       await copyText(prompt);
       editorOutput.textContent = prompt;
       window.open('https://chatgpt.com', '_blank', 'noopener');
-      setEditorStatus('prompt copied — generate in ChatGPT, then drag the image onto the hero field.', 'good');
+      setEditorStatus('prompt copied. Generate in ChatGPT, then drag the image onto the hero field.', 'good');
       touchEssay(state.selectedId, 'copy_thumbnail_prompt');
     } catch (err) {
       setEditorStatus(`thumbnail prompt failed: ${err.message}`, 'bad');
@@ -2318,7 +2318,7 @@ function bindEvents() {
       const editUrl = String(result.edit_url || '').trim();
       const liveNote = result.status_after_send === 'Live' ? ' status is now live.' : '';
       if (editUrl) {
-        setEditorStatusWithLink('draft created — ', editUrl, 'open in Substack ↗', `.${liveNote}${warningsNote}`, 'good');
+        setEditorStatusWithLink('draft created: ', editUrl, 'open in Substack ↗', `.${liveNote}${warningsNote}`, 'good');
         renderEditorDraftLink(editUrl);
       } else {
         setEditorStatus(`draft created in Substack.${liveNote}${warningsNote}`, 'good');
@@ -2350,7 +2350,7 @@ function bindEvents() {
         setEditorStatus(`send timed out: ${result.message || 'check Substack for the draft before sending again.'}${warningsNote}`, 'bad');
         break;
       default:
-        setEditorStatus(`${result.message || 'saved locally — could not create the Substack draft.'}${warningsNote}`, 'bad');
+        setEditorStatus(`${result.message || 'saved locally, but the Substack draft was not created.'}${warningsNote}`, 'bad');
     }
     return false;
   }
@@ -2390,7 +2390,7 @@ function bindEvents() {
           editorOutput.textContent = JSON.stringify(result, null, 2);
           return;
         }
-        setEditorStatus('reconnected — retrying...', 'pending');
+        setEditorStatus('reconnected, retrying...', 'pending');
         result = await postJson(`/api/essays/${state.selectedId}/send`, {
           ...saveRequestPayload(),
           publish: frontmatterPayload(),
@@ -2434,7 +2434,7 @@ function reportBootError(message) {
   if (gardenCountsEl) gardenCountsEl.textContent = `failed to load: ${message}`;
   const tendingList = document.getElementById('tending-list');
   if (tendingList) {
-    tendingList.innerHTML = `<li class="tending-empty">the garden could not load — ${message}</li>`;
+    tendingList.innerHTML = `<li class="tending-empty">the catalog could not load: ${message}</li>`;
   }
 }
 

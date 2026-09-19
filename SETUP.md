@@ -66,7 +66,7 @@ python3 -m unittest tests.test_draft_only
 ## Install
 
 ```bash
-git clone <this repository> airdate
+git clone https://github.com/seanjosephs/airdate-public.git airdate
 cd airdate
 scripts/setup
 ./run-airdate.command
@@ -125,6 +125,9 @@ treats it like any plugin you install by hand. Then, in Obsidian:
 
 Reload airdate's settings page. It should say it is connected through
 Obsidian. Obsidian has to be open for sending to work.
+
+To sign out, or to switch to a different Substack account, run **Disconnect
+Substack for airdate**, then **Connect Substack for airdate** again.
 
 After updating airdate, run `python3 scripts/install-connector` again and
 reload the plugin.
@@ -200,7 +203,9 @@ Restart airdate after editing the file by hand.
 
 airdate binds to `127.0.0.1` and needs no password there. To reach it from
 elsewhere, set `HOST`, `AIR_DATE_AUTH_USER`, and `AIR_DATE_AUTH_PASSWORD`
-(for example in `.env.local`, which the launcher reads). airdate refuses to
+(for example in `.env.local`, which the launcher reads). To require the
+password on this computer too, set `AIR_DATE_AUTH_REQUIRED=true`. Whenever a
+password is required, local folder paths are hidden from the browser. airdate refuses to
 bind beyond loopback without a password, and in that mode the vault folder can
 only be set in `config.json`, not from the browser. Put HTTPS in front of it
 before using it over a network.
@@ -213,6 +218,8 @@ before using it over a network.
   or the plugin is off.
 - **Send fails with an auth error**: the Substack session expired. Run
   **Connect Substack for airdate** again.
+- **Wrong Substack account**: run **Disconnect Substack for airdate**, then
+  **Connect Substack for airdate** and sign in with the right one.
 - **"python-substack not importable"**: run `scripts/setup`.
 - **Port in use**: another program has 8787. Start airdate with
   `AIR_DATE_PORT=8788 ./run-airdate.command`.

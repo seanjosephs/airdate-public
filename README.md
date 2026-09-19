@@ -25,7 +25,7 @@ means.
 ## Quick start
 
 ```bash
-git clone <this repository> airdate
+git clone https://github.com/seanjosephs/airdate-public.git airdate
 cd airdate
 scripts/setup
 ./run-airdate.command
