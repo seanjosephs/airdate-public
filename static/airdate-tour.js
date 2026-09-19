@@ -17,7 +17,7 @@
     { key: 'calendar', anchor: '#month-rail', title: 'calendar',
       text: 'One slot per week on your publish day. Drag a Writers Likey essay onto a week to schedule it.' },
     { key: 'filing', anchor: '#inbox-lane', title: 'needs filing',
-      text: 'Essays sitting outside a topic folder land here. "Sort this" suggests a folder and moves the note once you confirm.' },
+      text: 'Essays sitting outside a topic folder land here. "File this" suggests a folder and moves the note once you confirm.' },
     { key: 'filters', anchor: '.all-ideas-controls', title: 'filters',
       text: 'Search across everything, or narrow the catalog by totem or state.' },
     { key: 'editor', anchor: '#all-ideas-cards .garden-card .gc-title', title: 'the editor',

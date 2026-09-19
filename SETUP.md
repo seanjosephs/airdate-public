@@ -82,32 +82,51 @@ it with Control-C. To use another port: `AIR_DATE_PORT=8788 ./run-airdate.comman
 
 ## First run
 
-The first time AirDate opens, it shows only settings:
+The first time AirDate opens, a setup wizard walks you through it one step at
+a time, with back and next. Nothing is saved until you press finish, with one
+exception noted in step 2.
 
-1. **Obsidian vault folder**: the full path to the folder that contains
-   `.obsidian`.
-2. **Essays folder**: a folder inside the vault (default `Essays`), or `.` if
-   your essays sit at the vault root. If it does not exist yet, AirDate offers
-   to create it. That empty folder is the only
-   thing first run ever writes to your vault.
-3. **Vault name**: filled in from the folder name; used for "open in
-   Obsidian" links.
-4. **Substack publication**: for example `yourname.substack.com` or your
-   custom domain, and a display name for thumbnail prompts.
-5. **Publish day**: one weekday gives you a calendar with one slot per week on
-   that day. "none" hides the calendar; you still pick a date when an essay is
-   ready for air.
-6. **Totems**: five placeholder markers (circle, triangle, square, diamond,
-   star) for telling your essays apart. Rename them, recolor them, and swap any
-   icon for an image in your vault, such as `Essays/_assets/airdate/fox.png`.
-   Turn them off if you do not want them.
+1. **Welcome**: what AirDate does, and the promise that it only ever creates
+   drafts.
+2. **Your vault**: the full path to the folder that contains `.obsidian`; the
+   essays folder inside it (default `Essays`), or tick "my essays are at the
+   vault root"; and the vault name, filled in from the folder name and used
+   for "open in Obsidian" links. If the essays folder does not exist yet,
+   AirDate offers to create it. That empty folder is the only thing first run
+   ever writes to your vault, and the only thing written before finish.
+3. **Your publication**: for example `yourname.substack.com` or your custom
+   domain, and a display name for thumbnail prompts. You can leave it for
+   later; sending stays blocked until it is set.
+4. **How you organize**: whether you keep essays in topic folders. Yes makes
+   each folder inside your essays folder a category, and an essay outside any
+   folder asks to be filed. No turns categories off and nothing asks to be
+   filed.
+5. **Your totems**: five placeholder marks (circle, triangle, square, diamond,
+   star) for telling your kinds of work apart. Rename them, recolor them, and
+   swap any icon for an image in your vault, such as
+   `Essays/_assets/airdate/fox.png`. Or turn them off.
+6. **Your tags**: optional tag presets, each a name, a color and up to five
+   tags. The editor adds a preset's tags in one click. It starts empty.
+7. **Your calendar**: your publish day, with Monday preselected. One weekday
+   gives you a calendar with one slot per week on that day. "none" hides the
+   calendar; you still pick a date when an essay is ready for air.
+8. **Connect Substack**: the three Obsidian steps from the next section, the
+   folder the connector is copied to, and a live check of each step. "I'll do
+   this later" is fine; sending stays blocked until it is done.
+9. **Finish**: a summary of your choices. Finish writes
+   `.airdate-data/config.json` and opens your essays.
 
-Save, and AirDate opens your essays. Settings stay editable, and everything is
-stored in `.airdate-data/config.json`.
+A short tour follows: nine stops, each pointing at one part of the screen.
+Skip it whenever you like, and replay it from the top of settings.
+
+Everything from the wizard stays editable in settings, under the same
+headings. If `config.json` already exists but needs fixing (a moved vault,
+say), AirDate opens settings with the problem named instead of the wizard.
 
 ## Connect Substack through Obsidian
 
-After first run:
+The wizard's connect step shows these same steps and checks them live. During
+or after first run:
 
 ```bash
 python3 scripts/install-connector
@@ -148,10 +167,13 @@ reload the plugin.
   frontmatter says.
 - **Categories are the other top-level folders** inside the essays folder
   (folders starting with `_` are ignored). Filing an essay moves it into one.
-  To keep your own folder layout, set `"categories": {"mode": "off"}` in
-  `config.json`. If your essays folder is the vault root, every top-level
+  To keep your own folder layout, choose "no folders" under "how you organize"
+  in settings. If your essays folder is the vault root, every top-level
   folder in the vault counts as a category, so turning categories off is
   usually the better fit.
+- **Totems.** Every card has a totem slot. Click it to pick one of your five
+  or none; the choice is saved to the note's `totem` key. A value AirDate does
+  not recognize shows as "?" and is left alone until you pick.
 - **Images you attach** are written to `<essays folder>/_assets/substack/`.
 - **Frontmatter.** AirDate reads and writes these keys and keeps every other
   key you have exactly as it was: `title`, `subtitle`, `summary`, `status`,
@@ -181,6 +203,10 @@ makes it **Live**. When you have published it in Substack, mark it
 **Published** and paste the post link; it moves to the shelf. **Archived**
 sits outside the flow.
 
+The catalog's state filter follows the same stages, plus "needs attention":
+essays that need filing, are missing metadata, or are missing only a hero
+image.
+
 ## Thumbnails
 
 AirDate has no AI inside it. "Copy thumbnail prompt" puts a styled prompt on
@@ -196,8 +222,6 @@ the hero field. Change the prompt's style line in `config.json`
   none, for example `{"debate": 3}`. `totems.default`: the totem for essays
   that match nothing.
 - `categories.items`: category folders with keywords for filing suggestions.
-- `tag_presets`: named groups of up to five tags with a color, offered in the
-  editor and used to color essay cards.
 - `links`: extra links in the sidebar.
 - `connector.port`: the port AirDate expects before pairing. After
   pairing, AirDate uses the port you chose in **Pair with AirDate**.

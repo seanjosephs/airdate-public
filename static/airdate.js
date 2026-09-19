@@ -1274,7 +1274,7 @@ function inboxItemMarkup(essay) {
   const categories = suggestion?.categories || [];
   const controls = suggestion
     ? `<div class="inbox-controls">
-        ${APP_CONFIG.categoryMode === 'off' ? '' : `<select class="inbox-category" data-inbox-category="${essay.id}" aria-label="Category">
+        ${APP_CONFIG.categoryMode === 'off' ? '' : `<select class="inbox-category" data-inbox-category="${essay.id}" aria-label="Category" title="Categories are the folders inside your essays folder.">
           <option value="">choose a folder...</option>
           ${categories.map((cat) => `<option value="${escapeHtml(cat)}"${cat === suggestion.category ? ' selected' : ''}>${escapeHtml(cat.toLowerCase())}</option>`).join('')}
         </select>`}
@@ -1285,7 +1285,7 @@ function inboxItemMarkup(essay) {
         <button class="lifecycle-btn" type="button" data-intake-apply="${essay.id}">file it</button>
         ${APP_CONFIG.categoryMode === 'off' ? '' : `<span class="inbox-confidence">${suggestion.category ? `suggested (${suggestion.category_confidence})` : (categories.length ? 'no confident guess, pick one' : 'make a folder in your essays folder to file into')}</span>`}
       </div>`
-    : `<button class="lifecycle-btn" type="button" data-intake-suggest="${essay.id}">sort this</button>`;
+    : `<button class="lifecycle-btn" type="button" data-intake-suggest="${essay.id}">file this</button>`;
   return `<div class="inbox-item" data-essay-id="${essay.id}">
     <div class="inbox-item-main">
       <strong>${escapeHtml(essay.title)}</strong>
