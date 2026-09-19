@@ -49,4 +49,5 @@ Substack through Obsidian.
 
 ## License
 
-Not yet chosen.
+MIT. See [LICENSE](LICENSE). The Substack client airdate installs,
+[python-substack](https://pypi.org/project/python-substack/), is also MIT.
