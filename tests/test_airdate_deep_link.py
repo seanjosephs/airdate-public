@@ -193,7 +193,7 @@ class AirdateDeepLinkIntegrationContractTests(unittest.TestCase):
         self.assertNotIn(" hidden", notice_tag)
 
         source = APP.read_text(encoding="utf-8")
-        css = (ROOT / "static" / "air-date.css").read_text(encoding="utf-8")
+        css = (ROOT / "static" / "airdate.css").read_text(encoding="utf-8")
         self.assertNotIn("deepLinkNoticeEl.hidden", source)
         self.assertIn(".deep-link-notice:empty", css)
         empty_rule = css[css.index(".deep-link-notice:empty") :]

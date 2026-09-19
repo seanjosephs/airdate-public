@@ -1,4 +1,4 @@
-"""AirDate settings: one JSON file in the data dir, neutral defaults, env overrides.
+"""airdate settings: one JSON file in the data dir, neutral defaults, env overrides.
 
 Precedence for every value: environment variable, then config.json, then the
 neutral default below. Nothing here assumes who the writer is; a writer's own
@@ -22,7 +22,7 @@ WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", 
 CATEGORY_MODES = ("folders", "off")
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
-# Folder names AirDate owns directly under the essays folder. A category can
+# Folder names airdate owns directly under the essays folder. A category can
 # never be one of these.
 RESERVED_FOLDERS = ("published", "archive")
 
@@ -245,7 +245,7 @@ def validate_config(config: dict[str, Any]) -> list[str]:
         if not isinstance(name, str) or not name.strip() or "/" in name or "\\" in name or name.startswith((".", "_")):
             errors.append(f"{where}.name must be a plain folder name.")
         elif name.strip().lower() in RESERVED_FOLDERS:
-            errors.append(f"{where}.name '{name}' is reserved by AirDate.")
+            errors.append(f"{where}.name '{name}' is reserved by airdate.")
         if isinstance(item, dict):
             _check_keywords(item.get("keywords"), where, errors)
 

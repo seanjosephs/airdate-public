@@ -500,7 +500,7 @@ def main() -> int:
 
         assets = {
             "/static/airdate.js": "javascript",
-            "/static/air-date.css": "text/css",
+            "/static/airdate.css": "text/css",
             "/static/tokens.css": "text/css",
             "/static/totems/placeholder-1.svg": "image/svg+xml",
             "/static/totems/placeholder-5.svg": "image/svg+xml",

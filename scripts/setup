@@ -1,5 +1,5 @@
 #!/bin/zsh
-# One-time (and safe to re-run) setup for AirDate.
+# One-time (and safe to re-run) setup for airdate.
 # Creates the Substack venv from requirements-substack.txt and the private
 # runtime folder. Changes nothing outside this folder.
 set -eu
@@ -16,7 +16,7 @@ for candidate in python3.13 python3.12 python3.11 python3.10 python3; do
   fi
 done
 if [ -z "$PYTHON" ]; then
-  echo "AirDate needs Python 3.10 or newer for its Substack client."
+  echo "airdate needs Python 3.10 or newer for its Substack client."
   echo "Install one (for example: brew install python@3.12), then run scripts/setup again."
   exit 1
 fi
@@ -36,7 +36,7 @@ chmod 700 .airdate-data .airdate-data/secrets .airdate-data/state
 echo
 echo "Setup done."
 echo "Next:"
-echo "  1. ./run-airdate.command   (opens AirDate; first run asks for your vault)"
+echo "  1. ./run-airdate.command   (opens airdate; first run asks for your vault)"
 echo "  2. python3 scripts/install-connector   (after first run; copies the Obsidian connector into your vault)"
-echo "  3. In Obsidian: enable 'AirDate connector', then run 'Pair with AirDate' and 'Connect Substack for AirDate'."
+echo "  3. In Obsidian: enable 'airdate connector', then run 'Pair with airdate' and 'Connect Substack for airdate'."
 echo "SETUP.md has the details."
