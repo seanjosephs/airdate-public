@@ -253,7 +253,22 @@ def main() -> None:
         stored_draft_id = str(front.get("substack_draft_id") or "").strip()
         updated = bool(stored_draft_id)
         if stored_draft_id:
-            draft = api.put_draft(stored_draft_id, **post.get_draft())
+            try:
+                draft = api.put_draft(stored_draft_id, **post.get_draft())
+            except Exception as exc:  # noqa: BLE001
+                if "404" not in str(exc) and "not found" not in str(exc).lower():
+                    raise
+                # Never fall back to creating a new draft here: if the old one
+                # was published, a new draft would duplicate a live post.
+                fail(
+                    f"Substack has no draft {stored_draft_id} for the account signed in"
+                    f"{' on ' + publication_url if publication_url else ''}. It may have been"
+                    " deleted or published, or it belongs to another account. To send this"
+                    " note as a new draft, delete substack_draft_id and substack_draft_url"
+                    " from its frontmatter, then send again.",
+                    error_kind="transport",
+                    stale_draft_id=stored_draft_id,
+                )
             draft_id = stored_draft_id
         else:
             draft = api.post_draft(post.get_draft())
