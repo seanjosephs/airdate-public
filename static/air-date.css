@@ -831,3 +831,18 @@ body.wizard-open { overflow: hidden; }
   .preset-row { grid-template-columns: minmax(0, 1fr) 52px; }
   .preset-row [name="preset_tags"] { grid-column: 1 / -1; }
 }
+
+/* Totem slot on a card, and its picker. */
+button.gc-slot { padding: 0; cursor: pointer; display: grid; place-items: center; color: var(--vs-fg-dim); font: 500 8px/1 var(--vs-font); letter-spacing: .04em; }
+button.gc-slot:hover, button.gc-slot:focus-visible { border-color: var(--vs-orange); color: var(--vs-fg); }
+button.gc-slot[data-slot="empty"], button.gc-slot[data-slot="unknown"] { border-style: dashed; border-color: var(--vs-border-bright); background: transparent; }
+button.gc-slot[data-slot="unknown"] .gc-slot-label { font-size: 13px; }
+.totem-picker { position: absolute; z-index: 40; display: flex; flex-direction: column; gap: 2px; min-width: 170px; padding: 6px; border: 1px solid var(--vs-border-bright); border-radius: var(--vs-radius-sm); background: var(--vs-surface); box-shadow: 0 12px 30px rgba(0,0,0,.5); }
+.totem-picker button { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 0; border-radius: var(--vs-radius-xs); background: transparent; color: var(--vs-fg); font: 400 13px/1.2 var(--vs-font); text-align: left; cursor: pointer; }
+.totem-picker button:hover, .totem-picker button:focus-visible { background: var(--vs-surface2); }
+.totem-picker button:disabled { opacity: .5; cursor: default; }
+.totem-picker img, .totem-picker-none { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+.totem-picker-none { border: 1px dashed var(--vs-border-bright); }
+.totem-picker-status { font-size: 11px; color: var(--vs-fg-muted); padding: 0 8px; }
+.totem-picker-status:empty { display: none; }
+.totem-picker-status[data-kind="bad"] { color: var(--vs-danger); }
