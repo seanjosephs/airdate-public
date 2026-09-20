@@ -151,8 +151,11 @@ Obsidian. Obsidian has to be open for sending to work.
 To sign out, or to switch to a different Substack account, run **Disconnect
 Substack for airdate**, then **Connect Substack for airdate** again.
 
-After updating airdate, run `python3 scripts/install-connector` again and
-reload the plugin.
+After updating airdate, run `python3 scripts/install-connector` again, then
+reload the connector: **Settings → Community plugins**, and toggle **airdate
+connector** off and back on. Obsidian keeps the old plugin code in memory
+until you do, so a new command will not appear in the command palette —
+reloading the app itself does not reload the plugin.
 
 ## What airdate expects in your vault
 
