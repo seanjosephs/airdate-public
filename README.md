@@ -5,6 +5,11 @@
 A local essay manager for writers who keep their essays in **Obsidian** and
 publish on **Substack**.
 
+![The airdate catalog: a calendar rail on the left, and essay cards showing
+each essay's state, tags and lifecycle buttons](docs/catalog.png)
+
+*The catalog, running against a demo vault.*
+
 - Reads a folder of Markdown notes in your Obsidian vault and shows them as a
   catalog you can search, filter, and sort.
 - Tracks each essay from Writers Room to Published, with a weekly calendar on
