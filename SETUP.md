@@ -11,9 +11,12 @@ airdate creates Substack drafts and stops. It cannot publish, schedule, or
 email your subscribers. There is no setting that changes this. You open the
 draft in Substack, look it over, and press publish yourself.
 
-This is enforced in code, not just intended: `tests/test_draft_only.py` fails
-if the Substack client script, the server, or the Obsidian connector ever gains
-a way to publish, schedule, or send email. Run it yourself:
+This is checked in code, not just intended. `tests/test_draft_only.py` reads
+the three files that could ever reach Substack and fails if the obvious way in
+appears: a call to a python-substack `Api` method outside a reviewed allowlist,
+or any call whose name looks like publishing, scheduling or sending. It is a
+tripwire on the front door, not a proof that no door exists, so review is still
+what stands behind it. Run it yourself:
 
 ```bash
 python3 -m unittest tests.test_draft_only
@@ -68,8 +71,19 @@ python3 -m unittest tests.test_draft_only
 - macOS. (Linux may work but is untested; Windows is not supported.)
 - Obsidian desktop 1.11.4 or newer, with a vault.
 - Python 3.10 or newer for the Substack client. macOS's built-in `python3` is
-  3.9, which runs the airdate server but not the client; install a newer one,
-  for example `brew install python@3.12`.
+  3.9, which runs the airdate server but not the client, so you need to install
+  a newer one. Two ways, either is fine:
+
+  **The installer**, if you would rather not use a package manager: download
+  the current macOS installer from [python.org/downloads](https://www.python.org/downloads/)
+  and run it. Nothing else to set up.
+
+  **Homebrew**, if you already use it or want to: `brew install python@3.12`.
+  If `brew` is not a command on your machine you do not have Homebrew yet;
+  install it first from [brew.sh](https://brew.sh), then run that line.
+
+  `scripts/setup` finds any Python 3.10 through 3.13 on your PATH by itself, so
+  once one is installed there is nothing to configure.
 - A Substack account you can sign in to.
 
 ## Install
@@ -271,8 +285,8 @@ before using it over a network.
   `AIR_DATE_PORT=8788 ./run-airdate.command`.
 - **A send timed out**: check Substack for the draft before sending again; it
   may have been created.
-- **macOS refuses to open `run-airdate.command`** ("cannot be opened because it
-  is from an unidentified developer"): you downloaded the ZIP through a
+- **Double-clicking `run-airdate.command` does not start airdate**, whether it
+  fails silently or macOS puts up a warning: you downloaded the ZIP through a
   browser, so macOS quarantined it, and the launcher is not code-signed. Either
   clone the repository instead, which carries no quarantine, or clear it on the
   folder you already have:

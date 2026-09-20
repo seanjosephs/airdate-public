@@ -64,8 +64,9 @@ are not bugs, and reporting them tells me nothing I do not already know.
   barrier. airdate does not defend against malware already running as you.
 - **On loopback, airdate requires no password by default.** Anything that can
   reach `127.0.0.1:8787` on your machine can drive airdate, including local
-  folder paths. Set `AIR_DATE_AUTH_REQUIRED=true` if you want a password
-  locally too.
+  folder paths. To require one locally, set **both** `AIR_DATE_AUTH_REQUIRED=true`
+  and `AIR_DATE_AUTH_PASSWORD`; setting only the first makes the server refuse
+  to start.
 - **Downloaded copies hit Gatekeeper.** A repository you `git clone` carries no
   quarantine attribute and runs normally. A ZIP downloaded through a browser
   does carry one, and `run-airdate.command` is not code-signed, so macOS will

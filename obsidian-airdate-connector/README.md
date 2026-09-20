@@ -60,14 +60,19 @@ intended.
 Pairing pins the airdate folder and the Python interpreter. After that:
 
 - It runs exactly one program, `substack_draft.py`, from the folder you paired.
-- It only accepts a draft file inside that folder's `drafts/` directory. A path
-  sent by any caller is ignored.
+- The caller names a draft file. That path is resolved through `realpath`
+  (so a symlink cannot point out of the folder) and is rejected unless it
+  lands inside the pinned folder's `drafts/` directory and ends in `.md`.
+  What a caller cannot change is the airdate folder and the Python
+  interpreter: those come from pairing and are never read from a request.
 - It listens on `127.0.0.1` only, port 17777 by default, and every request
   needs the bridge token.
 - It never returns session material to anything, including airdate.
 - **It creates drafts. It cannot publish, schedule, or email subscribers.**
-  `tests/test_draft_only.py` in the airdate repo fails if this file ever gains
-  a way to do any of those.
+  `tests/test_draft_only.py` in the airdate repo checks this file for a second
+  child process, for HTTP calls of its own, and for any URL other than
+  Substack's sign-in page. That is a tripwire on the obvious route, not a
+  proof, so review stands behind it.
 
 ## Requirements
 

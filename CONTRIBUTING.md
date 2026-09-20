@@ -34,8 +34,13 @@ not be merged, however well written.
 
 - **It never publishes.** airdate creates Substack drafts and stops. No
   publishing, no scheduling, no emailing subscribers, and no setting that
-  changes this. `tests/test_draft_only.py` fails if the client script, the
-  server or the connector ever gains a way to do any of those.
+  changes this. `tests/test_draft_only.py` guards it by reading the three files
+  that could reach Substack and failing on the obvious route in: an `Api`
+  method outside a reviewed allowlist, or a call whose name looks like
+  publishing, scheduling or sending. Know what it is: a tripwire on the front
+  door. A patch that reached Substack some other way could pass it, so review
+  is the real backstop and a patch that moves toward publishing will be turned
+  down even if the suite is green.
 - **It never deletes a note.**
 - **It never touches anything outside the essays folder**, besides reading
   totem images the user points it at.
