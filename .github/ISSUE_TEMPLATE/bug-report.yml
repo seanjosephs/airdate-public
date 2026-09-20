@@ -1,0 +1,71 @@
+name: Bug report
+description: Something in airdate behaves wrong, other than sending to Substack.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a failed send, please use the "Sending to Substack failed"
+        template instead: it asks for the versions that failure depends on.
+
+        **Do not paste your Substack session cookie or your bridge token
+        here.** For anything that could expose a session, a token or a vault,
+        use [private reporting](../../security/advisories/new).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the catalog
+        2. Filter to Writers Likey
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: errors
+    attributes:
+      label: Errors
+      description: >
+        From the terminal running run-airdate.command, and from the browser
+        console if the problem is on screen.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: airdate version
+      placeholder: v0.5.0
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: Python 3.12.4
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: macOS version
+      placeholder: macOS 15.6
+  - type: textarea
+    id: vault
+    attributes:
+      label: Anything unusual about your vault
+      description: >
+        Essays at the vault root, categories turned off, an unusual folder
+        layout, a very large vault, iCloud or Dropbox sync. Optional, but it is
+        often the answer.

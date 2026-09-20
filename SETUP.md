@@ -34,8 +34,17 @@ python3 -m unittest tests.test_draft_only
 - **It can break without warning.** If Substack changes its editor, sending
   may fail until the library catches up. `requirements-substack.txt` pins a
   known-good set of versions; that pin is what you roll back to.
-- **It is your call.** Using an unofficial client with your own session is
-  your decision and your risk under Substack's terms.
+- **The risk is your account, not just a failed send.** Driving private
+  endpoints with a session cookie is not something Substack's terms
+  contemplate, and the realistic worst case is not "sending stops working", it
+  is Substack restricting or suspending the account you publish from. Nobody
+  has reported that happening because of airdate, and I cannot promise it
+  will not. airdate creates one draft per essay, at the pace a person writes,
+  which is the same thing your browser does when you use the editor. That is
+  the honest shape of it.
+- **It is your call.** If the publication matters more than the convenience,
+  copy and paste into Substack's editor instead. airdate is still useful for
+  everything up to that point.
 
 ## Where your Substack session lives
 
@@ -134,7 +143,12 @@ python3 scripts/install-connector
 
 This copies the connector into `<vault>/.obsidian/plugins/airdate-connector/`.
 The connector is not in Obsidian's community plugin directory, so Obsidian
-treats it like any plugin you install by hand. Then, in Obsidian:
+treats it like any plugin you install by hand. It is deliberately not submitted
+there: it does nothing without airdate installed and paired, and keeping the
+two in one repository means they always move together. Its source is one
+readable file, and
+[obsidian-airdate-connector/README.md](obsidian-airdate-connector/README.md)
+describes what it stores and what it will run. Then, in Obsidian:
 
 1. Settings, Community plugins: turn off Restricted mode if it is on, then
    enable **airdate connector**.
@@ -257,6 +271,17 @@ before using it over a network.
   `AIR_DATE_PORT=8788 ./run-airdate.command`.
 - **A send timed out**: check Substack for the draft before sending again; it
   may have been created.
+- **macOS refuses to open `run-airdate.command`** ("cannot be opened because it
+  is from an unidentified developer"): you downloaded the ZIP through a
+  browser, so macOS quarantined it, and the launcher is not code-signed. Either
+  clone the repository instead, which carries no quarantine, or clear it on the
+  folder you already have:
+
+  ```bash
+  xattr -dr com.apple.quarantine /path/to/airdate
+  ```
+
+  Only do that for a folder you fetched yourself from the airdate repository.
 
 ## Tests
 

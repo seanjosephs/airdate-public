@@ -1,0 +1,86 @@
+name: Sending to Substack failed
+description: airdate could not create a draft, or the connector is not connecting.
+title: "Send failed: "
+labels: ["send"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most common failure, and it is usually one of three things:
+        an expired Substack session, the connector not being loaded, or Substack
+        having changed something under the unofficial client.
+
+        Before filing, the quickest checks are in
+        [SETUP.md](../../blob/main/SETUP.md#troubleshooting).
+
+        **Do not paste your Substack session cookie or your bridge token
+        here.** If the problem seems to involve either one, use
+        [private reporting](../../security/advisories/new) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you pressed, and what airdate told you.
+      placeholder: I pressed Send on an essay in Ready for Air and got "…"
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: The exact error text
+      description: >
+        From airdate's screen, and from the terminal running
+        run-airdate.command. Redact anything that looks like a token or cookie.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: airdate version
+      description: The release tag, or the output of `git rev-parse --short HEAD`.
+      placeholder: v0.5.0
+    validations:
+      required: true
+  - type: input
+    id: connector-version
+    attributes:
+      label: Connector version
+      description: From Settings, Community plugins, airdate connector in Obsidian.
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      description: Output of `python3 --version`.
+      placeholder: Python 3.12.4
+    validations:
+      required: true
+  - type: input
+    id: substack-client
+    attributes:
+      label: python-substack version
+      description: >
+        Output of
+        `.venv-substack/bin/python -c "import substack, importlib.metadata as m; print(m.version('python-substack'))"`.
+        Say so if you changed it from the pinned version.
+      placeholder: 0.1.22
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: What you already tried
+      options:
+        - label: Obsidian is open and the airdate connector is enabled
+        - label: I ran "Connect Substack for airdate" again and signed in
+        - label: I re-ran `python3 scripts/install-connector` and toggled the plugin off and on
+        - label: airdate's settings page says it is connected through Obsidian
+        - label: I checked Substack to see whether the draft was created anyway
+  - type: input
+    id: os
+    attributes:
+      label: macOS version
+      placeholder: macOS 15.6

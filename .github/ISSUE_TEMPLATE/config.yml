@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Read SETUP.md first
+    url: https://github.com/seanjosephs/airdate-public/blob/main/SETUP.md
+    about: Install, first run, connecting Substack, and the troubleshooting list.
+  - name: Report a security problem privately
+    url: https://github.com/seanjosephs/airdate-public/security/advisories/new
+    about: Anything that could expose a Substack session, the bridge token, or a vault. Not a public issue.
+  - name: Before opening a pull request
+    url: https://github.com/seanjosephs/airdate-public/blob/main/CONTRIBUTING.md
+    about: The stack is locked and some changes need an issue first. Read this before writing code.

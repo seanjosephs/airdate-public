@@ -38,6 +38,12 @@ scripts/setup
 ./run-airdate.command
 ```
 
+**Clone it rather than downloading the ZIP.** A cloned folder runs as-is. A
+ZIP downloaded through a browser is quarantined by macOS, and because
+`run-airdate.command` is not code-signed, Gatekeeper will refuse to open it. If
+you already downloaded one, [SETUP.md](SETUP.md#troubleshooting) has the
+one-line fix.
+
 Then follow [SETUP.md](SETUP.md) to point airdate at your vault and connect
 Substack through Obsidian.
 
@@ -53,8 +59,37 @@ Substack through Obsidian.
 | `scripts/setup`, `scripts/install-connector` | Install helpers |
 | `tests/`, `scripts/*-test.py`, `scripts/workflow-smoke.py` | Offline tests |
 | `config.example.json` | Every setting, with examples |
+| `SETUP.md` | Install, first run, and what the unofficial Substack client means |
+| `CONTRIBUTING.md` | The locked stack and what to open an issue about first |
+| `SECURITY.md` | The trust model, and how to report a problem privately |
+
+## Contributing
+
+The stack is locked on purpose: no framework, no npm, no bundler, no
+TypeScript, and a standard-library-only server. Bug fixes are welcome as pull
+requests; anything that changes how airdate looks or behaves wants an issue
+first. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+airdate holds a live Substack session, through Obsidian's secret storage.
+[SECURITY.md](SECURITY.md) explains the trust model, the known tradeoffs, and
+how to report a problem privately rather than in a public issue.
+
+## Acknowledgements
+
+Sending works because of [python-substack](https://github.com/ma2za/python-substack)
+by [ma2za](https://github.com/ma2za), an unofficial, MIT-licensed community
+client for Substack. Substack publishes no official way to create a draft, so
+without that library airdate would stop at the edge of your vault. If you use
+airdate, the thanks belong there too.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). The Substack client airdate installs,
-[python-substack](https://pypi.org/project/python-substack/), is also MIT.
+MIT. See [LICENSE](LICENSE).
+
+airdate installs, but does not redistribute, its Python dependencies:
+python-substack (MIT), PyYAML (MIT), requests (Apache-2.0), certifi (MPL-2.0),
+urllib3 (MIT), idna (BSD-3-Clause), charset-normalizer (MIT) and python-dotenv
+(BSD-3-Clause). `scripts/setup` fetches them into `.venv-substack` on your own
+machine, at the versions pinned in `requirements-substack.txt`.
