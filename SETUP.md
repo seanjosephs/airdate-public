@@ -11,9 +11,12 @@ airdate creates Substack drafts and stops. It cannot publish, schedule, or
 email your subscribers. There is no setting that changes this. You open the
 draft in Substack, look it over, and press publish yourself.
 
-This is enforced in code, not just intended: `tests/test_draft_only.py` fails
-if the Substack client script, the server, or the Obsidian connector ever gains
-a way to publish, schedule, or send email. Run it yourself:
+This is checked in code, not just intended. `tests/test_draft_only.py` reads
+the three files that could ever reach Substack and fails if the obvious way in
+appears: a call to a python-substack `Api` method outside a reviewed allowlist,
+or any call whose name looks like publishing, scheduling or sending. It is a
+tripwire on the front door, not a proof that no door exists, so review is still
+what stands behind it. Run it yourself:
 
 ```bash
 python3 -m unittest tests.test_draft_only
@@ -34,8 +37,17 @@ python3 -m unittest tests.test_draft_only
 - **It can break without warning.** If Substack changes its editor, sending
   may fail until the library catches up. `requirements-substack.txt` pins a
   known-good set of versions; that pin is what you roll back to.
-- **It is your call.** Using an unofficial client with your own session is
-  your decision and your risk under Substack's terms.
+- **The risk is your account, not just a failed send.** Driving private
+  endpoints with a session cookie is not something Substack's terms
+  contemplate, and the realistic worst case is not "sending stops working", it
+  is Substack restricting or suspending the account you publish from. Nobody
+  has reported that happening because of airdate, and I cannot promise it
+  will not. airdate creates one draft per essay, at the pace a person writes,
+  which is the same thing your browser does when you use the editor. That is
+  the honest shape of it.
+- **It is your call.** If the publication matters more than the convenience,
+  copy and paste into Substack's editor instead. airdate is still useful for
+  everything up to that point.
 
 ## Where your Substack session lives
 
@@ -59,8 +71,19 @@ python3 -m unittest tests.test_draft_only
 - macOS. (Linux may work but is untested; Windows is not supported.)
 - Obsidian desktop 1.11.4 or newer, with a vault.
 - Python 3.10 or newer for the Substack client. macOS's built-in `python3` is
-  3.9, which runs the airdate server but not the client; install a newer one,
-  for example `brew install python@3.12`.
+  3.9, which runs the airdate server but not the client, so you need to install
+  a newer one. Two ways, either is fine:
+
+  **The installer**, if you would rather not use a package manager: download
+  the current macOS installer from [python.org/downloads](https://www.python.org/downloads/)
+  and run it. Nothing else to set up.
+
+  **Homebrew**, if you already use it or want to: `brew install python@3.12`.
+  If `brew` is not a command on your machine you do not have Homebrew yet;
+  install it first from [brew.sh](https://brew.sh), then run that line.
+
+  `scripts/setup` finds any Python 3.10 through 3.13 on your PATH by itself, so
+  once one is installed there is nothing to configure.
 - A Substack account you can sign in to.
 
 ## Install
@@ -134,7 +157,12 @@ python3 scripts/install-connector
 
 This copies the connector into `<vault>/.obsidian/plugins/airdate-connector/`.
 The connector is not in Obsidian's community plugin directory, so Obsidian
-treats it like any plugin you install by hand. Then, in Obsidian:
+treats it like any plugin you install by hand. It is deliberately not submitted
+there: it does nothing without airdate installed and paired, and keeping the
+two in one repository means they always move together. Its source is one
+readable file, and
+[obsidian-airdate-connector/README.md](obsidian-airdate-connector/README.md)
+describes what it stores and what it will run. Then, in Obsidian:
 
 1. Settings, Community plugins: turn off Restricted mode if it is on, then
    enable **airdate connector**.
@@ -154,8 +182,8 @@ Substack for airdate**, then **Connect Substack for airdate** again.
 After updating airdate, run `python3 scripts/install-connector` again, then
 reload the connector: **Settings → Community plugins**, and toggle **airdate
 connector** off and back on. Obsidian keeps the old plugin code in memory
-until you do, so a new command will not appear in the command palette —
-reloading the app itself does not reload the plugin.
+until you do, so a new command will not appear in the command palette.
+Reloading the app itself does not reload the plugin.
 
 ## What airdate expects in your vault
 
@@ -257,6 +285,17 @@ before using it over a network.
   `AIR_DATE_PORT=8788 ./run-airdate.command`.
 - **A send timed out**: check Substack for the draft before sending again; it
   may have been created.
+- **Double-clicking `run-airdate.command` does not start airdate**, whether it
+  fails silently or macOS puts up a warning: you downloaded the ZIP through a
+  browser, so macOS quarantined it, and the launcher is not code-signed. Either
+  clone the repository instead, which carries no quarantine, or clear it on the
+  folder you already have:
+
+  ```bash
+  xattr -dr com.apple.quarantine /path/to/airdate
+  ```
+
+  Only do that for a folder you fetched yourself from the airdate repository.
 
 ## Tests
 

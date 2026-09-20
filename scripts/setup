@@ -17,7 +17,11 @@ for candidate in python3.13 python3.12 python3.11 python3.10 python3; do
 done
 if [ -z "$PYTHON" ]; then
   echo "airdate needs Python 3.10 or newer for its Substack client."
-  echo "Install one (for example: brew install python@3.12), then run scripts/setup again."
+  echo "macOS ships 3.9, so install a newer one. Either works:"
+  echo "  - Installer: https://www.python.org/downloads/  (no package manager needed)"
+  echo "  - Homebrew:  brew install python@3.12"
+  echo "    No 'brew' command? Install Homebrew first: https://brew.sh"
+  echo "Then run scripts/setup again."
   exit 1
 fi
 echo "Using $PYTHON ($("$PYTHON" -c 'import platform; print(platform.python_version())'))"
