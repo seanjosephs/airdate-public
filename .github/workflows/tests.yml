@@ -1,0 +1,43 @@
+name: tests
+
+# airdate promises it only ever creates drafts. That promise is a test, so it
+# runs on every push and every pull request, including one from a stranger.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the floor scripts/setup enforces; the newest release catches
+        # what is about to break.
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # The browser helpers are tested through node, and the smoke exercises
+      # the Obsidian connector the same way.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Everything below is standard library and a fixture vault in a temp
+      # folder. No install step, no network, no Substack call.
+      - name: Unit tests
+        run: python -m unittest discover -s tests
+
+      - name: Workflow smoke
+        run: python scripts/workflow-smoke.py

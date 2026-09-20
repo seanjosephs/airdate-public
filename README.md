@@ -1,5 +1,7 @@
 # airdate
 
+[![tests](https://github.com/seanjosephs/airdate-public/actions/workflows/tests.yml/badge.svg)](https://github.com/seanjosephs/airdate-public/actions/workflows/tests.yml)
+
 A local essay manager for writers who keep their essays in **Obsidian** and
 publish on **Substack**.
 
