@@ -850,6 +850,10 @@ button.gc-slot[data-slot="unknown"] .gc-slot-label { font-size: 13px; }
 /* One-line lifecycle legend under the catalog filters. */
 .state-legend { flex: 1 0 100%; font: 300 11px/1.4 var(--vs-font); color: var(--vs-fg-dim); }
 
+/* An inline action inside the editor's status line, so a message that names a
+   problem can also offer the fix without sending the writer elsewhere. */
+.editor-status-action { margin-left: 6px; vertical-align: baseline; font-size: 11px; padding: 2px 8px; }
+
 /* The tour: a ring around one element, the rest dimmed, and a callout. */
 .tour-ring { position: fixed; z-index: 70; border: 2px solid var(--vs-orange); border-radius: var(--vs-radius-sm); box-shadow: 0 0 0 9999px rgba(0,0,0,.66); pointer-events: none; transition: top .18s ease, left .18s ease, width .18s ease, height .18s ease; }
 .tour-callout { position: fixed; z-index: 71; width: min(340px, calc(100vw - 16px)); padding: 16px; display: flex; flex-direction: column; gap: 8px; background: var(--vs-surface); border: 1px solid var(--vs-border-bright); border-radius: var(--vs-radius-sm); box-shadow: 0 12px 30px rgba(0,0,0,.5); }

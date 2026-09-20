@@ -35,6 +35,7 @@ if (document.body) document.body.dataset.appRoute = ROUTE_VIEW || 'airdate';
 const state = {
   essays: [],
   shelfEssays: [],
+  archivedEssays: [],
   intakeSuggestions: {},
   selectedId: null,
   view: ROUTE_VIEW || (VIEWS.includes(STORED_VIEW) ? STORED_VIEW : 'all-ideas'),
@@ -961,7 +962,10 @@ async function archiveEssayFlow(essayId) {
   if (!window.confirm(`Archive “${essay?.title || 'this essay'}”? It moves to Archive/ and leaves the catalog.`)) return;
   try {
     const result = await postJson(`/api/essays/${essayId}/archive`, {});
-    await handleLifecycleResult(result, 'archived');
+    // Name the destination. "archived" alone reads as "gone"; the note is fine,
+    // it just moved, and the writer should not have to go looking for it.
+    const where = String(result?.path || '').trim();
+    await handleLifecycleResult(result, where ? `archived to ${where}` : 'archived');
   } catch (err) {
     showRailSoonStatus(`archive failed: ${err.message}`);
   }
@@ -1082,13 +1086,29 @@ function gardenCardMarkup(essay, opts = {}) {
 }
 
 
+// Essays outside the default scope (archived, today) are fetched on demand and
+// cached, so switching the filter back and forth does not refetch.
+async function loadScopedEssays(scope) {
+  if (scope !== 'archived') return;
+  try {
+    const payload = await getJson('/api/essays?scope=archived');
+    state.archivedEssays = payload.essays || [];
+  } catch (err) {
+    state.archivedEssays = [];
+    showRailSoonStatus(`archived essays failed to load: ${err.message}`);
+  }
+}
+
 function renderAllIdeas() {
   const container = document.getElementById('all-ideas-cards');
   const countEl = document.getElementById('all-ideas-count');
   if (!container) return;
   const f = state.aiFilters;
   const status = f.status || 'all';
-  let essays = state.essays.filter((essay) => {
+  // Archived essays are outside the default API scope, so they come from their
+  // own list rather than the loaded catalog.
+  const source = status === 'archived' ? state.archivedEssays : state.essays;
+  let essays = source.filter((essay) => {
     if (f.topic !== 'all' && topicForEssay(essay) !== f.topic) return false;
     if (f.totem !== 'all' && essay.totem !== f.totem) return false;
     if (!window.AirdateFilters.matchesState(essay, status)) return false;
@@ -1099,7 +1119,9 @@ function renderAllIdeas() {
     if (f.sort === 'title') return a.title.localeCompare(b.title);
     return new Date(b.last_touched || 0) - new Date(a.last_touched || 0);
   });
-  if (countEl) countEl.textContent = `${essays.length} of ${state.essays.length}`;
+  // The denominator is the list actually being filtered, so "1 of 3" cannot
+  // mean one archived essay out of three active ones.
+  if (countEl) countEl.textContent = `${essays.length} of ${source.length}`;
   container.innerHTML = essays.length
     ? essays.map((essay) => gardenCardMarkup(essay, { actions: true })).join('')
     : '<div class="garden-empty">No ideas match these filters.</div>';
@@ -1852,6 +1874,21 @@ function setEditorStatus(message, kind) {
   editorStatusEl.dataset.kind = kind || '';
 }
 
+// Status line ending in one inline action button. Used where the writer can
+// fix the thing the message just described without leaving the editor.
+function setEditorStatusWithAction(message, actionLabel, onAction, kind) {
+  if (!editorStatusEl) return;
+  editorStatusEl.textContent = '';
+  editorStatusEl.append(document.createTextNode(message || ''));
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'settings-button editor-status-action';
+  button.textContent = actionLabel;
+  button.addEventListener('click', onAction);
+  editorStatusEl.append(document.createTextNode(' '), button);
+  editorStatusEl.dataset.kind = kind || '';
+}
+
 // Status line with one clickable anchor in the middle: `before`, the link, `after`.
 function setEditorStatusWithLink(before, url, linkText, after, kind) {
   if (!editorStatusEl) return;
@@ -2201,6 +2238,10 @@ async function loadEssays() {
   const payload = await getJson('/api/essays');
   state.essays = payload.essays || [];
   migrateHashIdsToUid();
+  // The state filter persists across reloads, so a saved 'archived' selection
+  // has to bring its own list or the catalog opens empty for no stated reason.
+  const scope = window.AirdateFilters.scopeForState(state.aiFilters.status);
+  if (scope) await loadScopedEssays(scope);
   renderAll();
   populateEditorTagControls();
 }
@@ -2294,9 +2335,11 @@ function bindEvents() {
     saveAiFilters();
     renderAllIdeas();
   });
-  document.getElementById('ai-status')?.addEventListener('change', (event) => {
+  document.getElementById('ai-status')?.addEventListener('change', async (event) => {
     state.aiFilters.status = event.target.value;
     saveAiFilters();
+    const scope = window.AirdateFilters.scopeForState(state.aiFilters.status);
+    if (scope) await loadScopedEssays(scope);
     renderAllIdeas();
   });
   document.getElementById('ai-clear')?.addEventListener('click', () => {
@@ -2429,6 +2472,26 @@ function bindEvents() {
     }
   }
 
+  // Clears substack_draft_id/url from the note, then sends again. The confirm
+  // exists because the wrong answer here (the draft was published, not deleted)
+  // would put a second copy of a live post in Substack.
+  async function forgetDraftLinkAndResend(staleId) {
+    if (!state.selectedId) return;
+    if (!window.confirm(
+      `Forget draft ${staleId} and send this as a NEW Substack draft?\n\n`
+      + 'Do this only if that draft was deleted. If it was published instead, '
+      + 'a new draft would duplicate a post that is already live.',
+    )) return;
+    setEditorStatus('forgetting the old draft link...', 'pending');
+    try {
+      await postJson(`/api/essays/${state.selectedId}/forget-draft-link`, {});
+      renderEditorDraftLink('');
+      document.getElementById('editor-send')?.click();
+    } catch (err) {
+      setEditorStatus(`could not clear the draft link: ${err.message}`, 'bad');
+    }
+  }
+
   function reportSendResult(result) {
     editorOutput.textContent = JSON.stringify(result, null, 2);
     const warningsNote = transportWarningsNote(result);
@@ -2468,8 +2531,24 @@ function bindEvents() {
       case 'timeout':
         setEditorStatus(`send timed out: ${result.message || 'check Substack for the draft before sending again.'}${warningsNote}`, 'bad');
         break;
-      default:
+      default: {
+        // A draft id we stored no longer resolves. The message already explains
+        // it; what was missing was any way to act on it short of hand-editing
+        // frontmatter. Clearing the link is deliberately the writer's call:
+        // substack_draft.py will not silently create a replacement, because a
+        // draft that was published rather than deleted would be duplicated.
+        const stale = String(result.stale_draft_id || '').trim();
+        if (stale) {
+          setEditorStatusWithAction(
+            `Substack no longer has draft ${stale}. If it was deleted, forget the link and send this as a new draft.`,
+            'forget the link and send again',
+            () => forgetDraftLinkAndResend(stale),
+            'bad',
+          );
+          break;
+        }
         setEditorStatus(`${result.message || 'saved locally, but the Substack draft was not created.'}${warningsNote}`, 'bad');
+      }
     }
     return false;
   }

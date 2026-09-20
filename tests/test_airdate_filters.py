@@ -26,9 +26,40 @@ def essay(**fields):
 
 
 class StateFilterTests(unittest.TestCase):
-    def test_filter_is_the_lifecycle_plus_needs_attention(self):
+    def test_filter_is_the_lifecycle_plus_needs_attention_and_archived(self):
         self.assertEqual(run_filters("filters.STATE_FILTER_VALUES"),
-                         ["all", "writers-room", "writers-likey", "ready-for-air", "live", "needs-attention"])
+                         ["all", "writers-room", "writers-likey", "ready-for-air", "live",
+                          "needs-attention", "archived"])
+
+
+class ArchivedIsReachableTests(unittest.TestCase):
+    """Archiving used to be one-way from the catalog's point of view: the note
+    moved to Archive/, left the default API scope, and no filter value could ask
+    for it back. The server always supported ?scope=archived."""
+
+    def test_archived_is_an_offered_state(self):
+        self.assertIn("archived", run_filters("filters.STATE_FILTER_VALUES"))
+
+    def test_archived_matches_only_archived_essays(self):
+        self.assertTrue(run_filters(
+            "filters.matchesState(%s, 'archived')" % json.dumps(essay(status="Archived"))))
+        self.assertFalse(run_filters(
+            "filters.matchesState(%s, 'archived')" % json.dumps(essay(status="Live"))))
+
+    def test_archived_needs_its_own_api_scope(self):
+        # Archived essays are not in the loaded catalog, so the filter has to
+        # tell the caller to go and fetch them.
+        self.assertEqual(run_filters("filters.scopeForState('archived')"), "archived")
+
+    def test_lifecycle_states_need_no_extra_fetch(self):
+        for value in ("all", "live", "writers-room", "needs-attention"):
+            self.assertEqual(run_filters(f"filters.scopeForState({json.dumps(value)})"), "",
+                             f"{value} should filter the list already loaded")
+
+    def test_an_archived_essay_is_not_swept_into_the_lifecycle_states(self):
+        archived = json.dumps(essay(status="Archived"))
+        for value in ("writers-room", "writers-likey", "ready-for-air", "live"):
+            self.assertFalse(run_filters(f"filters.matchesState({archived}, {json.dumps(value)})"))
 
     def test_needs_attention(self):
         cases = {

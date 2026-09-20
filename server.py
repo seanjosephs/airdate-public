@@ -1187,7 +1187,10 @@ def finish_transport_result(result: dict[str, Any]) -> dict[str, Any]:
     the typed error_kind and its sentence, and the warnings it collected on
     either outcome. A failure no layer classified is a transport failure."""
     payload = transport_payload(result)
-    for key in ("error_kind", "message", "draft_id", "edit_url"):
+    # stale_draft_id rides along so the editor can offer recovery instead of
+    # asking the writer to hand-edit YAML. substack_draft.py sets it when
+    # Substack 404s a draft id we stored.
+    for key in ("error_kind", "message", "draft_id", "edit_url", "stale_draft_id"):
         if not _stringify(result.get(key)).strip() and _stringify(payload.get(key)).strip():
             result[key] = payload[key]
     raw_warnings = result.get("warnings")
@@ -3342,6 +3345,24 @@ class Handler(BaseHTTPRequestHandler):
                     essay_id,
                     "Archived",
                     None,
+                    payload.get("expected_mtime"),
+                    payload.get("expected_content_hash"),
+                ))
+                return
+            if essay_id and action == "forget-draft-link":
+                # Recovery for a draft deleted in Substack. Deliberately an
+                # explicit, writer-initiated action: substack_draft.py refuses
+                # to silently create a replacement, because if the old draft was
+                # published instead of deleted a new one would duplicate a live
+                # post. Clearing the link is the writer saying it is gone.
+                # The effective status, which honors folder placement, not the
+                # raw frontmatter value: clearing the link must not also move
+                # the note.
+                current = _stringify(get_essay_detail(essay_id).get("status")) or "Live"
+                self.send_json(set_essay_status(
+                    essay_id,
+                    current,
+                    {"substack_draft_id": "", "substack_draft_url": ""},
                     payload.get("expected_mtime"),
                     payload.get("expected_content_hash"),
                 ))
