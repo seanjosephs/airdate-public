@@ -209,22 +209,28 @@ if Post is not None:
     check("FIXED tag line no longer becomes a heading",
           [n.get("type") for n in emit_repaired("Prose.\n\n#avss #content #writing\n")],
           ["paragraph"])
-    # Raw-parser damage, still documented so the contrast is explicit.
-    check_xfail("XFAIL raw parser still welds (proves the repair is what fixes it)",
-                len(emit("### Week 1\nThat piece is personal.\n")), 1)
-    check_xfail("XFAIL raw parser still makes a tag line a heading",
-                node_types("#avss #content #writing\n"), ["heading"])
-    check_xfail("XFAIL table rows become one paragraph each",
-                node_types("| A | B |\n|---|---|\n| 1 | 2 |\n"),
-                ["paragraph", "paragraph", "paragraph"])
-    check_xfail("XFAIL nested list flattens to one level",
-                len(emit("- Parent\n  - Child\n  - Second\n")[0]["content"]), 3)
-    check_xfail("XFAIL `1)` list is not a list",
-                node_types("1) First\n2) Second\n"), ["paragraph", "paragraph"])
-    check_xfail("XFAIL single-item list is literal text",
-                node_types("- lone bullet\n"), ["paragraph"])
-    check_xfail("XFAIL embed block is discarded entirely",
-                emit("![[diagram.png]]\nThis sentence follows.\n"), [])
+    # Raw-parser behavior. python-substack 0.7.0 repaired most of the damage
+    # these cases used to document as XFAIL, so each is now a regression guard:
+    # if a future client version reintroduces the damage, these fail loudly.
+    check("raw parser no longer welds a heading with the prose under it",
+          len(emit("### Week 1\nThat piece is personal.\n")), 2)
+    check("raw parser no longer makes a tag line a heading",
+          node_types("#avss #content #writing\n"), ["paragraph"])
+    check("raw parser nests a nested list instead of flattening it",
+          len(emit("- Parent\n  - Child\n  - Second\n")[0]["content"]), 1)
+    check("raw parser emits a real ordered_list for `1)` numbering",
+          node_types("1) First\n2) Second\n"), ["ordered_list"])
+    check("raw parser emits a real bullet_list for a single-item list",
+          node_types("- lone bullet\n"), ["bullet_list"])
+    check("an embed block is no longer discarded; its text survives",
+          emit("![[diagram.png]]\nThis sentence follows.\n"),
+          [{"type": "paragraph",
+            "content": [{"type": "text", "text": "![[diagram.png]] This sentence follows."}]}])
+    # Tables CHANGED but are not fixed: still no table node, now collapsed into
+    # one paragraph where it used to be three. obsidian_markdown.scan() still
+    # reports `table`, so a table refuses to send rather than crossing mangled.
+    check_xfail("XFAIL a table still has no table node (one paragraph now, was three)",
+                node_types("| A | B |\n|---|---|\n| 1 | 2 |\n"), ["paragraph"])
 
     # Things the parser already gets right — these must never regress.
     check("flat bullet list emits a bullet_list", node_types("- one\n- two\n"), ["bullet_list"])
@@ -350,8 +356,10 @@ if Post is not None:
                    "Intro sentence:\n- Parent item\nwrapped continuation prose\n  - Child item\nchild wrap\n- Sibling\n")
     invariant_sent("send-path invariant holds for tab-indented ordered items with prose",
                    "Structure:\n\t1.\t**Wake nobody.**\nRecognition is voluntary.\n\t2.\t**Costume matters.**\nPortal, not obstacle.\n")
-    invariant("XFAIL invariant broken by embed swallow",
-              "![[diagram.png]]\nThis sentence follows.\n\nLater prose.\n", False)
+    # Was XFAIL: the embed used to be swallowed whole. 0.7.0 keeps its text, so
+    # the anti-swallow invariant now holds and this guards against regression.
+    invariant("anti-swallow invariant holds for an embed block",
+              "![[diagram.png]]\nThis sentence follows.\n\nLater prose.\n", True)
 
 # Tier 4: corpus canary. Opt-in so the suite stays hermetic; point
 # AIRDATE_FIDELITY_CORPUS at your essays folder to scan your own vault.

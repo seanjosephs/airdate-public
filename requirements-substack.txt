@@ -4,11 +4,16 @@
 # python-substack is an unofficial, cookie-based client (MIT license). Pinned
 # exactly: when Substack changes something and a newer version breaks, this
 # known-good set is what you roll back to. Needs Python 3.10 or newer.
-python-substack==0.1.22
+python-substack==0.7.0
 PyYAML==6.0.3
 requests==2.34.2
-python-dotenv==1.2.2
-certifi==2026.5.20
-charset-normalizer==3.4.7
-idna==3.17
-urllib3==2.7.0
+python-dotenv==1.2.3
+certifi==2026.7.22
+charset-normalizer==3.5.1
+idna==3.20
+urllib3==2.8.0
+
+# Pulled in by python-substack 0.7.0 for Markdown parsing. All MIT.
+markdown-it-py==4.2.0
+mdit-py-plugins==0.6.1
+mdurl==0.1.2

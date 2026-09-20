@@ -90,6 +90,7 @@ MIT. See [LICENSE](LICENSE).
 
 airdate installs, but does not redistribute, its Python dependencies:
 python-substack (MIT), PyYAML (MIT), requests (Apache-2.0), certifi (MPL-2.0),
-urllib3 (MIT), idna (BSD-3-Clause), charset-normalizer (MIT) and python-dotenv
-(BSD-3-Clause). `scripts/setup` fetches them into `.venv-substack` on your own
-machine, at the versions pinned in `requirements-substack.txt`.
+urllib3 (MIT), idna (BSD-3-Clause), charset-normalizer (MIT), python-dotenv
+(BSD-3-Clause), and markdown-it-py, mdit-py-plugins and mdurl (all MIT).
+`scripts/setup` fetches them into `.venv-substack` on your own machine, at the
+versions pinned in `requirements-substack.txt`.
