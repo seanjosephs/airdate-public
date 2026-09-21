@@ -1014,6 +1014,13 @@ def preflight_essay_for_substack(
     # trusting the merged publish payload, which may contain unsaved form data.
     persisted_text = path.read_text(encoding="utf-8", errors="ignore")
     persisted_frontmatter, persisted_body = split_frontmatter(persisted_text)
+    # Advisory only. A key written twice reads as its last copy, which is rarely
+    # what the writer meant; airdate does not write duplicates, so say it is there.
+    for key in duplicated_frontmatter_keys(persisted_text):
+        preflight["warnings"].append({
+            "key": f"duplicate_key_{key}",
+            "message": f"This note has \"{key}\" more than once in its frontmatter; airdate reads the last one.",
+        })
     missing_persisted: list[str] = []
     for field in PERSISTED_DRAFT_FIELDS:
         if not _stringify(persisted_frontmatter.get(field)).strip():
@@ -1356,12 +1363,14 @@ def frontmatter_bounds(text: str) -> tuple[int, int, str] | None:
     return None
 
 
-def _frontmatter_key_spans(lines: list[str]) -> tuple[dict[str, tuple[int, int]], dict[str, str]]:
-    """Map each top-level key to the [start, end) line range it occupies (its key
-    line plus any block-list / indented continuation lines) and to its style
-    ('block' | 'inline' | 'scalar'). Comments and blank lines belong to no key."""
-    spans: dict[str, tuple[int, int]] = {}
-    styles: dict[str, str] = {}
+def _frontmatter_key_spans(lines: list[str]) -> list[tuple[str, int, int, str]]:
+    """Every top-level key occurrence, in file order, as (key, start, end, style):
+    the [start, end) line range it occupies (its key line plus any block-list /
+    indented continuation lines) and its style ('block' | 'inline' | 'scalar').
+    Comments and blank lines belong to no key. A key written twice yields two
+    occurrences; a note like that reads as its last copy, so callers that edit a
+    key have to deal with all of them."""
+    spans: list[tuple[str, int, int, str]] = []
     i, n = 0, len(lines)
     while i < n:
         line = lines[i]
@@ -1384,10 +1393,21 @@ def _frontmatter_key_spans(lines: list[str]) -> tuple[dict[str, tuple[int, int]]
                 j += 1
             else:
                 break
-        spans[key] = (i, j)
-        styles[key] = "block" if is_block else ("inline" if after_colon.startswith("[") else "scalar")
+        spans.append((key, i, j, "block" if is_block else ("inline" if after_colon.startswith("[") else "scalar")))
         i = j
-    return spans, styles
+    return spans
+
+
+def duplicated_frontmatter_keys(text: str) -> list[str]:
+    """Top-level frontmatter keys written more than once, in first-seen order."""
+    bounds = frontmatter_bounds(text)
+    if bounds is None:
+        return []
+    start, close_start, _marker = bounds
+    counts: dict[str, int] = {}
+    for key, _s, _e, _style in _frontmatter_key_spans(text[start:close_start].split("\n")):
+        counts[key] = counts.get(key, 0) + 1
+    return [key for key, count in counts.items() if count > 1]
 
 
 def _block_indent(lines: list[str], start: int, end: int) -> str:
@@ -1444,28 +1464,30 @@ def apply_frontmatter_edits(text: str, changes: dict[str, dict[str, Any]]) -> st
     start, close_start, marker = bounds
     tail = text[close_start:]  # closing fence + body, preserved verbatim
     lines = text[start:close_start].split("\n")
-    spans, styles = _frontmatter_key_spans(lines)
-    start_to_key = {span[0]: key for key, span in spans.items()}
+    occurrences = {s_start: (key, s_end, style) for key, s_start, s_end, style in _frontmatter_key_spans(lines)}
 
     new_lines: list[str] = []
     handled: set[str] = set()
     i, n = 0, len(lines)
     while i < n:
-        key = start_to_key.get(i)
-        if key is None:
+        occurrence = occurrences.get(i)
+        if occurrence is None:
             new_lines.append(lines[i])  # comment / blank / stray line
             i += 1
             continue
-        s_start, s_end = spans[key]
+        key, s_end, style = occurrence
         if key in changes:
-            handled.add(key)
+            # A changed key is written once, where it first appears. Any further
+            # copies of it are dropped, so the note cannot go on reading as an
+            # older value after the edit. Keys not in `changes` are never touched,
+            # repeated or not.
             after = changes[key]["after"]
-            if after not in (None, "", []):
-                new_lines.extend(_render_key_lines(
-                    key, after, styles.get(key, "scalar"), _block_indent(lines, s_start, s_end)))
-            # else: deletion — emit nothing for this span
+            if key not in handled and after not in (None, "", []):
+                new_lines.extend(_render_key_lines(key, after, style, _block_indent(lines, i, s_end)))
+            # else: deletion, or a later copy: emit nothing for this span
+            handled.add(key)
         else:
-            new_lines.extend(lines[s_start:s_end])  # unchanged: verbatim
+            new_lines.extend(lines[i:s_end])  # unchanged: verbatim
         i = s_end
 
     for key, change in changes.items():
