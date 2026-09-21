@@ -245,6 +245,130 @@ your clipboard and opens ChatGPT; you generate the image there and drag it onto
 the hero field. Change the prompt's style line in `config.json`
 (`thumbnail.style_prompt`; `{publication_name}` is filled in for you).
 
+## Let your AI fill in the metadata
+
+airdate can hold a lot of detail about an essay: a subtitle, a summary, tags,
+an email subject, search and social text, a thumbnail description. You do not
+have to type any of it. If you use an AI assistant that can read and write your
+Obsidian vault (Claude, ChatGPT, or another one, connected through an Obsidian
+MCP server or a similar plugin), it can read the essay and fill the blanks.
+
+You stay in charge. The prompt below tells the AI to show you what it would
+write before it writes anything, to fill only what is empty, and to leave alone
+everything airdate manages itself.
+Treat what comes back as a first draft: read it, and change whatever does
+not sound like you.
+
+### Before you start
+
+- Know the path of the note inside your vault, for example
+  `Essays/My Essay.md`.
+- The essay needs a title and a body. Everything else can be blank.
+
+### The short version (simplified metadata)
+
+Paste this, with your note's path in the first line.
+
+```text
+Read the note at [PATH TO YOUR ESSAY] in my Obsidian vault. It is an essay I
+publish with a tool called airdate, which reads the note's YAML frontmatter.
+
+Fill in only these three frontmatter keys, and only where they are missing or
+empty:
+
+- subtitle: one line that sits under the title. It should add something the
+  title does not say. No more than about 120 characters.
+- summary: two or three plain sentences saying what the essay is about. It
+  appears on the essay's card and as the preview line in the email.
+- tags: up to five, lowercase, one or two words each, as a YAML list. Choose
+  what the essay is actually about, not what would get clicks.
+
+Rules:
+1. Take everything from the essay itself. Do not invent facts, quotes or
+   claims that are not in it. Match its voice; do not make it sound like
+   marketing.
+2. Do not change the essay body, not a word.
+3. Do not change any key that already has a value, and do not touch any key I
+   did not list.
+4. Never write a key that is already there. Each key appears once.
+5. Show me the exact lines you plan to add, and wait for my yes before you
+   write to the note.
+```
+
+### The full version (complete metadata)
+
+```text
+Read the note at [PATH TO YOUR ESSAY] in my Obsidian vault. It is an essay I
+publish with a tool called airdate, which reads the note's YAML frontmatter
+and sends the essay to Substack as a draft.
+
+Fill in the frontmatter keys below, and only where they are missing or empty.
+
+About the essay
+- subtitle: one line under the title that adds something the title does not
+  say. About 120 characters at most.
+- summary: two or three plain sentences on what the essay is about. Shown on
+  the essay's card and used as the email preview if no other preview is set.
+- tags: up to five, lowercase, one or two words each, as a YAML list.
+- slug: the web address ending. Lowercase words joined by hyphens, taken from
+  the title, short enough to read aloud. Skip this if the title already makes
+  a good one; airdate derives it from the title when it is blank.
+
+Email
+- email_subject: the subject line subscribers see. It can be the title. If you
+  write a different one, keep it under about 60 characters and make it honest
+  about what is inside.
+- email_preview_text: the grey line after the subject in an inbox. One
+  sentence, about 90 characters, that does not repeat the subject.
+
+Search and sharing
+- seo_title: the title as a search result. About 60 characters at most.
+- seo_description: one or two sentences for the search result. About 155
+  characters at most.
+- social_title: the title as it appears when the link is shared. Often the
+  same as the title.
+- social_description: one sentence for the share card.
+
+Image
+- thumbnail_prompt: a description of an image that would suit this essay,
+  written so that I could hand it to an image generator or an illustrator.
+  Describe the subject, the mood and the composition. Do not ask for text in
+  the image.
+- thumbnail_alt: one sentence describing that image for someone who cannot
+  see it.
+
+Leave these keys alone, whatever they contain. airdate manages them:
+airdate_uid, status, scheduled_at, substack_draft_id, substack_draft_url,
+substack_url, published_date, source_role, draft_of, hero, hero_image,
+publication, audience, send_email, publish_on_web, comment_permissions.
+
+Rules:
+1. Take everything from the essay itself. Do not invent facts, quotes or
+   claims that are not in it. Match its voice; do not make it sound like
+   marketing.
+2. Do not change the essay body, not a word.
+3. Do not change any key that already has a value, and do not touch any key
+   that is not in the list above.
+4. Never write a key that is already there. Each key appears once in the
+   frontmatter.
+5. Keep the frontmatter valid YAML. Put text values in double quotes.
+6. Show me the exact lines you plan to add, and wait for my yes before you
+   write to the note.
+```
+
+### After it runs
+
+Open the essay in airdate. Everything the AI wrote is there to read and
+change. Press check readiness: if a key ended up in the note twice, airdate
+says so there.
+
+### Worth knowing
+
+- The AI reads your whole essay to do this. If the essay is private until it
+  is published, use an assistant you trust with it.
+- airdate never sends anything to an AI. This all happens between your
+  assistant and your vault; airdate only reads the note afterward.
+
 ## Optional settings in config.json
 
 `config.example.json` shows every key. Beyond the settings page you can set:
