@@ -26,6 +26,24 @@ KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 # never be one of these.
 RESERVED_FOLDERS = ("published", "archive")
 
+# The essay editor. A mode is a preset of sections; flipping any one section
+# makes it "custom". These are the sections a writer can switch; title,
+# subtitle, summary, the script and post settings are always on.
+EDITOR_MODES = ("simplified", "complete", "custom")
+EDITOR_SECTIONS = (
+    "totem",
+    "on_the_board",
+    "advanced",
+    "email_comments",
+    "seo_social",
+    "thumbnail",
+    "notes",
+    "scheduled_time",
+)
+# How tall the script area may be remembered, in CSS pixels.
+SCRIPT_HEIGHT_MIN = 240
+SCRIPT_HEIGHT_MAX = 2400
+
 DEFAULT_STYLE_PROMPT = (
     "Create a text-free Substack essay thumbnail for {publication_name}. "
     "Use a refined editorial illustration style, high-contrast enough for small "
@@ -82,6 +100,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "editor": {
         "mode": "simplified",          # simplified | complete | custom
         "sections": {},                # per-section overrides; empty = follow mode
+        # The script area's height once the writer has dragged it; null means
+        # airdate's own default.
+        "script_height": None,
     },
     # The red-pen jabs on old script pages. Twenty ship; a writer can add
     # their own lines or turn the whole thing off.
@@ -205,6 +226,37 @@ def _check_keywords(value: Any, where: str, errors: list[str]) -> None:
         errors.append(f"{where}.keywords must map words to whole-number weights.")
 
 
+def validate_editor(editor: Any, known_sections_only: bool = False) -> list[str]:
+    """editor.mode, editor.sections and editor.script_height.
+
+    config.json is checked loosely on sections (any switch name), so a file
+    written by a later airdate still loads; a change arriving from the browser
+    is checked against the sections this airdate has."""
+    errors: list[str] = []
+    if not isinstance(editor, dict):
+        return ["editor must be an object."]
+    if editor.get("mode") not in EDITOR_MODES:
+        errors.append("editor.mode must be \"simplified\", \"complete\" or \"custom\".")
+    sections = editor.get("sections", {})
+    if not isinstance(sections, dict) or not all(
+        isinstance(key, str) and isinstance(value, bool) for key, value in sections.items()
+    ):
+        errors.append("editor.sections must map section names to true or false.")
+    elif known_sections_only:
+        unknown = sorted(key for key in sections if key not in EDITOR_SECTIONS)
+        if unknown:
+            errors.append(f"editor.sections has no section called {', '.join(unknown)}.")
+    height = editor.get("script_height")
+    if height is not None and (
+        not isinstance(height, int) or isinstance(height, bool)
+        or not SCRIPT_HEIGHT_MIN <= height <= SCRIPT_HEIGHT_MAX
+    ):
+        errors.append(
+            f"editor.script_height must be a whole number from {SCRIPT_HEIGHT_MIN} to {SCRIPT_HEIGHT_MAX}, or null."
+        )
+    return errors
+
+
 def validate_config(config: dict[str, Any]) -> list[str]:
     """Structural checks on the whole file. Filesystem checks live in
     check_vault so a config can be valid while its vault is offline."""
@@ -313,6 +365,8 @@ def validate_config(config: dict[str, Any]) -> list[str]:
             errors.append(f"links[{index}].label is required.")
         elif not isinstance(link.get("url"), str) or not re.match(r"^https?://", link["url"]):
             errors.append(f"links[{index}].url must start with http:// or https://.")
+
+    errors.extend(validate_editor(config.get("editor", {})))
     return errors
 
 

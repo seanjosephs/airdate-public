@@ -100,7 +100,8 @@
   },
   "editor": {
     "mode": "simplified",
-    "sections": {}
+    "sections": {},
+    "script_height": null
   },
   "red_pen": {
     "enabled": true,

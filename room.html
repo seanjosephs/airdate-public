@@ -9,8 +9,9 @@
   <link rel="stylesheet" href="/static/room/room.css?v=2">
   <link rel="stylesheet" href="/static/room/cards.css?v=2">
   <link rel="stylesheet" href="/static/room/board.css?v=1">
+  <link rel="stylesheet" href="/static/room/editor.css?v=1">
   <script src="/static/room/api.js?v=1" defer></script>
-  <script src="/static/room/cards.js?v=2" defer></script>
+  <script src="/static/room/cards.js?v=3" defer></script>
   <script src="/static/room/keys.js?v=1" defer></script>
   <script src="/static/room/pool.js?v=2" defer></script>
   <script src="/static/room/dates.js?v=1" defer></script>
@@ -18,6 +19,8 @@
   <script src="/static/room/feedback.js?v=1" defer></script>
   <script src="/static/room/board-view.js?v=1" defer></script>
   <script src="/static/room/placing.js?v=1" defer></script>
+  <script src="/static/room/editor.js?v=1" defer></script>
+  <script src="/static/room/editor-view.js?v=1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#room-main">skip to the essays</a>
@@ -140,5 +143,283 @@
       <div class="pool-columns" id="pool"></div>
     </section>
   </main>
+
+  <!-- The essay editor (slice 4a). A div dialog rather than a native <dialog>
+       opened with showModal(): the tour in slice 4c puts its callout on
+       document.body, and a modal <dialog> would make it inert. The page
+       behind is made inert instead (editor-view.js). -->
+  <div class="editor" id="editor" role="dialog" aria-modal="true" aria-labelledby="ed-title" hidden>
+    <header class="ed-head">
+      <button type="button" class="ed-btn ed-close" id="ed-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>close</button>
+      <div class="ed-scrap" id="ed-scrap" role="img" aria-label="status"></div>
+      <div class="ed-titles">
+        <h1 class="ed-title" id="ed-title">essay</h1>
+        <p class="ed-status" id="ed-status"></p>
+      </div>
+      <span class="ed-grow"></span>
+      <p class="ed-state" id="ed-state" role="status"></p>
+      <a class="ed-btn ed-obsidian" id="ed-obsidian" href="#" aria-label="open in obsidian" title="open in obsidian" hidden><svg viewBox="0 0 24 24" width="25" height="25" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 4 9l3 13h10l3-13z"/><path d="M12 2 7 22"/><path d="M12 2 17 22"/><path d="M4 9h16"/></svg></a>
+      <button type="submit" form="ed-form" class="ed-save" id="ed-save">save</button>
+    </header>
+
+    <div class="ed-notices" id="ed-notices">
+      <div class="ed-conflict" id="ed-conflict" hidden>
+        <p class="ed-conflict-say" id="ed-conflict-say" role="alert"></p>
+        <p class="ed-conflict-more">reload from obsidian puts the note as it is now on this page, in place of what is here. copy the script first to keep your version of the writing.</p>
+        <div class="ed-actions">
+          <button type="button" class="ed-save is-dirty" id="ed-reload">reload from obsidian</button>
+          <button type="button" class="ed-btn" id="ed-copy">copy the script</button>
+        </div>
+        <div class="ed-conflict-feedback" id="ed-conflict-feedback"></div>
+      </div>
+      <div class="ed-guard" id="ed-guard" role="alertdialog" aria-labelledby="ed-guard-title" aria-describedby="ed-guard-text" hidden>
+        <p class="ed-guard-title" id="ed-guard-title">close without saving?</p>
+        <p class="ed-guard-text" id="ed-guard-text">what you changed on this page is not in obsidian yet.</p>
+        <div class="ed-actions">
+          <button type="button" class="ed-save is-dirty" id="ed-guard-save">save and close</button>
+          <button type="button" class="ed-btn" id="ed-guard-discard">close without saving</button>
+          <button type="button" class="ed-btn" id="ed-guard-keep">keep editing</button>
+        </div>
+      </div>
+      <div class="ed-feedback" id="ed-feedback"></div>
+    </div>
+
+    <div class="ed-body">
+      <form class="ed-main" id="ed-form" novalidate>
+        <div class="ed-block">
+          <div class="ed-row2">
+            <div class="ed-field">
+              <label for="ed-f-title">title</label>
+              <input id="ed-f-title" data-field="title" type="text" autocomplete="off">
+            </div>
+            <div class="ed-field">
+              <label for="ed-f-subtitle">subtitle</label>
+              <input id="ed-f-subtitle" data-field="subtitle" type="text" placeholder="one line under the title" autocomplete="off">
+            </div>
+          </div>
+            <div class="ed-field">
+              <label for="ed-f-summary">summary</label>
+              <p class="ed-hint" id="ed-f-summary-hint">shown on the card and used as the email preview.</p>
+              <textarea id="ed-f-summary" data-field="summary" rows="2" aria-describedby="ed-f-summary-hint"></textarea>
+            </div>
+        </div>
+
+        <div class="ed-script">
+          <div class="ed-script-head">
+            <label for="ed-f-body">the script</label>
+            <span class="ed-grow"></span>
+            <span class="ed-count" id="ed-count"></span>
+          </div>
+          <div class="ed-script-frame">
+            <textarea id="ed-f-body" data-field="body" spellcheck="true"></textarea>
+            <div class="ed-resize" id="ed-resize" role="separator" tabindex="0" aria-orientation="horizontal" aria-controls="ed-f-body" aria-label="script height" aria-describedby="ed-resize-help" aria-valuemin="240" aria-valuemax="2400" aria-valuenow="560">
+              <span class="ed-resize-grip" aria-hidden="true"></span><span aria-hidden="true">drag to resize. airdate remembers the size.</span>
+            </div>
+            <p class="visually-hidden" id="ed-resize-help">the up and down arrow keys change the height. airdate remembers it.</p>
+          </div>
+          <div class="ed-resize-feedback" id="ed-resize-feedback"></div>
+        </div>
+
+        <section class="ed-section" aria-labelledby="ed-post-heading">
+          <h2 id="ed-post-heading">post settings</h2>
+          <div class="ed-row2">
+            <div class="ed-stack">
+            <div class="ed-field">
+              <label for="ed-f-post_type">post type</label>
+              <select id="ed-f-post_type" data-field="post_type"><option value="text">text essay</option><option value="podcast">podcast</option><option value="video">video</option><option value="thread">thread</option><option value="note">note</option></select>
+            </div>
+              <div class="ed-field" data-section="totem">
+                <label for="ed-f-totem">totem</label>
+                <p class="ed-hint" id="ed-f-totem-hint">your mark for this kind of work.</p>
+                <select id="ed-f-totem" data-field="totem" aria-describedby="ed-f-totem-hint"></select>
+              </div>
+            </div>
+            <div class="ed-field">
+              <label for="ed-hero-file">hero image</label>
+              <div class="ed-hero" id="ed-hero">
+                <input type="file" id="ed-hero-file" accept="image/gif,image/jpeg,image/png,image/webp" aria-describedby="ed-hero-sub">
+                <div class="ed-hero-empty" id="ed-hero-empty">
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="15" height="14" rx="2"/><path d="M3 16l4.5-4.5 3.5 3.5 2.5-2.5L18 17M19 3v6M16 6h6"/></svg>
+                  <p class="ed-hero-lead">drop your hero image here</p>
+                  <p class="ed-hero-sub" id="ed-hero-sub">or <span class="ed-hero-choose">choose a file</span>. it is saved into your vault.</p>
+                </div>
+                <div class="ed-hero-filled" id="ed-hero-filled" hidden>
+                  <span class="ed-hero-thumb"><img id="ed-hero-img" alt="" width="132" height="84" decoding="async"></span>
+                  <span class="ed-hero-words">
+                    <span class="ed-hero-name" id="ed-hero-name"></span>
+                    <span class="ed-hero-sub">drop a new image to replace it</span>
+                  </span>
+                </div>
+              </div>
+              <div class="ed-hero-feedback" id="ed-hero-feedback"></div>
+            </div>
+          </div>
+          <div class="ed-field">
+            <label for="ed-tag-input">tags</label>
+            <div class="ed-tags" id="ed-tags">
+              <ul class="ed-chips" id="ed-chips" aria-label="tags on this essay"></ul>
+              <input id="ed-tag-input" type="text" placeholder="add a tag" autocomplete="off" aria-describedby="ed-tag-help">
+            </div>
+            <p class="visually-hidden" id="ed-tag-help">enter or a comma adds the tag.</p>
+            <p class="visually-hidden" id="ed-tag-say" role="status"></p>
+          </div>
+          <div class="ed-presets" id="ed-presets">
+            <label for="ed-preset" class="visually-hidden">add a tag preset</label>
+            <select id="ed-preset"><option value="">add a preset</option></select>
+            <p class="ed-hint">a preset is a saved group of up to five tags, added in one click. make them in settings, under your tags.</p>
+          </div>
+        </section>
+
+        <section class="ed-disclosure" data-section="advanced">
+          <h2 class="ed-disclosure-head">
+            <button type="button" class="ed-disclosure-button" id="ed-advanced-button" aria-expanded="true" aria-controls="ed-advanced-panel"><svg class="ed-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg><span>advanced</span></button>
+          </h2>
+          <div class="ed-disclosure-panel" id="ed-advanced-panel" role="region" aria-labelledby="ed-advanced-button">
+            <div class="ed-row2">
+            <div class="ed-field">
+              <label for="ed-f-slug">slug</label>
+              <input id="ed-f-slug" data-field="slug" type="text" placeholder="leave blank to use the title" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="ed-field">
+              <label for="ed-f-section">section</label>
+              <input id="ed-f-section" data-field="section" type="text" placeholder="no section" autocomplete="off">
+            </div>
+            </div>
+          </div>
+        </section>
+        <section class="ed-disclosure" data-section="email_comments">
+          <h2 class="ed-disclosure-head">
+            <button type="button" class="ed-disclosure-button" id="ed-email_comments-button" aria-expanded="true" aria-controls="ed-email_comments-panel"><svg class="ed-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg><span>email and comments</span></button>
+          </h2>
+          <div class="ed-disclosure-panel" id="ed-email_comments-panel" role="region" aria-labelledby="ed-email_comments-button">
+            <div class="ed-row2">
+            <div class="ed-field">
+              <label for="ed-f-email_subject">email subject</label>
+              <p class="ed-hint" id="ed-f-email_subject-hint">starts as your title. change it only if the email needs a different line.</p>
+              <input id="ed-f-email_subject" data-field="email_subject" type="text" aria-describedby="ed-f-email_subject-hint" autocomplete="off">
+            </div>
+            <div class="ed-field">
+              <label for="ed-f-email_preview_text">email preview text</label>
+              <p class="ed-hint" id="ed-f-email_preview_text-hint">blank means airdate sends your summary.</p>
+              <input id="ed-f-email_preview_text" data-field="email_preview_text" type="text" placeholder="using your summary" aria-describedby="ed-f-email_preview_text-hint" autocomplete="off">
+            </div>
+            </div>
+            <fieldset class="ed-fieldset">
+              <legend>who gets it</legend>
+              <div class="ed-options">
+                <label class="ed-option"><input type="radio" name="ed-audience" data-field="audience" value="everyone">everyone</label>
+                <label class="ed-option"><input type="radio" name="ed-audience" data-field="audience" value="free">free subscribers</label>
+                <label class="ed-option"><input type="radio" name="ed-audience" data-field="audience" value="paid">paid subscribers</label>
+                <label class="ed-option"><input type="radio" name="ed-audience" data-field="audience" value="founding">founding members</label>
+              </div>
+              <div class="ed-options">
+                <label class="ed-option"><input type="checkbox" data-field="publish_on_web">post on website</label>
+                <label class="ed-option"><input type="checkbox" data-field="send_email">send email and app inbox</label>
+                <label class="ed-option"><input type="checkbox" data-field="free_preview">add free preview</label>
+              </div>
+            </fieldset>
+            <div class="ed-row2">
+            <div class="ed-field">
+              <label for="ed-f-comment_permissions">comments</label>
+              <select id="ed-f-comment_permissions" data-field="comment_permissions"><option value="everyone">everyone can comment</option><option value="subscribers">subscribers can comment</option><option value="paid">paid subscribers can comment</option><option value="none">no comments</option></select>
+            </div>
+            <div class="ed-field">
+              <label for="ed-f-test_email_recipients">test email recipients</label>
+              <p class="ed-hint" id="ed-f-test_email_recipients-hint">comma separated. used for a pre-send check.</p>
+              <input id="ed-f-test_email_recipients" data-field="test_email_recipients" type="text" inputmode="email" placeholder="you@example.com" aria-describedby="ed-f-test_email_recipients-hint" autocomplete="off" spellcheck="false">
+            </div>
+            </div>
+          </div>
+        </section>
+        <section class="ed-disclosure" data-section="seo_social">
+          <h2 class="ed-disclosure-head">
+            <button type="button" class="ed-disclosure-button" id="ed-seo_social-button" aria-expanded="true" aria-controls="ed-seo_social-panel"><svg class="ed-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg><span>seo and social</span></button>
+          </h2>
+          <div class="ed-disclosure-panel" id="ed-seo_social-panel" role="region" aria-labelledby="ed-seo_social-button">
+            <div class="ed-row2">
+            <div class="ed-field">
+              <label for="ed-f-seo_title">seo title</label>
+              <input id="ed-f-seo_title" data-field="seo_title" type="text" autocomplete="off">
+            </div>
+            <div class="ed-field">
+              <label for="ed-f-canonical_url">canonical url</label>
+              <input id="ed-f-canonical_url" data-field="canonical_url" type="url" placeholder="only if it was first published somewhere else" autocomplete="off" spellcheck="false">
+            </div>
+            </div>
+            <div class="ed-field">
+              <label for="ed-f-seo_description">seo description</label>
+              <textarea id="ed-f-seo_description" data-field="seo_description" rows="2" placeholder="blank means airdate uses your summary"></textarea>
+            </div>
+            <div class="ed-row2">
+              <div class="ed-field">
+                <p class="ed-label" id="ed-published-label">published date</p>
+                <p class="ed-readonly" id="ed-published"></p>
+              </div>
+              <div class="ed-field">
+                <p class="ed-label" id="ed-live-label">live post url</p>
+                <p class="ed-readonly" id="ed-live"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="ed-disclosure" data-section="thumbnail">
+          <h2 class="ed-disclosure-head">
+            <button type="button" class="ed-disclosure-button" id="ed-thumbnail-button" aria-expanded="true" aria-controls="ed-thumbnail-panel"><svg class="ed-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg><span>thumbnail</span></button>
+          </h2>
+          <div class="ed-disclosure-panel" id="ed-thumbnail-panel" role="region" aria-labelledby="ed-thumbnail-button">
+            <div class="ed-field">
+              <label for="ed-f-thumbnail_prompt">thumbnail prompt</label>
+              <p class="ed-hint" id="ed-f-thumbnail_prompt-hint">a starting prompt for your image tool, built from the title, summary and publication name.</p>
+              <textarea id="ed-f-thumbnail_prompt" data-field="thumbnail_prompt" rows="3" aria-describedby="ed-f-thumbnail_prompt-hint"></textarea>
+            </div>
+          </div>
+        </section>
+        <section class="ed-disclosure" data-section="notes">
+          <h2 class="ed-disclosure-head">
+            <button type="button" class="ed-disclosure-button" id="ed-notes-button" aria-expanded="true" aria-controls="ed-notes-panel"><svg class="ed-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg><span>internal notes</span></button>
+          </h2>
+          <div class="ed-disclosure-panel" id="ed-notes-panel" role="region" aria-labelledby="ed-notes-button">
+            <div class="ed-field">
+              <label for="ed-f-notes">notes to yourself</label>
+              <p class="ed-hint" id="ed-f-notes-hint">stays in obsidian. never sent to substack.</p>
+              <textarea id="ed-f-notes" data-field="notes" rows="3" aria-describedby="ed-f-notes-hint"></textarea>
+            </div>
+          </div>
+        </section>
+
+        <p class="ed-hidden-line" id="ed-hidden-line" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span id="ed-hidden-text"></span></p>
+      </form>
+
+      <aside class="ed-rail" aria-label="substack and the board">
+        <div class="ed-conn" id="ed-conn">
+          <span class="ed-conn-dot" aria-hidden="true"></span>
+          <div class="ed-conn-words">
+            <p class="ed-conn-name" id="ed-conn-name">checking substack…</p>
+            <p class="ed-conn-sub" id="ed-conn-sub"></p>
+          </div>
+        </div>
+        <div class="ed-air">
+          <p class="ed-air-label">air date</p>
+          <p class="ed-air-value" id="ed-air-value"></p>
+          <p class="ed-air-hint" id="ed-air-hint" hidden></p>
+        </div>
+        <section class="ed-board" data-section="on_the_board" aria-labelledby="ed-board-heading">
+          <div>
+            <h2 id="ed-board-heading">on the board</h2>
+            <p class="ed-hint">how this essay looks when it goes up. pick once, it sticks.</p>
+          </div>
+          <div class="ed-cork" aria-hidden="true">
+            <div class="board-note ed-note" id="ed-note">
+              <span class="note-pin" id="ed-note-pin" hidden></span>
+              <p class="board-note-title" id="ed-note-title"></p>
+              <p class="board-note-date" id="ed-note-date"></p>
+            </div>
+          </div>
+          <div class="ed-pads" role="group" aria-label="note pad"><button type="button" class="ed-pad" data-pad="sticky" aria-pressed="false">sticky</button><button type="button" class="ed-pad" data-pad="paper" aria-pressed="false">paper</button><button type="button" class="ed-pad" data-pad="index" aria-pressed="false">index card</button></div>
+          <div class="ed-colors" role="group" aria-label="note color"><button type="button" class="ed-color pad-canary" data-color="canary" aria-pressed="false" aria-label="canary"></button><button type="button" class="ed-color pad-blue" data-color="blue" aria-pressed="false" aria-label="blue"></button><button type="button" class="ed-color pad-orange" data-color="orange" aria-pressed="false" aria-label="orange"></button><button type="button" class="ed-color pad-pink" data-color="pink" aria-pressed="false" aria-label="pink"></button><button type="button" class="ed-color pad-green" data-color="green" aria-pressed="false" aria-label="green"></button></div>
+        </section>
+      </aside>
+    </div>
+  </div>
 </body>
 </html>

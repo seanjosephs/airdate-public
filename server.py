@@ -478,7 +478,14 @@ EDITOR_ALLOWED_FIELDS = {
     "substack_url",
     "substack_draft_id",
     "substack_draft_url",
+    # The note this essay goes up on the board as, chosen in the editor's
+    # right rail. Validated in sanitize_updates: only what the board draws.
+    "note_pad",
+    "note_color",
 }
+
+NOTE_PADS = ("sticky", "paper", "index")
+NOTE_COLORS = ("canary", "blue", "orange", "pink", "green")
 
 ORDERED_FRONTMATTER_KEYS = [
     "title",
@@ -520,6 +527,8 @@ ORDERED_FRONTMATTER_KEYS = [
     "thumbnail_prompt",
     "thumbnail_alt",
     "notes",
+    "note_pad",
+    "note_color",
     # Machine-only durable identity — stamped once, never client-settable
     # (deliberately absent from EDITOR_ALLOWED_FIELDS). Last so it stays out of
     # the human-facing top of the Properties editor. Namespaced to avoid
@@ -2035,7 +2044,7 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
                     "starred_at": load_starred().get(essay_id, ""),
                     "excerpt": first_line_excerpt(body),
                     "substack_draft_url": str(frontmatter.get("substack_draft_url") or "").strip(),
-                    "hero_url": vault_asset_url(frontmatter.get("hero_image") or frontmatter.get("hero")),
+                    "hero_url": hero_asset_url(frontmatter.get("hero_image") or frontmatter.get("hero")),
                     "note_pad": str(frontmatter.get("note_pad") or "").strip() or BOARD_DEFAULT_PAD,
                     "note_color": str(frontmatter.get("note_color") or "").strip() or BOARD_DEFAULT_COLOR,
                     "needs_intake": needs_intake,
@@ -2360,18 +2369,56 @@ def ui_config_payload() -> dict[str, Any]:
             "default_pad": BOARD_DEFAULT_PAD,
             "default_color": BOARD_DEFAULT_COLOR,
         },
+        # What the essay editor shows, and how tall the writer left the script.
+        "editor": editor_settings(),
     }
 
 
-def vault_asset_url(value: Any) -> str:
-    """A vault-relative image path as a URL the browser can fetch, or "".
+def editor_settings() -> dict[str, Any]:
+    """The running editor settings, shaped for the browser."""
+    editor = CONFIG.get("editor") if isinstance(CONFIG.get("editor"), dict) else {}
+    mode = editor.get("mode") if editor.get("mode") in airdate_config.EDITOR_MODES else "simplified"
+    sections = editor.get("sections") if isinstance(editor.get("sections"), dict) else {}
+    height = editor.get("script_height")
+    if not isinstance(height, int) or isinstance(height, bool) or not (
+        airdate_config.SCRIPT_HEIGHT_MIN <= height <= airdate_config.SCRIPT_HEIGHT_MAX
+    ):
+        height = None
+    return {
+        "mode": mode,
+        "sections": {str(k): v for k, v in sections.items() if isinstance(v, bool)},
+        "script_height": height,
+    }
 
-    The card and the shelf need the hero image itself, not the boolean-ish
-    readiness signal that was the only hero hint on an index row before."""
-    path = str(value or "").strip()
-    if not path or path.startswith(("http://", "https://", "data:")):
-        return path
-    return f"/vault-asset/{urllib_parse_quote_path(path)}"
+
+EDITOR_SETTING_KEYS = ("mode", "sections", "script_height")
+
+
+def save_editor_settings(payload: dict[str, Any]) -> dict[str, Any]:
+    """Change only editor.* in config.json: the script height the writer
+    dragged to, and (slice 4c's gear sheet) the mode and its sections. The
+    rest of the file is carried over untouched and is not re-validated, so a
+    remembered height never trips over an unrelated setting."""
+    global _essay_cache
+    unknown = sorted(key for key in payload if key not in EDITOR_SETTING_KEYS)
+    if unknown:
+        return {"ok": False, "errors": [f"only the editor's mode, sections and script height change here, not {', '.join(unknown)}."]}
+    if not payload:
+        return {"ok": False, "errors": ["nothing to change."]}
+    current, _, load_error = airdate_config.load_config(DATA_DIR)
+    if load_error:
+        raise ValueError(f"{load_error} Fix or remove the file, then try again.")
+    editor = dict(current.get("editor") or {})
+    for key in EDITOR_SETTING_KEYS:
+        if key in payload:
+            editor[key] = payload[key]
+    errors = airdate_config.validate_editor(editor, known_sections_only=True)
+    if errors:
+        return {"ok": False, "errors": errors}
+    current["editor"] = editor
+    airdate_config.save_config(DATA_DIR, current)
+    load_and_apply_config()
+    return {"ok": True, "editor": editor_settings()}
 
 
 def urllib_parse_quote_path(value: str) -> str:
@@ -2655,7 +2702,36 @@ def get_essay_detail(essay_id: str) -> dict[str, Any]:
         "linked_draft_count": summary.get("linked_draft_count", 0) if summary else 0,
         "is_long_source": summary.get("is_long_source", is_long_source) if summary else is_long_source,
         "obsidian_url": obsidian_url_for(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix()),
+        "hero_url": hero_asset_url(frontmatter.get("hero_image") or frontmatter.get("hero")),
+        # The catalog row, for what only the index knows: when the essay
+        # arrived and when it was starred, which the editor's stamp shows.
+        "row": summary,
     }
+
+
+def hero_asset_url(value: Any) -> str:
+    """The hero image as a URL the editor can show, or "" when it is not a
+    file airdate can find. attach-hero writes the path relative to the essays
+    folder; a writer may have typed one relative to the vault. Both are tried,
+    the essays folder first."""
+    raw = _stringify(value).strip()
+    if not raw:
+        return ""
+    if raw.startswith(("http://", "https://")):
+        return raw
+    relative = raw[2:] if raw.startswith("./") else raw.lstrip("/")
+    try:
+        essays_prefix = OBSIDIAN_ESSAYS_DIR.resolve().relative_to(VAULT_DIR.resolve()).as_posix()
+    except (OSError, ValueError):
+        essays_prefix = ""
+    candidates = []
+    if essays_prefix and essays_prefix != ".":
+        candidates.append(f"{essays_prefix}/{relative}")
+    candidates.append(relative)
+    for candidate in candidates:
+        if resolve_vault_asset(candidate) is not None:
+            return f"/vault-asset/{urllib_parse_quote_path(candidate)}"
+    return ""
 
 
 def sanitize_updates(updates: dict[str, Any]) -> dict[str, Any]:
@@ -2683,6 +2759,22 @@ def sanitize_updates(updates: dict[str, Any]) -> dict[str, Any]:
             cleaned["totem"] = ""
         else:
             cleaned.pop("totem")
+    # The board note. A value the board cannot draw is refused, never stored
+    # and never silently dropped: the writer picked it, so they hear why.
+    # Blank clears the key, and the note falls back to the settings default.
+    for key, allowed, sentence in (
+        ("note_pad", NOTE_PADS, "a note pad is sticky, paper or index card."),
+        ("note_color", NOTE_COLORS, "a note color is canary, blue, orange, pink or green."),
+    ):
+        if key not in cleaned:
+            continue
+        value = cleaned[key]
+        if value is None or value == "":
+            cleaned[key] = ""
+            continue
+        if not isinstance(value, str) or value.strip().lower() not in allowed:
+            raise ValueError(sentence)
+        cleaned[key] = value.strip().lower()
     if "status" in cleaned and cleaned.get("status"):
         cleaned["status"] = normalize_status(cleaned.get("status"))
     if "source_role" in cleaned and cleaned.get("source_role"):
@@ -3823,6 +3915,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(save_image_upload(payload))
                 return
 
+            if path == "/api/settings/editor":
+                # After the setup check on purpose: a write here must never
+                # create config.json on a fresh install, which would stop the
+                # first-run wizard from opening.
+                result = save_editor_settings(payload)
+                self.send_json(result, status=200 if result.get("ok") else 400)
+                return
+
             if path == "/api/app/refresh-essays":
                 essays, _ = refresh_essay_index()
                 self.send_json({
@@ -3841,13 +3941,20 @@ class Handler(BaseHTTPRequestHandler):
             if essay_id and action == "save":
                 updates = payload.get("updates", {}) if isinstance(payload, dict) else {}
                 body = payload.get("body") if isinstance(payload.get("body"), str) else None
-                self.send_json(save_essay_updates(
+                result = save_essay_updates(
                     essay_id,
                     updates,
                     body,
                     payload.get("expected_mtime"),
                     payload.get("expected_content_hash"),
-                ))
+                )
+                if payload.get("return_row") is True:
+                    # The room's editor hands the fresh card to the pool and
+                    # the board, so it asks for the row as it is on disk now.
+                    # The old page does not ask and keeps its background rescan.
+                    refresh_essay_index()
+                    result["row"] = index_row_for(str(result.get("new_id") or essay_id))
+                self.send_json(result)
                 return
             if essay_id and action == "create-draft":
                 self.send_json(create_linked_draft(essay_id, payload))

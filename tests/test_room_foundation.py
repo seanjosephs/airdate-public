@@ -32,10 +32,19 @@ def point_server_at(server, root: Path) -> Path:
     move it (see test_config.ServerSettingsTests.configure). Returns the essays
     folder notes should be written into."""
     import copy as _copy
+    import os as _os
     import airdate_config as _cfg
     vault = root / "vault"
     (vault / ".obsidian").mkdir(parents=True, exist_ok=True)
     (vault / "Essays").mkdir(parents=True, exist_ok=True)
+    # The environment is applied ON TOP of the config. Every test class sets
+    # OBSIDIAN_ESSAYS_DIR before importing server, and left pointing at the
+    # vault root it collapsed "Essays" back to the root - so the essays folder
+    # and the vault were the same directory in every room test. That is the one
+    # layout where an essays-relative vs vault-relative path bug cannot show,
+    # and it is not how a real vault is laid out. Point the variable at the
+    # Essays folder so the tests run on the real layout.
+    _os.environ["OBSIDIAN_ESSAYS_DIR"] = str(vault / "Essays")
     config = _cfg.DEFAULT_CONFIG and _copy.deepcopy(_cfg.DEFAULT_CONFIG)
     config["vault"]["path"] = str(vault)
     config["vault"]["essays_folder"] = "Essays"
