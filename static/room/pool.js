@@ -3,6 +3,11 @@
 // Loads the same /api/essays the old page uses (default scope, active), plus
 // the writer's config from /api/app/status for totems, tag presets and the
 // red pen. Owns search, the filters, the sort and the star round trip.
+//
+// The board (board-view.js) changes essays too. Every changed row travels as
+// one "room:essay" event on document, { oldId, essay, source }, and both sides
+// take it; a row that has left the active list (live, rainy day) leaves the
+// pool. window.RoomPool is what placing mode (placing.js) builds on.
 (function startPool() {
   const Cards = window.AirdateCards;
   const Api = window.RoomApi;
@@ -24,7 +29,12 @@
     busy: new Set(),
     errors: new Map(),
     loaded: false,
+    // The card whose note is up on the board in placing mode.
+    placing: '',
   };
+  // Phases that live in the default, active list. Anything else is the
+  // shelf's or rainy day's.
+  const ACTIVE = new Set(['Writers Room', 'Writers Likey', 'Ready for Air']);
 
   const els = {};
   let roving = null;
@@ -44,6 +54,7 @@
       redPen: cfg.red_pen || { enabled: true, lines: [] },
       presets: Array.isArray(cfg.tag_presets) ? cfg.tag_presets : [],
       error: essay ? state.errors.get(String(essay.id)) || '' : '',
+      placing: Boolean(essay && state.placing && state.placing === String(essay.id)),
     };
   }
 
@@ -179,12 +190,49 @@
       const at = state.essays.findIndex((essay) => String(essay.id) === id);
       if (at >= 0) state.essays[at] = fresh;
       replaceCard(id, fresh, Boolean(cardElement(id)?.contains(document.activeElement)));
+      document.dispatchEvent(new CustomEvent('room:essay', {
+        detail: { oldId: id, essay: fresh, source: 'pool' },
+      }));
     } catch (error) {
       state.busy.delete(id);
       const at = state.essays.findIndex((essay) => String(essay.id) === id);
       if (at >= 0) state.essays[at] = before;
       state.errors.set(id, starFailure(error, starred));
       replaceCard(id, before, Boolean(cardElement(id)?.contains(document.activeElement)));
+    }
+  }
+
+  // A row the board changed. Swap the card in place when it is still showing
+  // and still belongs here; otherwise redraw, which drops a card that has
+  // gone live or been parked, or adds one the board sent back.
+  function takeEssay(detail) {
+    const oldId = String(detail.oldId || '');
+    const row = detail.essay || null;
+    const at = state.essays.findIndex((essay) => String(essay.id) === oldId);
+    const belongs = Boolean(row && ACTIVE.has(row.status));
+    if (at >= 0 && belongs) state.essays[at] = row;
+    else if (at >= 0) state.essays.splice(at, 1);
+    else if (belongs) state.essays.push(row);
+    else return;
+    if (oldId && row && String(row.id) !== oldId && state.errors.has(oldId)) {
+      state.errors.set(String(row.id), state.errors.get(oldId));
+      state.errors.delete(oldId);
+    }
+    const card = cardElement(oldId);
+    if (belongs && card && matches(row)) {
+      replaceCard(oldId, row, card.contains(document.activeElement));
+      return;
+    }
+    render(false);
+  }
+
+  function setPlacing(id) {
+    const before = state.placing;
+    state.placing = id ? String(id) : '';
+    for (const key of new Set([before, state.placing])) {
+      if (!key) continue;
+      const essay = state.essays.find((row) => String(row.id) === key);
+      if (essay && cardElement(key)) replaceCard(key, essay, false);
     }
   }
 
@@ -287,6 +335,18 @@
       columnSelector: '.pool-column',
     });
     bind();
+    document.addEventListener('room:essay', (event) => {
+      const detail = event.detail || {};
+      if (detail.source === 'pool' || !state.loaded) return;
+      takeEssay(detail);
+    });
+    document.addEventListener('room:reload', () => { load(); });
+    window.RoomPool = {
+      onKey: (handler) => roving.onKey(handler),
+      card: (id) => cardElement(id),
+      feedbackHost: (id) => cardElement(id)?.querySelector('.card-feedback') || null,
+      setPlacing,
+    };
     load();
   }
 

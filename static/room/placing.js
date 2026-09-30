@@ -1,0 +1,191 @@
+// Placing mode: the keyboard route onto the board (build spec §6.5, the
+// Placing board). A first-class route, not a fallback.
+//
+//   A (a writers likey card focused), or a click on its handle, lifts the note.
+//   Left and right move between open Mondays only; taken and past ones are
+//   skipped and dimmed. At either end the board pages a week. No wrap.
+//   Enter or S sets it: the same round trip as a drop.
+//   Escape or Tab puts it back, and focus returns to the handle.
+//
+// Focus moves to the candidate slot itself, so its two-tone ring is the focus
+// ring and not a decoration. The legend strip under the board is role=status
+// and carries every announcement. "A" arrives through the pool's roving-focus
+// hook (keys.js onKey), which never fires while the writer types in search.
+(function startPlacing() {
+  const Board = window.RoomBoard;
+  const Feedback = window.RoomFeedback;
+
+  let current = null; // { id, essay, candidate, offset }
+  let moving = false;
+
+  function view() { return window.RoomBoardView; }
+  function pool() { return window.RoomPool; }
+
+  function cardSay(id, tone, text) {
+    const host = pool() && pool().feedbackHost(id);
+    if (host) Feedback.plaque(host, { tone, text });
+  }
+
+  function focusHandle(id) {
+    const card = pool() && pool().card(id);
+    const handle = card && (card.querySelector('.card-handle') || card.querySelector('.card-link'));
+    if (handle) handle.focus();
+  }
+
+  // Move the candidate to a Monday and put focus on it.
+  function moveTo(monday, sentence) {
+    current.candidate = monday;
+    moving = true;
+    try {
+      view().setPlacing({ essay: current.essay, candidate: monday });
+      const zone = view().reveal(monday);
+      if (zone) zone.focus();
+    } finally {
+      moving = false;
+    }
+    view().announce(sentence);
+  }
+
+  function lift(id) {
+    const board = view();
+    if (!board || !board.ready() || !pool()) return false;
+    const essay = board.essay(id);
+    if (!essay) return false;
+    if (essay.status !== 'Writers Likey') {
+      cardSay(id, 'amber', Board.say.cannotLift(essay.status));
+      return true;
+    }
+    if (current) finish();
+    const candidate = Board.firstOpen(board.today(), board.index());
+    if (!candidate) {
+      cardSay(id, 'amber', Board.say.noOpen());
+      return true;
+    }
+    // Where the board was paged, so putting the note back puts the board back.
+    current = { id: String(id), essay, candidate, offset: board.offset() };
+    pool().setPlacing(String(id));
+    board.showLifted(essay.title);
+    moveTo(candidate, Board.say.lifting(essay.title, candidate));
+    return true;
+  }
+
+  function finish() {
+    if (!current) return null;
+    const ended = current;
+    current = null;
+    moving = true;
+    try {
+      if (pool()) pool().setPlacing(null);
+      if (view()) {
+        view().setPlacing(null);
+        view().showLifted('');
+      }
+    } finally {
+      moving = false;
+    }
+    return ended;
+  }
+
+  // Put the note back on its card. options: { quiet, focusHandle }
+  function cancel(options) {
+    const opts = options || {};
+    const ended = finish();
+    if (!ended) return;
+    view().setOffset(ended.offset);
+    view().announce('');
+    if (opts.focusHandle) focusHandle(ended.id);
+    if (!opts.quiet) cardSay(ended.id, 'green', Board.say.putBack());
+  }
+
+  async function set() {
+    const ended = finish();
+    if (!ended) return;
+    const landed = await view().schedule(ended.id, ended.candidate, { origin: 'placing' });
+    if (!landed) focusHandle(ended.id);
+  }
+
+  function step(direction) {
+    const board = view();
+    const next = Board.stepOpen(current.candidate, direction, board.today(), board.index());
+    if (!next) {
+      board.announce(direction < 0 ? Board.say.noEarlier(current.candidate) : Board.say.noOpen());
+      return;
+    }
+    moveTo(next, Board.say.moved(next));
+  }
+
+  // A click on a Monday while placing: set it there if it is open.
+  function setAt(monday) {
+    if (!current) return;
+    const board = view();
+    const index = board.index();
+    if (Board.isOpen(monday, board.today(), index)) {
+      current.candidate = monday;
+      set();
+      return;
+    }
+    const taken = (index.get(monday) || [])[0];
+    board.report(monday, 'amber', taken ? Board.say.taken(monday, taken.essay.title) : Board.say.past(monday));
+    board.zone(current.candidate)?.focus();
+  }
+
+  function onKeydown(event) {
+    if (!current || moving) return;
+    const zone = event.target.closest && event.target.closest('#board-slots .slot-zone');
+    if (!zone) return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const key = event.key;
+    if (key === 'ArrowRight' || key === 'ArrowLeft') {
+      event.preventDefault();
+      step(key === 'ArrowRight' ? 1 : -1);
+    } else if (key === 'Enter' || key === 's' || key === 'S') {
+      event.preventDefault();
+      set();
+    } else if (key === 'Escape' || key === 'Tab') {
+      event.preventDefault();
+      cancel({ focusHandle: true });
+    }
+  }
+
+  // Focus leaving the board for anywhere else puts the note back.
+  function onFocusout(event) {
+    if (!current || moving) return;
+    if (!event.target.closest || !event.target.closest('#board-slots .slot-zone')) return;
+    const next = event.relatedTarget;
+    if (next && next.closest && next.closest('#board-slots .slot-zone')) return;
+    cancel({ quiet: false });
+  }
+
+  function start() {
+    const board = view();
+    const rooms = pool();
+    if (!board || !rooms || !Board || !Feedback) return;
+    rooms.onKey((event, item) => {
+      if (event.key !== 'a' && event.key !== 'A') return false;
+      return lift(item.dataset.essayId);
+    });
+    const poolEl = document.getElementById('pool');
+    // The handle keeps focus where it is on press, so a second press puts the
+    // note back instead of focus leaving the board first.
+    poolEl.addEventListener('mousedown', (event) => {
+      if (current && event.target.closest('[data-action="place"]')) event.preventDefault();
+    });
+    poolEl.addEventListener('click', (event) => {
+      const handle = event.target.closest('[data-action="place"]');
+      if (!handle) return;
+      event.preventDefault();
+      const card = handle.closest('.card');
+      const id = card && card.dataset.essayId;
+      if (!id) return;
+      if (current && current.id === String(id)) cancel({ focusHandle: true });
+      else lift(id);
+    });
+    document.addEventListener('keydown', onKeydown, true);
+    document.addEventListener('focusout', onFocusout);
+  }
+
+  window.RoomPlacing = { lift, cancel, setAt, active: () => Boolean(current) };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+}());

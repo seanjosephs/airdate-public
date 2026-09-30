@@ -301,11 +301,14 @@ class CardMarkupTests(unittest.TestCase):
         self.assertNotIn("card-postit", html)
         self.assertIn("airs mon oct 5", html)
 
-    def test_no_drag_handle_and_no_umbrella_yet(self):
+    def test_a_room_card_has_no_handle_and_no_umbrella(self):
+        # A writers room essay cannot go on the board, so it has no handle
+        # (tests/test_room_board_js.py covers the likey card's). The umbrella
+        # arrives with rainy day.
         html = self.markup()
         self.assertNotIn("drag", html)
         self.assertNotIn("rainy", html)
-        self.assertEqual(html.count("<button"), 1, "the post-it is the only button on a card")
+        self.assertEqual(html.count("<button"), 1, "the post-it is the only button on a room card")
 
     def test_the_obsidian_link(self):
         html = self.markup()

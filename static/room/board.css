@@ -1,0 +1,676 @@
+/* The writers room: the board, its notes, placing mode and the feedback
+ * (slice 3).
+ *
+ * Measured from docs/design-handoff-2026-09-21/measured-specs-room-cards-board.md
+ * sections 1, 3, 5 and 6, and transcribed from the Main, NoteStyle,
+ * ScheduleMoment, Feedback, LiveAsk and Placing artboards.
+ */
+
+:root {
+  --cork: #8C6642;
+  --frame: #4E321C;
+  --plaque-ground: #17110C;
+  --plaque-edge: #2E2218;
+  --plaque-text: #CDBFA6;
+  --index-card: #F6F0E1;
+  --note-error: #8A0F0F;
+  /* The focus ring on cork is two-tone: ink, amber, ink. Amber alone is
+     2.86:1 against the cork, under the 3:1 a focus indicator needs; the ink
+     edge is 3.64:1 against the cork and 10.4:1 against the amber, so the ring
+     reads whichever colour sits behind it. Placing mode depends on it. */
+  --ring-cork: 3px solid var(--orange-soft);
+  --ring-cork-edge: 0 0 0 2px var(--ink), 0 0 0 7px var(--ink);
+}
+
+/* ---- the head ---------------------------------------------------------- */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.board-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.board-head h2 {
+  margin: 0;
+  font: 700 22px/1.2 var(--font-ui);
+}
+.board-grow { flex-grow: 1; }
+
+/* The letter-board sign. */
+.board-sign {
+  padding: 6px 14px;
+  border: 3px solid #5A3B22;
+  border-radius: 3px;
+  background-color: #121212;
+  background-image: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 5px);
+  color: #F4F1E8;
+  font: 700 12px/1.3 var(--font-ui);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.50);
+}
+
+.board-pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.board-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--b2);
+  border-radius: var(--r-md);
+  background: var(--s2);
+  color: var(--text);
+  cursor: pointer;
+}
+.board-page:hover { border-color: var(--muted); }
+.board-page svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.board-range {
+  min-width: 7.5em;
+  text-align: center;
+  font: 700 13px/1 var(--font-ui);
+  white-space: nowrap;
+}
+
+/* ---- the cork, in its wood frame ---------------------------------------- */
+
+.board-cork {
+  padding: 22px 24px;
+  overflow-x: auto;
+  background-color: var(--cork);
+  background-image:
+    radial-gradient(rgba(60, 36, 14, 0.55) 1px, transparent 1.3px),
+    radial-gradient(rgba(255, 226, 170, 0.30) 1px, transparent 1.3px),
+    radial-gradient(700px 300px at 30% 0%, rgba(255, 214, 150, 0.35), transparent);
+  background-size: 7px 7px, 11px 11px, 100% 100%;
+  background-position: 0 0, 3px 5px, 0 0;
+  border: 12px solid var(--frame);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 2px #2C1B0E,
+    inset 0 6px 18px rgba(0, 0, 0, 0.55),
+    0 14px 30px rgba(0, 0, 0, 0.55);
+}
+
+.board-slots {
+  margin: 0;
+  padding: 10px 6px 6px;
+  list-style: none;
+  display: flex;
+  gap: 20px;
+}
+
+.board-message {
+  margin: 0 auto;
+  padding: 10px 16px;
+  border-radius: 3px;
+  background: var(--cream);
+  color: var(--ink);
+  font: 700 14px/1.4 var(--font-ui);
+}
+
+/* ---- a slot ------------------------------------------------------------ */
+
+.slot {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* A past Monday that has gone to the shelf, and every week placing mode
+   skips. The artboards dim the whole slot, but the plaque at 55% measures
+   4.02:1 on the cork, under AA for its 12px text, so the plaque keeps full
+   strength and says what the dimming means. */
+.slot.is-dim > .slot-date,
+.slot.is-dim > .slot-zone,
+.slot.is-dim > .slot-more { opacity: 0.55; }
+
+.slot-date {
+  align-self: flex-start;
+  padding: 3px 12px 4px;
+  background: var(--cream);
+  color: var(--ink);
+  font: 400 15px/1.3 var(--font-marker);
+  transform: rotate(-1.5deg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.slot-zone {
+  position: relative;
+  height: 230px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: 2px dashed rgba(40, 22, 8, 0.45);
+  outline-offset: -2px;
+}
+/* The zone only ever takes focus from the room itself: placing mode's
+   candidate, or the slot an action just emptied. Its ring is the two-tone
+   cork ring, whether or not the browser thinks focus came from a key. */
+.slot-zone:focus,
+.slot-zone:focus-visible {
+  outline: var(--ring-cork);
+  outline-offset: 2px;
+  box-shadow: var(--ring-cork-edge);
+}
+.slot.is-candidate .slot-zone { background: rgba(255, 178, 77, 0.10); }
+
+.slot-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 3px;
+  background: var(--cream);
+  color: var(--ink);
+  font: 700 13px/1.2 var(--font-ui);
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.40);
+}
+
+/* "2 of 2 this week": a week that holds two essays says so. */
+.slot-more {
+  align-self: center;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--cream);
+  color: var(--ink);
+  font: 700 12px/1.2 var(--font-ui);
+  cursor: pointer;
+}
+.slot-more:focus-visible {
+  outline: var(--ring-cork);
+  outline-offset: 2px;
+  box-shadow: var(--ring-cork-edge);
+}
+
+/* ---- the plaque under a slot, and ON AIR ---- */
+
+.slot-foot {
+  align-self: center;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 30px;
+}
+.slot-plaque {
+  padding: 5px 14px;
+  border-radius: 6px;
+  background: var(--plaque-ground);
+  border: 2px solid var(--plaque-edge);
+  color: var(--plaque-text);
+  font: 600 12px/1.35 var(--font-ui);
+  text-align: center;
+  text-wrap: balance;
+}
+/* A feedback plaque takes the plaque's place while it is up. */
+.slot-foot.has-feedback > .slot-plaque,
+.slot-foot.has-feedback > .slot-onair { display: none; }
+
+.slot-onair {
+  padding: 5px 20px;
+  border-radius: 6px;
+  background: #F8F4EA;
+  border: 3px solid #2A2420;
+  color: #C8140F;
+  font: 700 17px/1.2 var(--font-ui);
+  letter-spacing: 0.28em;
+  white-space: nowrap;
+  box-shadow:
+    0 0 22px rgba(255, 244, 220, 0.55),
+    0 0 60px rgba(255, 236, 200, 0.25),
+    inset 0 0 10px rgba(200, 20, 15, 0.12);
+  animation: onair 2.8s ease-in-out infinite;
+}
+/* The drawn pulse dips the whole sign to .72, which takes the red lettering
+   under 4.5:1 at the dip (3.95:1 over the cork). The glow pulses instead;
+   the lettering holds at 5.37:1 on the lamp. */
+@keyframes onair {
+  50% {
+    box-shadow:
+      0 0 8px rgba(255, 244, 220, 0.25),
+      0 0 24px rgba(255, 236, 200, 0.10),
+      inset 0 0 10px rgba(200, 20, 15, 0.12);
+  }
+}
+
+/* ---- the notes -------------------------------------------------------- */
+
+.board-note {
+  position: relative;
+  width: 224px;
+  height: 176px;
+  padding: 22px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink);
+  transform: rotate(var(--tilt, 0deg));
+  --pad: var(--pad-canary);
+}
+.board-note.pad-canary { --pad: var(--pad-canary); }
+.board-note.pad-blue { --pad: var(--pad-blue); }
+.board-note.pad-orange { --pad: var(--pad-orange); }
+.board-note.pad-pink { --pad: var(--pad-pink); }
+.board-note.pad-green { --pad: var(--pad-green); }
+
+/* Sticky deck: flat, a sticky back strip, a soft lifted corner. */
+.board-note.pad-sticky {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.09) 0 24px, transparent 24px), var(--pad);
+  border-radius: 2px 2px 12px 2px;
+  box-shadow: 0 10px 16px -4px rgba(0, 0, 0, 0.55), 0 2px 3px rgba(0, 0, 0, 0.40);
+}
+/* Paper: fibre grain and a curled corner, still sticky-backed. */
+.board-note.pad-paper {
+  background:
+    linear-gradient(315deg, rgba(0, 0, 0, 0.30) 0, transparent 24px),
+    repeating-linear-gradient(92deg, rgba(0, 0, 0, 0.030) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(0, 0, 0, 0.08)),
+    var(--pad);
+  border-radius: 2px 2px 20px 2px;
+  box-shadow: 0 16px 20px -8px rgba(0, 0, 0, 0.70), 0 3px 4px rgba(0, 0, 0, 0.45);
+}
+/* Index card: ruled cream with a colour edge. Cards have no glue, so this is
+   the one note with a pushpin. */
+.board-note.pad-index {
+  background:
+    linear-gradient(180deg, var(--pad) 0 10px, transparent 10px),
+    repeating-linear-gradient(180deg, transparent 0 23px, rgba(70, 120, 200, 0.32) 23px 24px),
+    var(--index-card);
+  border-radius: 3px;
+  box-shadow: 0 8px 14px rgba(0, 0, 0, 0.50), 0 2px 3px rgba(0, 0, 0, 0.40);
+}
+.note-pin {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: var(--r-pill);
+  background: var(--danger);
+  box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.30), 0 3px 4px rgba(0, 0, 0, 0.50);
+}
+
+.board-note-title {
+  margin: 0;
+  font: 400 22px/1.12 var(--font-marker);
+  text-wrap: balance;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.board-note-date {
+  margin: 0;
+  font: 400 13px/1.2 var(--font-marker);
+  color: rgba(21, 18, 14, 0.72);
+}
+.board-note-grow { flex-grow: 1; }
+
+.board-note-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.note-pill,
+.note-sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  font: 700 12px/1 var(--font-ui);
+  white-space: nowrap;
+}
+.note-pill {
+  border: 1.5px solid rgba(21, 18, 14, 0.55);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.note-pill:hover { border-color: var(--ink); }
+.note-sent {
+  background: var(--ink);
+  color: var(--pad);
+  text-decoration: none;
+}
+
+/* The note after air day: "is it live?" */
+.board-note.is-asking {
+  height: auto;
+  min-height: 176px;
+  padding-top: 18px;
+}
+.board-note.is-asking .board-note-title { font-size: 19px; }
+.board-note.pad-index.is-asking { padding-top: 22px; }
+.board-note-ask {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.board-note-ask label {
+  font: 700 12px/1.2 var(--font-ui);
+  color: var(--ink);
+}
+.note-text-button {
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 700 12px/1 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.board-note-field {
+  display: flex;
+  gap: 6px;
+}
+.board-note-field input {
+  flex-grow: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1.5px solid rgba(21, 18, 14, 0.55);
+  border-radius: var(--r-sm);
+  background: #FFFFFF;
+  color: var(--ink);
+  font: 600 12px/1 var(--font-ui);
+}
+.board-note-field input::placeholder { color: #5E574B; }
+.board-note-field input[aria-invalid="true"] { border: 2px solid var(--note-error); }
+.note-live-button {
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--ink);
+  color: var(--pad);
+  font: 700 12px/1 var(--font-ui);
+  cursor: pointer;
+}
+/* Dark red on the orange and pink pads is 4.15 and 4.13:1, under AA; on a
+   white strip it is 9.74:1. */
+.board-note-error {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #FFFFFF;
+  border-left: 3px solid var(--note-error);
+  color: var(--note-error);
+  font: 700 12px/1.3 var(--font-ui);
+  text-wrap: balance;
+}
+.board-note-error svg { flex-shrink: 0; }
+.board-note.has-error { min-height: 206px; }
+
+.board-note[aria-busy="true"] { cursor: progress; }
+.board-note[aria-busy="true"] button { cursor: progress; }
+
+/* ---- scheduling motion ---------------------------------------------------- */
+
+/* The note drops from 135% with overshoot, 320ms. */
+.board-note.is-landing {
+  animation: note-slap 320ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 1;
+}
+@keyframes note-slap {
+  0% { transform: translateY(-70px) scale(1.35) rotate(-10deg); opacity: 0; }
+  30% { opacity: 1; }
+  58% { transform: translateY(0) scale(0.94) rotate(calc(var(--tilt, 0deg) + 1deg)); }
+  79% { transform: scale(1.03) rotate(calc(var(--tilt, 0deg) - 0.5deg)); }
+  100% { transform: scale(1) rotate(var(--tilt, 0deg)); opacity: 1; }
+}
+/* An orange ring bursts from the slot, 600ms. */
+.slot-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 250px;
+  height: 200px;
+  margin: -100px 0 0 -125px;
+  border: 5px solid var(--orange);
+  border-radius: 24px;
+  pointer-events: none;
+  opacity: 0;
+  animation: slot-ring 600ms ease-out 1 forwards;
+}
+@keyframes slot-ring {
+  0% { transform: scale(0.6); opacity: 0; }
+  20% { opacity: 0.95; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+/* Reduced motion: no drop; the ring holds as a 2s outline instead. */
+.slot-zone.is-ring-held { box-shadow: 0 0 0 5px var(--orange); }
+
+/* Going live: the note lifts 6px and slides toward the sidebar as it fades. */
+.board-note.is-leaving {
+  transition: transform 240ms ease-in, opacity 240ms ease-in;
+  transform: translate(-40px, -6px) rotate(var(--tilt, 0deg));
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-onair,
+  .board-note.is-landing,
+  .slot-ring { animation: none; }
+  .slot-ring { display: none; }
+  .board-note.is-leaving { transition: none; }
+}
+
+/* ---- dragging ------------------------------------------------------------- */
+
+.slot-drop-label {
+  display: none;
+  padding: 4px 12px;
+  border-radius: 3px;
+  background: var(--cream);
+  color: var(--ink);
+  font: 700 13px/1.2 var(--font-ui);
+  white-space: nowrap;
+}
+/* While a note rides the cursor, every open Monday lights up and names the
+   date you would get. */
+.board.is-dragging .slot.is-open .slot-zone {
+  outline: 3px dashed var(--orange);
+  outline-offset: -3px;
+  background: rgba(255, 106, 0, 0.22);
+  box-shadow: 0 0 0 6px rgba(255, 106, 0, 0.20);
+}
+.board.is-dragging .slot.is-open .slot-chip { display: none; }
+.board.is-dragging .slot.is-open .slot-drop-label { display: block; }
+.board.is-dragging .slot.is-open.is-over .slot-zone { background: rgba(255, 106, 0, 0.34); }
+
+/* ---- placing mode --------------------------------------------------------- */
+
+.slot-ghost {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.slot-set-label {
+  padding: 3px 10px;
+  border-radius: 3px;
+  background: var(--cream);
+  color: var(--ink);
+  font: 700 12px/1.2 var(--font-ui);
+  white-space: nowrap;
+}
+.slot-ghost-frame {
+  outline: 2px dashed var(--ink);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.slot-ghost .board-note {
+  width: 200px;
+  height: 150px;
+}
+.slot-ghost .board-note-title { font-size: 20px; }
+
+/* The legend strip under the board. role=status: it carries every
+   placing-mode announcement. */
+.board-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding: 10px 16px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r-md);
+  background: var(--s1);
+  font: 600 13px/1.3 var(--font-ui);
+  color: var(--text);
+}
+.legend-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.board-legend kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--b2);
+  border-bottom-width: 3px;
+  background: var(--s2);
+  color: var(--text);
+  font: 700 12px/1 var(--font-ui);
+  white-space: nowrap;
+}
+.legend-placing {
+  color: var(--orange-soft);
+  white-space: nowrap;
+}
+
+/* ---- feedback: the plaque and the slip ------------------------------------ */
+
+.fb-plaque {
+  margin: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: var(--plaque-ground);
+  border: 2px solid currentColor;
+  font: 700 12px/1.35 var(--font-ui);
+  text-wrap: balance;
+  transition: opacity 300ms ease;
+}
+.fb-plaque svg { flex-shrink: 0; }
+.fb-plaque.fb-green { color: var(--green); }
+.fb-plaque.fb-amber { color: var(--orange-soft); }
+.fb-plaque.fb-red { color: var(--red-text); }
+.fb-plaque.is-fading { opacity: 0; }
+
+/* On a card the plaque sits above the footer's actions. */
+.card-feedback:not(.has-feedback) { display: none; }
+.card-feedback .fb-plaque {
+  font-size: 13px;
+  border-width: 1.5px;
+  border-radius: var(--r-md);
+  padding: 8px 10px;
+}
+
+/* The slip: one cream strip pinned bottom-centre, above everything. */
+.slip-host {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.slip {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px 10px 16px;
+  border-radius: 3px;
+  background: var(--cream);
+  color: var(--ink);
+  font: 700 14px/1.3 var(--font-ui);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.60);
+  transform: rotate(-0.8deg);
+  transition: opacity 300ms ease;
+}
+.slip.is-fading { opacity: 0; }
+.slip-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: var(--r-pill);
+  background: #0E7A3A;
+}
+.slip-amber .slip-dot { background: #8A4B00; }
+.slip-red .slip-dot { background: var(--note-error); }
+.slip-undo {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font: 700 12px/1 var(--font-ui);
+  cursor: pointer;
+}
+.slip-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.slip :focus-visible { outline: var(--focus-paper); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fb-plaque,
+  .slip { transition: none; }
+}
