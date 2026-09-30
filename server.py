@@ -73,6 +73,11 @@ CONTENT_TYPES = {
 VAULT_ASSET_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 UPLOADS = DRAFTS / "assets"
 CONTACT_LOG = STATE_DIR / "creative_contact.json"
+# When each essay first showed up in airdate, keyed by essay id. The five ages
+# of paper on a script card count from here, not from the file's mtime, which
+# moves every time the writer saves. Runtime only: nothing about arrival is
+# ever written into the vault.
+ARRIVALS_LOG = STATE_DIR / "arrivals.json"
 # Written by the connector's "Pair with airdate" command: {port, token}. The
 # token is the only capability airdate holds; the Substack session itself
 # stays in Obsidian's secret storage.
@@ -159,7 +164,7 @@ def public_path(path: Path) -> str:
 
 
 LONG_SOURCE_WORD_THRESHOLD = int(env_first("AIR_DATE_LONG_SOURCE_WORD_THRESHOLD", default="10000"))
-STATUS_SET = {"Writers Room", "Writers Likey", "Ready for Air", "Live", "Published", "Archived"}
+STATUS_SET = {"Writers Room", "Writers Likey", "Ready for Air", "Live", "Archived"}
 SOURCE_ROLE_SET = {"source", "draft", "standalone"}
 
 
@@ -193,12 +198,17 @@ HIDDEN_TITLE_CONTAINS: list[str] = []
 HIDDEN_TOPLEVEL_TITLE_CONTAINS: list[str] = []
 THUMBNAIL_STYLE_PROMPT = airdate_config.DEFAULT_STYLE_PROMPT
 PUBLISH_DAY: str | None = None
+# The board: what a new essay's note looks like until it gets its own.
+BOARD_DEFAULT_PAD = "sticky"
+BOARD_DEFAULT_COLOR = "canary"
+BOARD_WEEKS_SHOWN = 3
 TAG_PRESETS: list[dict[str, Any]] = []
 LINKS: list[dict[str, str]] = []
 
 
 def apply_config(config: dict[str, Any], file_exists: bool, load_error: str = "") -> None:
     """Install a config (already merged with defaults) as the running settings."""
+    global BOARD_DEFAULT_PAD, BOARD_DEFAULT_COLOR, BOARD_WEEKS_SHOWN
     global CONFIG, CONFIG_FILE_EXISTS, CONFIG_LOAD_ERROR, CONFIG_ERRORS, VAULT_CHECK, SETUP_REQUIRED
     global CONFIG_FINGERPRINT, VAULT_DIR, ESSAYS_FOLDER, OBSIDIAN_ESSAYS_DIR, OBSIDIAN_VAULT_NAME
     global OBSIDIAN_SUBSTACK_ASSETS_DIR, SUBSTACK_PUBLICATION, PUBLICATION_NAME, CONNECTOR_PORT
@@ -250,6 +260,14 @@ def apply_config(config: dict[str, Any], file_exists: bool, load_error: str = ""
     THUMBNAIL_STYLE_PROMPT = str(effective["thumbnail"].get("style_prompt") or "").strip() or airdate_config.DEFAULT_STYLE_PROMPT
     day = effective["calendar"].get("publish_day")
     PUBLISH_DAY = day if day in airdate_config.WEEKDAYS else None
+
+    board = effective.get("board") or {}
+    BOARD_DEFAULT_PAD = str(board.get("default_pad") or "").strip() or "sticky"
+    BOARD_DEFAULT_COLOR = str(board.get("default_color") or "").strip() or "canary"
+    try:
+        BOARD_WEEKS_SHOWN = max(1, min(12, int(board.get("weeks_shown") or 3)))
+    except (TypeError, ValueError):
+        BOARD_WEEKS_SHOWN = 3
     TAG_PRESETS = [p for p in effective.get("tag_presets") or [] if isinstance(p, dict) and p.get("name")]
     LINKS = [l for l in effective.get("links") or [] if isinstance(l, dict) and l.get("label") and l.get("url")]
 
@@ -1504,6 +1522,27 @@ def apply_frontmatter_edits(text: str, changes: dict[str, dict[str, Any]]) -> st
     return text[:start] + "\n".join(new_lines) + tail
 
 
+def first_line_excerpt(body: str, limit: int = 180) -> str:
+    """The essay's actual opening line, for the script page on a card.
+
+    This is not `summary`. Summary prefers frontmatter and is what Substack
+    sends as the email preview; the card wants the first thing the writer
+    actually wrote. Headings, blockquote markers, list bullets and horizontal
+    rules are skipped, because none of them is a sentence."""
+    for raw in (body or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith(("#", ">", "---", "***", "|", "```")):
+            continue
+        line = re.sub(r"^[-*+]\s+", "", line)
+        line = re.sub(r"^\d+\.\s+", "", line)
+        line = re.sub(r"[*_`]", "", line).strip()
+        if line:
+            return line if len(line) <= limit else line[: limit - 1].rstrip() + "\u2026"
+    return ""
+
+
 def safe_excerpt(text: str, limit: int = 180) -> str:
     clean = re.sub(r"\s+", " ", text).strip()
     if len(clean) <= limit:
@@ -1555,16 +1594,17 @@ def ensure_totem(value: Any) -> str:
 
 
 def normalize_status(value: Any) -> str:
-    # Lifecycle: Writers Room -> Writers Likey -> Ready for Air -> Live -> Published.
+    # Lifecycle: Writers Room -> Writers Likey -> Ready for Air -> Live.
     # Writers Room = the default: any essay that exists is in the writers room,
     # so an absent/blank status means Writers Room (there is no "Inbox" status;
     # un-filed essays surface via the needs-intake flag, not a status).
     # Writers Likey = writing done, ready to be scheduled (no date yet) — the
     # pool you drag onto the calendar. Ready for Air = scheduled + on the
-    # calendar (set by the Ready for Air button/drag); Live = draft sent to
-    # Substack; Published = the writer pressed publish there. Archived sits outside the
-    # flow. "airdate" is the tool's name, never a status: the old working status
-    # "Air Date" aliases to "Ready for Air".
+    # calendar (set by the Ready for Air button/drag); Live = published on
+    # Substack. There is no "Published" status any more: live means published,
+    # and the old word survives only as a folder on disk and as an alias here.
+    # Archived sits outside the flow. "airdate" is the tool's name, never a
+    # status: the old working status "Air Date" aliases to "Ready for Air".
     if not value:
         return "Writers Room"
     raw = str(value).strip()
@@ -1595,8 +1635,8 @@ def normalize_status(value: Any) -> str:
         "air-date": "Ready for Air",
         "airdate": "Ready for Air",
         "live": "Live",
-        "released": "Published",
-        "published": "Published",
+        "released": "Live",
+        "published": "Live",
         "archived": "Archived",
         "archive": "Archived",
     }
@@ -1646,29 +1686,64 @@ def infer_totem(
     return TOTEM_DEFAULT
 
 
+def scheduling_refusal(status: Any) -> str | None:
+    """Why this essay cannot go on the board, or None if it can.
+
+    Writers room essays cannot be scheduled. The card dims its drag handle and
+    placing mode declines, but those are hints — this is the rule, so a direct
+    POST cannot put an unstarred essay on a Monday either. The sentence comes
+    back in the refusal so the interface can show it without inventing wording."""
+    if normalize_status(status) == "Writers Room":
+        return "star it for writers likey before it can go on the board."
+    return None
+
+
+def has_live_post_link(frontmatter: dict[str, Any]) -> bool:
+    """Proof that an essay is actually published: a real http(s) post link.
+
+    A draft id is not proof — the draft exists on Substack but nobody can read
+    it. This is the one piece of evidence that turns an essay live, whether it
+    is pasted on the board or found in an old note."""
+    url = str(frontmatter.get("substack_url") or "").strip()
+    return bool(re.match(r"^https?://", url))
+
+
 def effective_status(relative_path: str, frontmatter: dict[str, Any]) -> str:
     """The single source of truth for an essay's lifecycle status.
 
     Folder wins for the two terminal states: a file physically in Published/ IS
-    Published and a file in Archive/ IS Archived, no matter what the frontmatter
+    live and a file in Archive/ IS Archived, no matter what the frontmatter
     says — that reconciliation is the whole point (it kills the bug where a
-    Published/ essay showed a working status with a live Publish button).
+    published essay showed a working status with a live Publish button). The
+    folder keeps its old name; only the word the app uses changed.
 
-    Off the terminal folders, the frontmatter status carries the working state
-    (Inbox -> Writers Room -> Ready for Air -> Live). A frontmatter-declared
-    Published/Archived that hasn't been physically moved yet is still honored
-    here; set_essay_status relocates it on the next write."""
+    Off the terminal folders the frontmatter status carries the working state,
+    with one re-reading. Old notes wrote "Live" to mean "draft sent", which is
+    not what live means now, so that one word is believed only when the note
+    carries a real post link; a draft id alone, or nothing, reads as Ready for
+    Air. An old "Published" gets no such treatment: it was the writer's own
+    claim that the essay went out, and airdate takes them at their word.
+    Nothing is rewritten in the vault; set_essay_status relocates and restamps
+    on the next write."""
     rp = relative_path.lower()
     top = rp.split("/", 1)[0] if "/" in rp else ""
     if top == "published" or "/published/" in rp:
-        return "Published"
+        return "Live"
     if top == "archive" or "/archive/" in rp:
         return "Archived"
     raw = frontmatter.get("status")
     if raw and str(raw).strip():
-        return normalize_status(raw)
+        status = normalize_status(raw)
+        # Only the ambiguous old word is re-read. "Published" is believed.
+        if (
+            status == "Live"
+            and str(raw).strip().lower() == "live"
+            and not has_live_post_link(frontmatter)
+        ):
+            return "Ready for Air"
+        return status
     if frontmatter.get("published") is True:
-        return "Published"
+        return "Live"
     return "Writers Room"
 
 
@@ -1701,7 +1776,7 @@ def classify_essay(relative_path: str, title: str, frontmatter: dict[str, Any]) 
     status = effective_status(relative_path, frontmatter)
     if status == "Archived":
         return "archived"
-    if status == "Published":
+    if status == "Live":
         return "shelf"
     return "active"
 
@@ -1904,6 +1979,16 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
                     "published_date": published_date,
                     "substack_url": substack_url,
                     "scheduled_at": str(frontmatter.get("scheduled_at") or "").strip(),
+                    # The room's fields. arrived_at drives the five ages of
+                    # paper; excerpt is the line on the script page and is
+                    # deliberately not `summary`; note_pad/note_color are the
+                    # essay's own board note, falling back to app settings.
+                    "arrived_at": arrival_for(essay_id, touched.isoformat()),
+                    "excerpt": first_line_excerpt(body),
+                    "substack_draft_url": str(frontmatter.get("substack_draft_url") or "").strip(),
+                    "hero_url": vault_asset_url(frontmatter.get("hero_image") or frontmatter.get("hero")),
+                    "note_pad": str(frontmatter.get("note_pad") or "").strip() or BOARD_DEFAULT_PAD,
+                    "note_color": str(frontmatter.get("note_color") or "").strip() or BOARD_DEFAULT_COLOR,
                     "needs_intake": needs_intake,
                     "tags": tags,
                     "word_count": word_count,
@@ -2173,6 +2258,16 @@ def setup_payload() -> dict[str, Any]:
     }
 
 
+def totem_image_url(key: str, vault_path: str, index: int) -> str:
+    """Where a totem's art comes from, in order of preference."""
+    if vault_path and resolve_vault_asset(vault_path) is not None:
+        return f"/vault-asset/{urllib_parse_quote_path(vault_path)}"
+    shipped = STATIC / "totems" / f"{key}-512.webp"
+    if shipped.is_file():
+        return f"/static/totems/{key}-512.webp"
+    return f"/static/totems/placeholder-{index % 5 + 1}.svg"
+
+
 def ui_config_payload() -> dict[str, Any]:
     """The writer's taxonomy and cadence, for the browser. No filesystem paths."""
     totems = []
@@ -2183,9 +2278,11 @@ def ui_config_payload() -> dict[str, Any]:
             "label": str(item.get("label") or key),
             "color": str(item.get("color") or ""),
             "role": str(item.get("role") or ""),
-            # A vault image the writer chose, else the slot's placeholder icon.
-            "image": f"/vault-asset/{urllib_parse_quote_path(image)}" if image
-            else f"/static/totems/placeholder-{index % 5 + 1}.svg",
+            # The writer's own vault art wins. Failing that, the art airdate
+            # ships, so a fresh clone looks right instead of showing five grey
+            # placeholders. The placeholder is the last resort, for a totem
+            # key with no shipped art at all.
+            "image": totem_image_url(key, image, index),
             "image_path": image,
         })
     return {
@@ -2205,6 +2302,17 @@ def ui_config_payload() -> dict[str, Any]:
         ],
         "links": [{"label": str(l["label"]), "url": str(l["url"])} for l in LINKS],
     }
+
+
+def vault_asset_url(value: Any) -> str:
+    """A vault-relative image path as a URL the browser can fetch, or "".
+
+    The card and the shelf need the hero image itself, not the boolean-ish
+    readiness signal that was the only hero hint on an index row before."""
+    path = str(value or "").strip()
+    if not path or path.startswith(("http://", "https://", "data:")):
+        return path
+    return f"/vault-asset/{urllib_parse_quote_path(path)}"
 
 
 def urllib_parse_quote_path(value: str) -> str:
@@ -2344,6 +2452,18 @@ def resolve_essay_path(essay_id: str) -> Path:
     if path is None:
         raise FileNotFoundError("Essay not found")
     return path
+
+
+class SchedulingRefusedError(Exception):
+    """A write would put a writers room essay on the board.
+
+    Its own type, not a ValueError, so every route answers it the same way:
+    409 with {error, refused: "writers-room"}. The client tells it apart from a
+    file-changed 409 by the `refused` key."""
+
+    def __init__(self, sentence: str):
+        super().__init__(sentence)
+        self.payload = {"error": sentence, "refused": "writers-room", "ok": False}
 
 
 class EssayConflictError(Exception):
@@ -2560,6 +2680,16 @@ def save_essay_updates(
     assert_expected_file_state(essay_id, path, text, expected_mtime, expected_content_hash)
     frontmatter, current_body = split_frontmatter(text)
     sanitized = sanitize_updates(updates)
+    # The scheduling gate. It lives here, at the write, rather than on one
+    # route: /ready-for-air used to be the only guarded door, while /set-status
+    # and /save both reached Ready for Air without it (sanitize_updates promotes
+    # a bare scheduled_at to Ready for Air). One rule at the write closes every
+    # path, including routes that do not exist yet.
+    if sanitized.get("status") == "Ready for Air":
+        current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+        refusal = scheduling_refusal(current)
+        if refusal:
+            raise SchedulingRefusedError(refusal)
     # Durable identity, stamped lazily on the write this call already performs
     # (no extra write, no extra mtime bump). Assigned AFTER sanitize_updates so a
     # client payload can never set or overwrite uid — "uid" is deliberately not
@@ -2588,6 +2718,11 @@ def save_essay_updates(
 
     atomic_write_text(path, new_text)
     if minted_uid:
+        # The id changes from the path hash to the uid on this write. Carry the
+        # arrival across BEFORE the rescan, which would otherwise find no entry
+        # under the new id and record now - handing an old essay fresh paper on
+        # its very first write, which is usually the star.
+        carry_arrival(essay_id, sanitized[UID_KEY])
         # The essay's id flips here (path hash -> uid). Refresh blocking, as the
         # other re-id sites do, so the client's very next /api/essays already
         # reports the canonical id — a background rescan loses that race and the
@@ -2647,12 +2782,15 @@ def move_essay_file(path: Path, target_dir: Path) -> Path:
 
 def folder_for_status(status: str, frontmatter: dict[str, Any], relative_path: str) -> Path | None:
     """Where a file belongs for its status; None = leave it where it is.
-    Published/Archived pull files into their folders; a working status pulls a
-    shelved/archived file back out into its category folder (stamped on the way in)."""
+    Live/Archived pull files into their folders; a working status pulls a
+    shelved/archived file back out into its category folder (stamped on the way
+    in). The folders keep their old names — a live essay still lands in
+    Published/ — because renaming them would move every essay on disk to buy
+    nothing the writer can see."""
     top = relative_path.split("/", 1)[0].lower() if "/" in relative_path else ""
     in_published = top == "published"
     in_archive = top == "archive"
-    if status == "Published":
+    if status == "Live":
         return None if in_published else OBSIDIAN_ESSAYS_DIR / "Published"
     if status == "Archived":
         return None if in_archive else OBSIDIAN_ESSAYS_DIR / "Archive"
@@ -2727,9 +2865,9 @@ def set_essay_status(
 
 
 def publish_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """Bookkeeping for a publish the writer performed on Substack themselves: stamp the
-    live URL + date, set status Published, move the file to Published/. The app
-    itself never publishes anything."""
+    """Bookkeeping for a publish the writer performed on Substack themselves:
+    stamp the live URL + date, set status Live, move the file to Published/.
+    The app itself never publishes anything."""
     substack_url = str(payload.get("substack_url") or "").strip()
     if not re.match(r"^https?://", substack_url):
         raise ValueError("substack_url must be the full http(s) link to the live post.")
@@ -2738,7 +2876,7 @@ def publish_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         published_date = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
     return set_essay_status(
         essay_id,
-        "Published",
+        "Live",
         {"published_date": published_date, "substack_url": substack_url},
         payload.get("expected_mtime"),
         payload.get("expected_content_hash"),
@@ -3035,7 +3173,11 @@ def send_essay_to_substack(
         try:
             # finish_transport_result already lifted draft_id/edit_url from
             # the transport's stdout onto the result.
-            remote_updates: dict[str, Any] = {"status": "Live"}
+            # A send creates a DRAFT. It does not change the phase: live now
+            # means published, and only the writer pasting the post link can
+            # say that. The draft id below is the "sent" marker, and
+            # effective_status reads it as Ready for Air, never as live.
+            remote_updates: dict[str, Any] = {}
             draft_id = _stringify(result.get("draft_id")).strip()
             draft_url = _stringify(result.get("edit_url")).strip()
             if draft_id:
@@ -3047,13 +3189,86 @@ def send_essay_to_substack(
                 result["draft_id"] = draft_id
             if draft_url:
                 result["edit_url"] = draft_url
-            result["status_after_send"] = "Live"
+            result["draft_recorded"] = True
             result["mtime"] = live_state["mtime"]
             result["mtime_iso"] = live_state["mtime_iso"]
             result["content_hash"] = live_state["content_hash"]
         except Exception as exc:
             result["status_after_send_error"] = str(exc)
     return result
+
+
+_ARRIVALS_CACHE: dict[str, str] | None = None
+
+
+def load_arrivals() -> dict[str, str]:
+    """The arrivals sidecar, read once and held."""
+    global _ARRIVALS_CACHE
+    if _ARRIVALS_CACHE is None:
+        try:
+            data = json.loads(ARRIVALS_LOG.read_text(encoding="utf-8"))
+            _ARRIVALS_CACHE = {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            _ARRIVALS_CACHE = {}
+    return _ARRIVALS_CACHE
+
+
+def save_arrivals(arrivals: dict[str, str]) -> None:
+    global _ARRIVALS_CACHE
+    _ARRIVALS_CACHE = dict(arrivals)
+    ARRIVALS_LOG.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(ARRIVALS_LOG, json.dumps(arrivals, indent=2, sort_keys=True))
+
+
+def arrival_for(essay_id: str, seen_at: str) -> str:
+    """When this essay arrived, recording `seen_at` the first time it is asked.
+
+    The clock only ever goes up. A later sighting does not move it forward, and
+    an earlier one does not drag it back: rescheduling, re-indexing and a uid
+    mint all have to leave the paper exactly as old as it was. The only thing
+    that resets it is the writer asking for it, in settings."""
+    key = str(essay_id or "").strip()
+    if not key:
+        return seen_at
+    arrivals = load_arrivals()
+    existing = arrivals.get(key)
+    if existing:
+        return existing
+    arrivals[key] = seen_at
+    save_arrivals(arrivals)
+    return seen_at
+
+
+def carry_arrival(old_id: str, new_id: str) -> None:
+    """Carry an arrival across a uid mint so minting does not freshen paper."""
+    old_key, new_key = str(old_id or "").strip(), str(new_id or "").strip()
+    if not old_key or not new_key or old_key == new_key:
+        return
+    arrivals = load_arrivals()
+    stamp = arrivals.get(old_key)
+    if not stamp or arrivals.get(new_key):
+        return
+    arrivals[new_key] = stamp
+    save_arrivals(arrivals)
+
+
+def reset_arrivals() -> None:
+    """Settings' "reset the writers room": every essay's paper starts fresh."""
+    save_arrivals({})
+
+
+def reset_room(payload: dict[str, Any]) -> dict[str, Any]:
+    """The settings action behind "reset the writers room".
+
+    It restarts every essay's paper clock at once and cannot be undone, so the
+    request has to say so explicitly. The confirmation dialog is the interface's
+    job; this is the rule underneath it, so a stray POST cannot age-reset a
+    whole catalog. Nothing in the vault is touched either way."""
+    if payload.get("confirm") is not True:
+        return {"ok": False, "error": "resetting the writers room needs confirm: true."}
+    count = len(load_arrivals())
+    reset_arrivals()
+    return {"ok": True, "cleared": count}
 
 
 def load_contact_log() -> dict[str, Any]:
@@ -3147,6 +3362,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.redirect("/airdate")
+                return
+            if path == "/airdate/room":
+                # The writers room, built beside the old page. Slice 7 makes
+                # /airdate serve this and deletes airdate.html.
+                self.serve_file(ROOT / "room.html", "text/html; charset=utf-8")
                 return
             if path == "/airdate":
                 # First run is handled in the page: it reads /api/app/status and
@@ -3252,6 +3472,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/settings/create-essays-folder":
                 self.send_json(create_essays_folder(payload))
                 return
+            if path == "/api/settings/reset-room":
+                result = reset_room(payload)
+                self.send_json(result, status=200 if result.get("ok") else 400)
+                return
             if path == "/api/substack/connect":
                 result = connector_request("/connect", {})
                 self.send_json(result, status=202 if result.get("pending") else 400 if not result.get("ok") else 200)
@@ -3339,6 +3563,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not scheduled_at:
                     self.send_json({"error": "scheduled_at (an air date) is required"}, status=400)
                     return
+                # The scheduling gate is enforced in save_essay_updates, which
+                # this reaches through set_essay_status. A writers room essay
+                # comes back as a 409 with the sentence the room shows.
                 self.send_json(set_essay_status(
                     essay_id,
                     "Ready for Air",
@@ -3401,6 +3628,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "Request body must be valid JSON."}, status=400)
         except FileNotFoundError as exc:
             self.send_json({"error": str(exc)}, status=404)
+        except SchedulingRefusedError as exc:
+            self.send_json(exc.payload, status=409)
         except EssayConflictError as exc:
             self.send_json(exc.payload, status=409)
         except ValueError as exc:

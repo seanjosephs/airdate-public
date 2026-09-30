@@ -1,0 +1,92 @@
+/* The writers room: design tokens.
+ *
+ * Straight from the Claude Design handoff, with the font stacks pointed at the
+ * three families airdate self-hosts. Stardos Stencil and Special Elite are not
+ * shipped: Courier bold carries the stamps and the typed slips instead, which
+ * is the cut the handoff itself proposed.
+ *
+ * Contrast is measured in the browser, never assumed from this table. The old
+ * --vs-fg-dim failed on every surface and is not carried over. */
+:root {
+  --bg: #0C0A08;
+  --s1: #15120F;
+  --s2: #1E1A16;
+  --s3: #262019;
+  --b1: #2E2720;
+  --b2: #40372D;
+  --text: #F0F0F0;
+  --muted: #A39B8B;
+  --orange: #FF6A00;      /* never under black text */
+  --orange-soft: #FFB24D; /* amber chips and text on dark */
+  --send: #C44A00;        /* filled button, white text */
+  --green: #3BFF7A;
+  --danger: #FF3B3B;
+  --blue: #2B7FFF;
+  --ink: #15120E;         /* text on paper */
+  --cream: #F3EAD3;       /* paper */
+
+  --r-lg: 14px; --r-md: 8px; --r-sm: 5px; --r-pill: 99px;
+
+  /* sticky deck */
+  --pad-canary: #FFE14D; --pad-blue: #5CC8FF; --pad-orange: #FF8A3D;
+  --pad-pink: #FF7EB6;   --pad-green: #8CE86B;
+
+  /* totems */
+  --fox: #FF5B45; --octopus: #3FD9EC; --bison: #8FD16A;
+  --elephant: #8EA2FF; --phoenix: #B98CFF;
+
+  /* stamp inks */
+  /* ready was #C44A00: 4.19:1 on the paper scrap, fails AA (measured 09-24). */
+  --ink-room: #27408B; --ink-ready: #A83E00; --ink-live: #B3123A;
+
+  /* length bars, short to long */
+  --bar-1: #A8913A; --bar-2: #E0B93B; --bar-3: #A6D84A; --bar-4: #3BFF7A;
+
+  --font-ui: "Quicksand", system-ui, sans-serif;
+  --font-marker: "Permanent Marker", cursive;
+  --font-script: "Courier Prime", "Courier New", monospace;
+  /* Courier bold stands in for both; neither font is shipped. */
+  --font-typed: "Courier Prime", "Courier New", monospace;
+  --font-stamp: "Courier Prime", "Courier New", monospace;
+
+  /* Red TEXT on dark uses --red-text; --danger is 4.56 on s3, a pass by a
+     hair, so it is for borders and icons only. */
+  --red-text: #FF7A7A;
+  /* Focus is amber on dark and ink on paper. Both are 3px: the ring has to
+     read against cork, cream and a sticky, not only against the page. */
+  --focus-dark: 3px solid #FFB24D;
+  --focus-paper: 3px solid #15120E;
+}
+h1, h2, h3, h4, label, legend { text-wrap: balance; }
+button, .chip, .pill { white-space: nowrap; }
+
+/* The three families, self-hosted. The CSP has no font-src, so default-src
+   'self' covers these and no server change was needed. */
+@font-face {
+  font-family: "Quicksand";
+  src: url("/static/fonts/quicksand-variable.woff2") format("woff2-variations");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Permanent Marker";
+  src: url("/static/fonts/permanent-marker-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Courier Prime";
+  src: url("/static/fonts/courier-prime-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Courier Prime";
+  src: url("/static/fonts/courier-prime-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

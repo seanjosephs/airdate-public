@@ -1,0 +1,161 @@
+/* The writers room: the shell.
+ *
+ * Slice 1 is the frame only - sidebar, page head, and the empty main. The
+ * board, the cards, the editor, settings and the shelf arrive in slices 2 to 6
+ * and bring their own sections.
+ */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { color-scheme: dark; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  background:
+    radial-gradient(1000px 520px at 34% -6%, rgba(255, 176, 92, 0.14), transparent),
+    var(--bg);
+  color: var(--text);
+  font: 400 15px/1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every control shows where the keyboard is. The baseline audit's first
+   blocker was that you could not reach an essay without a mouse.
+   Amber on dark, ink on paper: in placing mode this same ring is what marks
+   the candidate Monday, so it has to read against cork and cream too. */
+:focus-visible {
+  outline: var(--focus-dark);
+  outline-offset: 2px;
+}
+/* On paper the ring is ink. The first three catch a note, page or sticky that
+   is itself focusable (the post-it is a button); the last three catch a control
+   inside one. The designer's tokens had only the second set, which misses the
+   post-it entirely. */
+.paper:focus-visible,
+.note:focus-visible,
+.sticky:focus-visible,
+.paper :focus-visible,
+.note :focus-visible,
+.sticky :focus-visible { outline: var(--focus-paper); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Skip link: first thing in the tab order, invisible until it has focus. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -64px;
+  z-index: 10;
+  padding: 10px 16px;
+  border-radius: var(--r-md);
+  background: var(--cream);
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  transition: top 120ms ease;
+}
+.skip-link:focus { top: 12px; }
+
+/* ---- sidebar ---------------------------------------------------------- */
+
+.room-sidebar {
+  flex: 0 0 200px;
+  width: 200px;
+  padding: 28px 16px;
+  border-right: 1px solid var(--b1);
+  background: rgba(0, 0, 0, 0.30);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.room-brand { display: block; line-height: 0; }
+.room-brand img {
+  width: 100%;
+  height: auto;
+  max-width: 168px;
+}
+
+.room-nav { display: flex; flex-direction: column; gap: 4px; }
+
+.room-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  color: var(--muted);
+  font: 700 14px/1 var(--font-ui);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.room-nav a:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); }
+.room-nav a[aria-current="page"] {
+  background: rgba(255, 106, 0, 0.16);
+  color: var(--orange-soft);
+}
+.room-nav svg {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+}
+
+/* ---- main ------------------------------------------------------------- */
+
+.room-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.room-head h1 {
+  margin: 0;
+  font: 700 28px/1.2 var(--font-ui);
+  letter-spacing: -0.5px;
+}
+
+.room-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* The slot slices 2 to 6 fill. Until then it says so rather than looking
+   broken, because a blank page reads as a bug. */
+.room-placeholder {
+  padding: 28px;
+  border: 1px dashed var(--b2);
+  border-radius: var(--r-lg);
+  background: var(--s1);
+  color: var(--muted);
+  font-size: 14px;
+}
+.room-placeholder strong { color: var(--text); font-weight: 700; }

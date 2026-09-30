@@ -32,44 +32,41 @@
     "default": null,
     "items": [
       {
-        "key": "circle",
-        "label": "Argument",
-        "color": "#8f79ff",
-        "role": "",
-        "image": "Essays/_assets/airdate/totems/argument.png",
-        "keywords": {
-          "debate": 3,
-          "critique": 2
-        }
-      },
-      {
-        "key": "triangle",
-        "label": "Triangle",
-        "color": "#d9653b",
+        "key": "fox",
+        "label": "Fox",
+        "color": "#FF5B45",
         "role": "",
         "image": "",
         "keywords": {}
       },
       {
-        "key": "square",
-        "label": "Square",
-        "color": "#3f9a6e",
+        "key": "octopus",
+        "label": "Octopus",
+        "color": "#3FD9EC",
         "role": "",
         "image": "",
         "keywords": {}
       },
       {
-        "key": "diamond",
-        "label": "Diamond",
-        "color": "#3a7bd5",
+        "key": "bison",
+        "label": "Bison",
+        "color": "#8FD16A",
         "role": "",
         "image": "",
         "keywords": {}
       },
       {
-        "key": "star",
-        "label": "Star",
-        "color": "#d4a017",
+        "key": "elephant",
+        "label": "Elephant",
+        "color": "#8EA2FF",
+        "role": "",
+        "image": "",
+        "keywords": {}
+      },
+      {
+        "key": "phoenix",
+        "label": "Phoenix",
+        "color": "#B98CFF",
         "role": "",
         "image": "",
         "keywords": {}
@@ -95,6 +92,22 @@
         }
       }
     ]
+  },
+  "board": {
+    "default_pad": "sticky",
+    "default_color": "canary",
+    "weeks_shown": 3
+  },
+  "editor": {
+    "mode": "simplified",
+    "sections": {}
+  },
+  "red_pen": {
+    "enabled": true,
+    "lines": []
+  },
+  "paper": {
+    "fresh_on_promotion": false
   },
   "tag_presets": [
     {
