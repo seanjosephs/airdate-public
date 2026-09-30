@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/static/room/room.css?v=2">
   <link rel="stylesheet" href="/static/room/cards.css?v=2">
   <link rel="stylesheet" href="/static/room/board.css?v=1">
-  <link rel="stylesheet" href="/static/room/editor.css?v=1">
+  <link rel="stylesheet" href="/static/room/editor.css?v=2">
   <script src="/static/room/api.js?v=1" defer></script>
   <script src="/static/room/cards.js?v=3" defer></script>
   <script src="/static/room/keys.js?v=1" defer></script>
@@ -19,8 +19,8 @@
   <script src="/static/room/feedback.js?v=1" defer></script>
   <script src="/static/room/board-view.js?v=1" defer></script>
   <script src="/static/room/placing.js?v=1" defer></script>
-  <script src="/static/room/editor.js?v=1" defer></script>
-  <script src="/static/room/editor-view.js?v=1" defer></script>
+  <script src="/static/room/editor.js?v=2" defer></script>
+  <script src="/static/room/editor-view.js?v=2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#room-main">skip to the essays</a>
@@ -307,7 +307,7 @@
             <fieldset class="ed-fieldset">
               <legend>who gets it</legend>
               <div class="ed-options">
-                <label class="ed-option"><input type="radio" name="ed-audience" data-field="audience" value="everyone">everyone</label>
+                <label class="ed-option"><input type="radio" id="ed-f-audience-everyone" name="ed-audience" data-field="audience" value="everyone">everyone</label>
                 <label class="ed-option"><input type="radio" name="ed-audience" data-field="audience" value="free">free subscribers</label>
                 <label class="ed-option"><input type="radio" name="ed-audience" data-field="audience" value="paid">paid subscribers</label>
                 <label class="ed-option"><input type="radio" name="ed-audience" data-field="audience" value="founding">founding members</label>
@@ -402,6 +402,34 @@
           <p class="ed-air-label">air date</p>
           <p class="ed-air-value" id="ed-air-value"></p>
           <p class="ed-air-hint" id="ed-air-hint" hidden></p>
+        </div>
+        <div class="ed-send">
+          <button type="button" class="ed-send-button" id="ed-send" aria-describedby="ed-send-caption" disabled><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg><span id="ed-send-label">send to substack</span></button>
+          <p class="ed-send-why" id="ed-send-why" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></svg><span id="ed-send-why-text"></span></p>
+          <p class="ed-send-caption" id="ed-send-caption">sends a draft. airdate never publishes.</p>
+          <div class="ed-send-result" id="ed-send-result" tabindex="-1" hidden></div>
+          <p class="ed-draft-link" id="ed-draft-link" hidden>sent before as a draft. <a id="ed-draft-link-a" href="#" target="_blank" rel="noopener">open it in substack</a></p>
+        </div>
+        <div class="ed-check">
+          <button type="button" class="ed-action" id="ed-check"><span class="ed-action-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="ed-action-words"><span class="ed-action-name">check readiness</span><span class="ed-action-sub">finds anything substack would reject</span></span></button>
+          <div class="ed-readiness" id="ed-readiness" role="region" aria-label="readiness" aria-live="polite">
+            <p class="ed-readiness-head" id="ed-readiness-head"></p>
+            <ol class="ed-readiness-list" id="ed-readiness-list"></ol>
+          </div>
+          <div class="ed-readiness-feedback" id="ed-readiness-feedback"></div>
+        </div>
+        <button type="button" class="ed-action" id="ed-attach"><span class="ed-action-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M3 17l5-5 4 4 3-3 6 5"/></svg></span><span class="ed-action-words"><span class="ed-action-name">attach hero</span><span class="ed-action-sub">uploads the hero image to the draft</span></span></button>
+        <div class="ed-more">
+          <button type="button" class="ed-more-button" id="ed-more-button" aria-expanded="false" aria-controls="ed-more-panel"><svg class="ed-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg><span>more</span></button>
+          <div class="ed-more-panel" id="ed-more-panel" hidden>
+            <button type="button" class="ed-action" id="ed-thumb-prompt"><span class="ed-action-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></span><span class="ed-action-words"><span class="ed-action-name">copy thumbnail prompt</span><span class="ed-action-sub">for your image tool</span></span></button>
+            <button type="button" class="ed-action" id="ed-preview"><span class="ed-action-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="ed-action-words"><span class="ed-action-name">preview markdown</span><span class="ed-action-sub">the note as a save would write it</span></span></button>
+            <div class="ed-more-feedback" id="ed-more-feedback"></div>
+            <div class="ed-preview-box" id="ed-preview-box" hidden>
+              <pre class="ed-preview-text" id="ed-preview-text" tabindex="0" aria-label="markdown preview"></pre>
+              <button type="button" class="ed-btn" id="ed-preview-hide">hide the preview</button>
+            </div>
+          </div>
         </div>
         <section class="ed-board" data-section="on_the_board" aria-labelledby="ed-board-heading">
           <div>

@@ -462,14 +462,534 @@
     return 'in the writers room. move it to writers likey before it can be scheduled.';
   }
 
-  // "saved to obsidian 2:14pm"
-  function savedLine(date) {
+  // "2:14pm", local time.
+  function clockTime(date) {
     const d = date instanceof Date ? date : new Date(date);
     let hours = d.getHours();
     const suffix = hours >= 12 ? 'pm' : 'am';
     hours %= 12;
     if (hours === 0) hours = 12;
-    return `saved to obsidian ${hours}:${String(d.getMinutes()).padStart(2, '0')}${suffix}`;
+    return `${hours}:${String(d.getMinutes()).padStart(2, '0')}${suffix}`;
+  }
+
+  // "saved to obsidian 2:14pm"
+  function savedLine(date) {
+    return `saved to obsidian ${clockTime(date)}`;
+  }
+
+  // ---- send: the readiness list ---------------------------------------------
+  //
+  // The server's preflight is the only judge of what Substack would reject.
+  // These functions only route its rows: which belong to the list, which to
+  // the connection gate, which fold together, and where each one sends the
+  // writer. No check is added here that the server does not make.
+
+  // Where a row puts the writer: the id of the control for a field.
+  const FIELD_TARGETS = {
+    title: 'ed-f-title',
+    subtitle: 'ed-f-subtitle',
+    summary: 'ed-f-summary',
+    body: 'ed-f-body',
+    hero_image: 'ed-hero-file',
+    tags: 'ed-tag-input',
+    slug: 'ed-f-slug',
+    section: 'ed-f-section',
+    email_subject: 'ed-f-email_subject',
+    email_preview_text: 'ed-f-email_preview_text',
+    comment_permissions: 'ed-f-comment_permissions',
+    audience: 'ed-f-audience-everyone',
+    seo_title: 'ed-f-seo_title',
+    seo_description: 'ed-f-seo_description',
+    canonical_url: 'ed-f-canonical_url',
+    thumbnail_prompt: 'ed-f-thumbnail_prompt',
+  };
+
+  // Details the note must carry that have no control of their own: airdate
+  // fills them in from these fields when the essay opens.
+  const FILLED_FROM = {
+    thumbnail_alt: 'title',
+    social_title: 'title',
+    social_description: 'summary',
+  };
+
+  // The switchable section a field sits in, when it is not always shown.
+  const FIELD_SECTIONS = {
+    slug: 'advanced',
+    section: 'advanced',
+    email_subject: 'email_comments',
+    email_preview_text: 'email_comments',
+    audience: 'email_comments',
+    comment_permissions: 'email_comments',
+    seo_title: 'seo_social',
+    seo_description: 'seo_social',
+    canonical_url: 'seo_social',
+    thumbnail_prompt: 'thumbnail',
+  };
+
+  const FIELD_NAMES = {
+    title: 'the title',
+    subtitle: 'the subtitle',
+    summary: 'the summary',
+    body: 'the script',
+    hero_image: 'the hero image',
+    tags: 'tags',
+    audience: 'who gets it',
+    comment_permissions: 'comments',
+    email_subject: 'the email subject',
+    email_preview_text: 'the email preview text',
+    seo_title: 'the seo title',
+    seo_description: 'the seo description',
+    thumbnail_prompt: 'the thumbnail prompt',
+    thumbnail_alt: 'the thumbnail alt text',
+    social_title: 'the social title',
+    social_description: 'the social description',
+    publication: 'your substack address',
+  };
+
+  // What an empty field's row says, in the room's voice.
+  const EMPTY_SENTENCES = {
+    title: ['the title is empty', 'write it'],
+    subtitle: ['the subtitle is empty. substack shows it under the title', 'write it'],
+    summary: ['the summary is empty. substack uses it as the preview', 'write it'],
+    body: ['the script is empty', 'write it'],
+    hero_image: ['the hero image is missing', 'attach'],
+    tags: ['there are no tags. substack needs at least one', 'add one'],
+  };
+
+  // Order on the page, top to bottom. Save sits in the header.
+  const PAGE_ORDER = [
+    'ed-save', 'ed-f-title', 'ed-f-subtitle', 'ed-f-summary', 'ed-f-body', 'ed-hero-file', 'ed-tag-input',
+    'ed-f-slug', 'ed-f-section', 'ed-f-email_subject', 'ed-f-email_preview_text', 'ed-f-audience-everyone',
+    'ed-f-comment_permissions', 'ed-f-seo_title', 'ed-f-canonical_url', 'ed-f-seo_description', 'ed-f-thumbnail_prompt',
+  ];
+
+  // Rows that are about the connection, not the note. They shut gate 1.
+  const CONNECTION_KEYS = new Set(['publication', 'substack_command', 'substack_session']);
+
+  // A blocker the server keys to the note directly, and the field it names.
+  const DIRECT_FIELDS = { title: 'title', subtitle: 'subtitle', hero: 'hero_image', hero_path: 'hero_image', body: 'body' };
+
+  // What a body-fidelity finding is, short enough for one row.
+  const BODY_KINDS = {
+    table: 'a table. substack has no tables',
+    block_swallowed: 'this block would be dropped',
+    embed: 'an obsidian embed substack cannot show',
+    local_image: 'an image that is only on this computer',
+  };
+
+  function lowerFirst(text) {
+    const value = String(text || '').trim();
+    return value ? value.charAt(0).toLowerCase() + value.slice(1) : '';
+  }
+
+  function plural(n, one, many) {
+    return `${n} ${n === 1 ? one : many}`;
+  }
+
+  function rowFor(key, text, target, action, extra) {
+    return { key, text, target: target || '', action: action || '', line: null, ...(extra || {}) };
+  }
+
+  // A detail the note does not have, as a row. What the editor holds
+  // decides it: a value the writer only has to save folds into one row;
+  // an empty one sends them to the field.
+  function emptyRow(field, visibility) {
+    if (FILLED_FROM[field]) {
+      const from = FILLED_FROM[field];
+      return rowFor(`persisted_${field}`, `${FIELD_NAMES[field]} is empty. airdate fills it in from ${FIELD_NAMES[from]}`, FIELD_TARGETS[from], 'write it');
+    }
+    const [text, action] = EMPTY_SENTENCES[field] || [`${FIELD_NAMES[field] || field.replace(/_/g, ' ')} is empty`, 'fill it in'];
+    const section = FIELD_SECTIONS[field];
+    if (section && visibility && visibility[section] === false) {
+      return rowFor(`persisted_${field}`, `${text}. it is in ${SECTION_NAMES[section] || section}, which is switched off`, '', '');
+    }
+    return rowFor(`persisted_${field}`, text, FIELD_TARGETS[field] || '', FIELD_TARGETS[field] ? action : '');
+  }
+
+  function bodyRow(blocker) {
+    const key = String(blocker.key || '');
+    if (key === 'body_blockers_more') {
+      const count = Number.isInteger(blocker.count) ? blocker.count : 0;
+      const text = count ? `and ${plural(count, 'more problem', 'more problems')} in the script` : 'and more problems in the script';
+      return rowFor(key, text, 'ed-f-body', 'go to it');
+    }
+    const kind = key.slice(5, key.lastIndexOf('_'));
+    const line = Number.isInteger(blocker.line) ? blocker.line : null;
+    const what = BODY_KINDS[kind] || lowerFirst(String(blocker.message || '').replace(/^line \d+:\s*/i, ''));
+    const text = line ? `line ${line}: ${what}` : what;
+    return rowFor(key, text, 'ed-f-body', 'go to it', { line });
+  }
+
+  // The list the rail shows for a preflight.
+  //   values      what the editor holds now (state.values)
+  //   visibility  which sections are on (sectionVisibility)
+  //   body        the script the editor holds now (state.body)
+  // Returns { source, rows, connection } where `connection` holds the keys
+  // that shut gate 1 instead of joining the list.
+  function readinessList(preflight, values, visibility, body) {
+    const result = preflight && typeof preflight === 'object' ? preflight : {};
+    const blockers = Array.isArray(result.blockers) ? result.blockers : [];
+    const held = values || {};
+    const connection = blockers.filter((b) => CONNECTION_KEYS.has(String(b.key || ''))).map((b) => String(b.key));
+    if (result.source_role === 'source' || blockers.some((b) => b.key === 'source_role')) {
+      return {
+        source: true,
+        connection,
+        rows: [rowFor('source_role', 'this is a source note. make a linked draft to send it', '', 'make a linked draft', { kind: 'source' })],
+      };
+    }
+    const direct = new Set();
+    for (const blocker of blockers) {
+      const field = DIRECT_FIELDS[String(blocker.key || '')];
+      if (field) direct.add(field);
+    }
+    const rows = [];
+    const toSave = [];
+    for (const blocker of blockers) {
+      const key = String(blocker.key || '');
+      if (CONNECTION_KEYS.has(key) || key === 'source_role') continue;
+      if (key.startsWith('persisted_')) {
+        const field = key.slice('persisted_'.length);
+        // The same gap the server also named directly: one row, not two.
+        if (direct.has(field)) continue;
+        const holds = field === 'body' ? String(body || '').trim() !== '' : !isBlank(normalize(field, held[field]));
+        if (!holds) rows.push(emptyRow(field, visibility));
+        else toSave.push(field);
+        continue;
+      }
+      if (key.startsWith('body_')) {
+        rows.push(bodyRow(blocker));
+        continue;
+      }
+      const field = DIRECT_FIELDS[key];
+      if (field === 'hero_image' && key === 'hero_path') {
+        rows.push(rowFor(key, 'the hero image is not in your vault any more', FIELD_TARGETS.hero_image, 'attach'));
+        continue;
+      }
+      if (field) {
+        const [text, action] = EMPTY_SENTENCES[field];
+        rows.push(rowFor(key, text, FIELD_TARGETS[field], action));
+        continue;
+      }
+      // Anything this list does not know yet still shows, in the server's words.
+      const target = FIELD_TARGETS[String(blocker.field || '')] || '';
+      rows.push(rowFor(key, lowerFirst(blocker.message) || key.replace(/_/g, ' '), target, target ? 'fix it' : ''));
+    }
+    if (toSave.length) {
+      rows.push(rowFor('persisted', `press save: ${plural(toSave.length, 'detail is', 'details are')} not in the note yet`, 'ed-save', 'save', { fields: toSave }));
+    }
+    const rank = (row) => {
+      const at = PAGE_ORDER.indexOf(row.target);
+      return at === -1 ? PAGE_ORDER.length : at;
+    };
+    rows.sort((a, b) => rank(a) - rank(b) || (a.line || 0) - (b.line || 0));
+    return { source: false, connection, rows };
+  }
+
+  // "3 things to fix. checked 2:14pm" or "all clear. checked 2:14pm".
+  function readinessHeading(count, checkedAt) {
+    const time = clockTime(checkedAt);
+    return count ? `${plural(count, 'thing', 'things')} to fix. checked ${time}` : `all clear. checked ${time}`;
+  }
+
+  // Where the Nth line of the script starts and ends in the textarea. The
+  // server counts from the first non-blank line, as the script is sent.
+  function lineRange(body, line) {
+    const text = String(body || '');
+    const first = text.search(/\S/);
+    const skipped = first === -1 ? 0 : (text.slice(0, first).match(/\n/g) || []).length;
+    const lines = text.split('\n');
+    const index = Math.min(Math.max(0, skipped + Math.max(1, Number(line) || 1) - 1), lines.length - 1);
+    let start = 0;
+    for (let i = 0; i < index; i += 1) start += lines[i].length + 1;
+    return { start, end: start + lines[index].length, index };
+  }
+
+  // ---- send: the three gates ------------------------------------------------
+  //
+  // 1 connected, which includes a real substack address; 2 on the board;
+  // 3 readiness clear. Send is disabled while any is shut. The line under
+  // the button names the first shut gate in full and the rest after it.
+
+  // Gate 1, from /api/substack/status (null when it could not be read) and
+  // the connection rows of the last preflight.
+  function connectionGate(substack, connectionKeys) {
+    const keys = new Set(connectionKeys || []);
+    if (substack === undefined) return { problem: 'checking substack', action: 'wait a moment', clause: 'wait a moment', pending: true };
+    if (!substack || typeof substack !== 'object') {
+      return { problem: 'airdate could not check substack', action: 'press check readiness to look again', clause: 'check again' };
+    }
+    const connector = substack.connector || {};
+    if (!substack.connected) {
+      if (!connector.paired) return { problem: 'the obsidian connector is not paired', action: 'pair it in obsidian', clause: 'pair it' };
+      if (!connector.available) return { problem: 'obsidian is not answering', action: 'open obsidian with the airdate connector on', clause: 'open obsidian' };
+      return { problem: 'substack is not connected', action: 'connect it through obsidian', clause: 'connect it' };
+    }
+    if (!substack.publication_configured) return { problem: 'airdate has no substack address yet', action: 'add it in settings', clause: 'add it' };
+    if (keys.has('publication')) {
+      return { problem: 'this note names a placeholder substack address', action: 'fix publication in the note in obsidian', clause: 'fix it' };
+    }
+    if (keys.has('substack_command') || keys.has('substack_session')) {
+      return { problem: 'the obsidian connector stopped answering', action: 'check obsidian, then check readiness again', clause: 'check obsidian' };
+    }
+    return null;
+  }
+
+  // Gate 2. The server has no "on the board" check for send; the old page
+  // kept this in the browser too.
+  const SEND_PHASES = ['Ready for Air', 'Live'];
+
+  function boardGate(status) {
+    const phase = String(status || '');
+    if (SEND_PHASES.includes(phase)) return null;
+    if (phase === 'Archived') return { problem: 'saved for a rainy day', action: 'bring it back to the room, then schedule it', clause: 'bring it back and schedule it' };
+    if (phase === 'Writers Likey') return { problem: 'not on the board yet', action: 'schedule it', clause: 'schedule it' };
+    return { problem: 'not on the board yet', action: 'star it for writers likey, then schedule it', clause: 'star it and schedule it' };
+  }
+
+  // Gate 3. readiness: { state: 'loading' | 'error' | 'done', count, source }.
+  function readinessGate(readiness) {
+    const r = readiness || {};
+    if (r.state === 'loading' || !r.state) return { problem: 'checking readiness', action: 'wait a moment', clause: 'wait for readiness', pending: true };
+    if (r.state === 'error') return { problem: 'readiness was not checked', action: 'press check readiness', clause: 'check readiness' };
+    if (r.source) return { problem: '', action: 'make a linked draft below', clause: 'make a linked draft below' };
+    const count = Number(r.count) || 0;
+    if (!count) return null;
+    const things = `fix ${plural(count, 'thing', 'things')} below`;
+    return { problem: '', action: things, clause: things };
+  }
+
+  // All three, and the line under the button ('' when send is open).
+  function sendGates(input) {
+    const opts = input || {};
+    const gates = [
+      ['connected', connectionGate(opts.substack, opts.connection)],
+      ['board', boardGate(opts.status)],
+      ['readiness', readinessGate(opts.readiness)],
+    ].filter(([, gate]) => gate);
+    if (!gates.length) return { open: true, shut: [], line: '' };
+    if (gates.some(([, gate]) => gate.pending)) {
+      return { open: false, shut: gates.map(([name]) => name), line: 'checking whether this can go to substack…' };
+    }
+    const [[, first], ...rest] = gates;
+    let line = first.problem ? `${first.problem}. ${first.action}` : first.action;
+    // One "then" per line: an action that already has one takes the rest with "and".
+    const joiner = first.action.includes(', then ') ? ' and ' : ', then ';
+    line += rest.length ? `${joiner}${rest.map(([, gate]) => gate.clause).join(' and ')}` : ' to send';
+    return { open: false, shut: gates.map(([name]) => name), line: `${line}.` };
+  }
+
+  // The substack line at the top of the rail. `refused` mirrors an auth
+  // failure from the last send, so it shows from anywhere in the rail.
+  function connectionLine(substack, refused) {
+    if (substack === undefined) return { tone: 'checking', name: 'checking substack…', sub: '' };
+    if (!substack || typeof substack !== 'object') {
+      return { tone: 'off', name: 'substack status unknown', sub: 'airdate could not check. check readiness looks again.' };
+    }
+    const host = String(substack.publication || '').replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+    if (refused) return { tone: 'off', name: 'substack: session refused', sub: 'sign in to substack again through obsidian.' };
+    const connector = substack.connector || {};
+    if (substack.connected) {
+      return { tone: 'connected', name: 'substack connected', sub: substack.publication_configured ? host : 'add your substack address in settings.' };
+    }
+    if (!connector.paired) return { tone: 'off', name: 'substack not connected', sub: 'pair the airdate connector in obsidian.' };
+    if (!connector.available) return { tone: 'off', name: 'substack not connected', sub: 'open obsidian with the airdate connector on.' };
+    return { tone: 'off', name: 'substack not connected', sub: 'connect substack through obsidian.' };
+  }
+
+  // ---- send: what the result says ------------------------------------------
+
+  // Only a refused session earns the one automatic retry, and only after the
+  // writer finished signing in again. A timeout never does: the draft may
+  // already exist, and a blind retry is how a second copy gets made.
+  function shouldRetrySend(result, attempts, reconnected) {
+    return Boolean(result && !result.ok && result.error_kind === 'auth' && attempts === 1 && reconnected === true);
+  }
+
+  // The status code or reason, for the brackets. Display only: the failure
+  // is classified by error_kind, never by this.
+  function failureCode(result) {
+    if (result && result.error_kind === 'timeout') return 'timed out';
+    const text = `${(result && result.message) || ''} ${(result && result.error) || ''}`;
+    const match = /\b([45]\d\d)\b/.exec(text);
+    return match ? match[1] : '';
+  }
+
+  // Did the send get as far as asking the connector for a draft?
+  function reachedConnector(result) {
+    return Boolean(result && result.transport === 'obsidian_connector');
+  }
+
+  // The red box under the button: one sentence (who refused, why with the
+  // code, whether anything was sent) and the actions that go with it.
+  //   outcome  the /send result, or { error_kind: 'network' | 'http' | 'setup'
+  //            | 'refused', message } when the request itself failed
+  //   substack the /api/substack/status read after the failure, if any
+  // Actions: 'connect' signs in through obsidian, 'retry' sends again,
+  // 'open-substack' opens substack to check, 'forget' forgets a stale link.
+  function sendFailure(outcome, substack, blockedCount) {
+    const result = outcome || {};
+    const kind = String(result.error_kind || 'transport');
+    const code = failureCode(result);
+    const bracket = code ? ` (${code})` : '';
+    const check = 'check substack before you send again';
+    if (kind === 'blocked') {
+      const n = Number(blockedCount) || 0;
+      const what = n ? `fix ${plural(n, 'thing', 'things')} below` : 'the readiness list has something to fix';
+      return { sentence: `airdate stopped before substack: ${what}. nothing was sent.`, sent: 'no', actions: [], refused: false };
+    }
+    if (kind === 'auth') {
+      const sentence = reachedConnector(result)
+        ? `substack refused the session obsidian holds${bracket}. no draft was made.`
+        : 'substack is not signed in inside obsidian. nothing was sent.';
+      return { sentence, sent: 'no', actions: ['connect', 'retry'], refused: true };
+    }
+    if (kind === 'timeout') {
+      return {
+        sentence: `substack did not answer in time${bracket}. a draft may already exist, so ${check}.`,
+        sent: 'maybe',
+        actions: ['open-substack'],
+        refused: false,
+      };
+    }
+    if (kind === 'network') {
+      return {
+        sentence: `airdate stopped answering during the send. it cannot tell whether a draft was made, so ${check}.`,
+        sent: 'maybe',
+        actions: ['open-substack'],
+        refused: false,
+      };
+    }
+    if (kind === 'setup') {
+      return { sentence: 'airdate is not set up yet. finish setup in settings. nothing was sent.', sent: 'no', actions: [], refused: false };
+    }
+    if (kind === 'refused') {
+      return { sentence: `airdate would not send this: ${lowerFirst(result.message) || 'it refused'}. nothing was sent.`, sent: 'no', actions: [], refused: false };
+    }
+    if (kind === 'http') {
+      return {
+        sentence: `airdate hit a problem while sending${bracket}. it cannot tell whether a draft was made, so ${check}.`,
+        sent: 'maybe',
+        actions: ['open-substack'],
+        refused: false,
+      };
+    }
+    // transport
+    const stale = String(result.stale_draft_id || '').trim();
+    if (stale) {
+      return {
+        sentence: `substack no longer has draft ${stale}, so nothing was sent. if you deleted it there, forget the link and send this as a new draft.`,
+        sent: 'no',
+        actions: ['forget'],
+        stale,
+        refused: false,
+      };
+    }
+    if (!reachedConnector(result)) {
+      const connector = (substack && substack.connector) || {};
+      if (substack && !connector.paired) {
+        return { sentence: 'the obsidian connector is not paired, so nothing was sent. in obsidian, run "pair with airdate".', sent: 'no', actions: ['retry'], refused: false };
+      }
+      if (substack && !connector.available) {
+        return { sentence: 'obsidian is not answering, so nothing was sent. open obsidian with the airdate connector on.', sent: 'no', actions: ['retry'], refused: false };
+      }
+      return { sentence: `the obsidian connector did not take the draft${bracket}, so nothing was sent.`, sent: 'no', actions: ['retry'], refused: false };
+    }
+    return {
+      sentence: `the obsidian connector could not make the draft${bracket}. airdate cannot tell whether substack kept anything, so ${check}.`,
+      sent: 'maybe',
+      actions: ['open-substack'],
+      refused: false,
+    };
+  }
+
+  // Where "open substack" goes: the draft itself when the note knows it,
+  // otherwise the publication's posts. '' when neither is known.
+  function substackCheckUrl(substack, frontmatter) {
+    const draft = String((frontmatter && frontmatter.substack_draft_url) || '').trim();
+    if (/^https:\/\//i.test(draft)) return draft;
+    const publication = String((substack && substack.publication) || '').trim().replace(/\/+$/, '');
+    if (!publication || !(substack && substack.publication_configured)) return '';
+    const base = /^https?:\/\//i.test(publication) ? publication : `https://${publication}`;
+    return `${base}/publish/posts`;
+  }
+
+  // The green line after a draft lands.
+  function sendSuccess(result) {
+    const res = result || {};
+    const url = String(res.edit_url || '').trim();
+    const warnings = (Array.isArray(res.warnings) ? res.warnings : []).map(lowerFirst).filter(Boolean);
+    return {
+      text: res.updated ? 'the draft in substack is updated. airdate did not publish it.' : 'the draft is in substack. airdate did not publish it.',
+      url: /^https:\/\//i.test(url) ? url : '',
+      warnings,
+    };
+  }
+
+  // After a send. The send saved first, so whenever it reports the state that
+  // save left, the sent values are the new baseline, whatever became of the
+  // send; and a draft it recorded wrote the note once more.
+  //   sent     snapshot(state) taken when send was pressed
+  //   payload  the savePayload sent with it
+  function adoptSend(state, sent, payload, result) {
+    const res = result || {};
+    const saved = res.saved_state && typeof res.saved_state === 'object' ? res.saved_state : null;
+    let next = { ...state, frontmatter: { ...state.frontmatter } };
+    if (saved && saved.mtime != null) {
+      next = {
+        ...next,
+        id: String(saved.new_id || state.id),
+        baseline: copyValues(sent.values),
+        opened: copyValues(sent.values),
+        bodyBaseline: sent.body,
+        bodyOpened: sent.body,
+        fileState: { mtime: saved.mtime ?? null, content_hash: saved.content_hash ?? null },
+      };
+      const written = res.saved && typeof res.saved === 'object' && res.saved.saved_frontmatter;
+      if (written && typeof written === 'object') {
+        next.frontmatter = { ...written };
+      } else {
+        for (const [key, value] of Object.entries((payload && payload.updates) || {})) {
+          if (isBlank(value) || (key === 'totem' && value === TOTEM_NONE)) delete next.frontmatter[key];
+          else next.frontmatter[key] = Array.isArray(value) ? [...value] : value;
+        }
+      }
+    }
+    if (res.ok && res.draft_recorded) {
+      next.fileState = { mtime: res.mtime ?? null, content_hash: res.content_hash ?? null };
+      if (res.draft_id) next.frontmatter.substack_draft_id = String(res.draft_id);
+      if (res.edit_url) next.frontmatter.substack_draft_url = String(res.edit_url);
+    }
+    return next;
+  }
+
+  // After forget-draft-link, which rewrote the note without the two keys
+  // and answers with the essay as it is now.
+  function adoptForget(state, result) {
+    const res = result || {};
+    const frontmatter = { ...state.frontmatter };
+    delete frontmatter.substack_draft_id;
+    delete frontmatter.substack_draft_url;
+    return {
+      ...state,
+      id: String(res.new_id || state.id),
+      frontmatter: res.essay && res.essay.frontmatter && typeof res.essay.frontmatter === 'object'
+        ? { ...res.essay.frontmatter }
+        : frontmatter,
+      fileState: res.mtime != null ? { mtime: res.mtime, content_hash: res.content_hash ?? null } : state.fileState,
+    };
+  }
+
+  // What preflight, preview and the thumbnail prompt are told the editor
+  // holds, so they judge what a save would write, not only what is on disk.
+  function publishValues(state) {
+    const out = {};
+    for (const key of Object.keys(FIELDS)) {
+      if (NEVER_SEND.has(key)) continue;
+      const value = normalize(key, state.values[key]);
+      if (!isBlank(value)) out[key] = value;
+    }
+    return out;
   }
 
   // ---- the deep link --------------------------------------------------------
@@ -516,8 +1036,26 @@
     formatDay,
     airDate,
     statusLine,
+    clockTime,
     savedLine,
     essayFromSearch,
     editorUrl,
+    FIELD_TARGETS,
+    readinessList,
+    readinessHeading,
+    lineRange,
+    connectionGate,
+    boardGate,
+    readinessGate,
+    sendGates,
+    connectionLine,
+    shouldRetrySend,
+    failureCode,
+    sendFailure,
+    substackCheckUrl,
+    sendSuccess,
+    adoptSend,
+    adoptForget,
+    publishValues,
   };
 });
