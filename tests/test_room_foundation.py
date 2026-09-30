@@ -222,3 +222,42 @@ class TotemArtTests(unittest.TestCase):
             )
         finally:
             self.server.resolve_vault_asset = original
+
+
+class ResetRoomTests(unittest.TestCase):
+    """The settings action that restarts every paper clock. It must be asked for."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        root = Path(cls.tmp.name)
+        (root / "vault").mkdir()
+        (root / "runtime").mkdir()
+        os.environ["OBSIDIAN_ESSAYS_DIR"] = str(root / "vault")
+        os.environ["AIR_DATE_DATA_DIR"] = str(root / "runtime")
+        import server  # noqa: PLC0415
+        cls.server = server
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        self.server.reset_arrivals()
+        self.server.arrival_for("essay-a", "2026-09-01T10:00:00+00:00")
+        self.server.arrival_for("essay-b", "2026-09-02T10:00:00+00:00")
+
+    def test_without_confirmation_nothing_is_cleared(self):
+        result = self.server.reset_room({})
+        self.assertFalse(result["ok"])
+        self.assertEqual(len(self.server.load_arrivals()), 2)
+
+    def test_a_truthy_string_is_not_confirmation(self):
+        # Only the literal true counts; "yes" or "1" from a sloppy client does not.
+        self.assertFalse(self.server.reset_room({"confirm": "yes"})["ok"])
+        self.assertEqual(len(self.server.load_arrivals()), 2)
+
+    def test_confirmed_it_clears_every_clock_and_says_how_many(self):
+        result = self.server.reset_room({"confirm": True})
+        self.assertEqual(result, {"ok": True, "cleared": 2})
+        self.assertEqual(self.server.load_arrivals(), {})

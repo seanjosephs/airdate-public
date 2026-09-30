@@ -3230,6 +3230,20 @@ def reset_arrivals() -> None:
     save_arrivals({})
 
 
+def reset_room(payload: dict[str, Any]) -> dict[str, Any]:
+    """The settings action behind "reset the writers room".
+
+    It restarts every essay's paper clock at once and cannot be undone, so the
+    request has to say so explicitly. The confirmation dialog is the interface's
+    job; this is the rule underneath it, so a stray POST cannot age-reset a
+    whole catalog. Nothing in the vault is touched either way."""
+    if payload.get("confirm") is not True:
+        return {"ok": False, "error": "resetting the writers room needs confirm: true."}
+    count = len(load_arrivals())
+    reset_arrivals()
+    return {"ok": True, "cleared": count}
+
+
 def load_contact_log() -> dict[str, Any]:
     if not CONTACT_LOG.exists():
         return {"total": 0, "events": []}
@@ -3430,6 +3444,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/api/settings/create-essays-folder":
                 self.send_json(create_essays_folder(payload))
+                return
+            if path == "/api/settings/reset-room":
+                result = reset_room(payload)
+                self.send_json(result, status=200 if result.get("ok") else 400)
                 return
             if path == "/api/substack/connect":
                 result = connector_request("/connect", {})
