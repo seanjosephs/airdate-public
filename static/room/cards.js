@@ -319,8 +319,11 @@
     return item && item.image ? { key: raw, label: String(item.label || raw).toLowerCase(), image: String(item.image) } : null;
   }
 
+  // The room's own editor (slice 4). A real link, so it opens with the
+  // keyboard and in a new tab; editor-view.js opens it in place on a plain
+  // click and reads ?essay= when the room loads.
   function editorHref(essay) {
-    return `/airdate?essay=${encodeURIComponent(String(essay?.id || ''))}`;
+    return `/airdate/room?essay=${encodeURIComponent(String(essay?.id || ''))}`;
   }
 
   function isPostLink(value) {
@@ -507,6 +510,7 @@
     totemFor,
     editorHref,
     escapeHtml,
+    stampMarkup,
     cardMarkup,
   };
 });
