@@ -2353,6 +2353,13 @@ def ui_config_payload() -> dict[str, Any]:
         # The twenty that ship, then the writer's own. The card picks one per
         # essay; the client decides which fit which paper.
         "red_pen": {"enabled": RED_PEN_ENABLED, "lines": [*RED_PEN_JABS, *RED_PEN_LINES]},
+        # How many Mondays the board shows from this week, and the note an
+        # essay gets when it has not chosen one.
+        "board": {
+            "weeks_shown": BOARD_WEEKS_SHOWN,
+            "default_pad": BOARD_DEFAULT_PAD,
+            "default_color": BOARD_DEFAULT_COLOR,
+        },
     }
 
 
@@ -2924,23 +2931,161 @@ def set_essay_status(
     return result
 
 
+NOT_A_POST_LINK = "that is not a substack post link."
+
+
+def _bare_host(value: str) -> str:
+    """The host of a publication setting, lowercased, without a leading www."""
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if not re.match(r"^[a-z][a-z0-9+.-]*://", raw, re.I):
+        raw = f"https://{raw}"
+    try:
+        host = (urlparse(raw).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return ""
+    return host[4:] if host.startswith("www.") else host
+
+
+def live_link_refusal(url: Any) -> str | None:
+    """Why a pasted link cannot mark an essay live, or None if it can.
+
+    Checked by shape and never fetched, so airdate never claims live about a
+    post it cannot see. A post link is https, on substack.com, a subdomain of
+    it, or the writer's own custom domain from settings (with or without www),
+    and names a post under /p/. The host is compared whole, never as a
+    substring, so substack.com.evil.test and a user@host prefix are both out."""
+    text = str(url or "").strip()
+    if not text:
+        return NOT_A_POST_LINK
+    try:
+        parsed = urlparse(text)
+        port = parsed.port
+    except ValueError:
+        return NOT_A_POST_LINK
+    if parsed.scheme.lower() != "https" or parsed.username or parsed.password:
+        return NOT_A_POST_LINK
+    if port not in (None, 443):
+        return NOT_A_POST_LINK
+    host = (parsed.hostname or "").lower().rstrip(".")
+    custom = _bare_host(SUBSTACK_PUBLICATION)
+    on_substack = host == "substack.com" or host.endswith(".substack.com")
+    on_custom = bool(custom) and host in (custom, f"www.{custom}")
+    if not (on_substack or on_custom):
+        return NOT_A_POST_LINK
+    if not re.search(r"/p/[^/]+", parsed.path or ""):
+        return NOT_A_POST_LINK
+    return None
+
+
+def air_day_of(value: Any) -> str:
+    """The calendar day of an air date ("2026-09-14" from "2026-09-14T09:00"),
+    or "" when there is none. No time zone arithmetic: the board wrote a day."""
+    match = re.match(r"^(\d{4}-\d{2}-\d{2})", str(value or "").strip())
+    if not match:
+        return ""
+    try:
+        datetime.strptime(match.group(1), "%Y-%m-%d")
+    except ValueError:
+        return ""
+    return match.group(1)
+
+
+def with_index_row(result: dict[str, Any]) -> dict[str, Any]:
+    """Add the fresh catalog row, which is what the room renders from."""
+    new_id = result.get("new_id") or result.get("old_id") or ""
+    result["row"] = index_row_for(str(new_id)) if new_id else None
+    return result
+
+
 def publish_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Bookkeeping for a publish the writer performed on Substack themselves:
     stamp the live URL + date, set status Live, move the file to Published/.
-    The app itself never publishes anything."""
+    The app itself never publishes anything.
+
+    Going live stamps the air date, not today: the essay aired on its Monday,
+    whenever the writer got round to pasting the link. Today is the fallback
+    only for an essay that never had an air date. The air date itself stays."""
     substack_url = str(payload.get("substack_url") or "").strip()
-    if not re.match(r"^https?://", substack_url):
-        raise ValueError("substack_url must be the full http(s) link to the live post.")
-    published_date = str(payload.get("published_date") or "").strip()
+    refusal = live_link_refusal(substack_url)
+    if refusal:
+        raise ValueError(refusal)
+    path = resolve_essay_path(essay_id)
+    frontmatter, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    published_date = air_day_of(frontmatter.get("scheduled_at"))
     if not published_date:
         published_date = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
-    return set_essay_status(
+    return with_index_row(set_essay_status(
         essay_id,
         "Live",
         {"published_date": published_date, "substack_url": substack_url},
         payload.get("expected_mtime"),
         payload.get("expected_content_hash"),
-    )
+    ))
+
+
+# Why the board will not take an essay in these phases. Writers room has its
+# own sentence at the write (scheduling_refusal); these two are past the board
+# rather than before it.
+SCHEDULE_REFUSALS = {
+    "Live": "it is live already, so it stays on the shelf.",
+    "Archived": "it is saved for a rainy day. bring it back to the room first.",
+}
+
+AIR_DATE_SHAPE = re.compile(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$")
+
+
+def schedule_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Put an essay on the board: write scheduled_at and move it to Ready for Air.
+
+    A date that is not a real calendar date is a bad request (ValueError, 400).
+    A live or rainy-day essay is refused with a sentence (409, refused). A
+    writers room essay is refused at the write, in save_essay_updates, which
+    is the one rule every route passes through. Taken and past weeks are the
+    client's to refuse: the server does not know which week the writer meant."""
+    scheduled_at = str(payload.get("scheduled_at") or payload.get("scheduledAt") or "").strip()
+    if not scheduled_at:
+        raise ValueError("scheduled_at (an air date) is required")
+    if not AIR_DATE_SHAPE.match(scheduled_at) or not air_day_of(scheduled_at):
+        raise ValueError("scheduled_at must be a calendar date, like 2026-10-05.")
+    path = resolve_essay_path(essay_id)
+    frontmatter, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+    if current in SCHEDULE_REFUSALS:
+        raise RefusedError(SCHEDULE_REFUSALS[current], current.lower())
+    return with_index_row(set_essay_status(
+        essay_id,
+        "Ready for Air",
+        {"scheduled_at": scheduled_at},
+        payload.get("expected_mtime"),
+        payload.get("expected_content_hash"),
+    ))
+
+
+def unschedule_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Clear the air date and drop back to Writers Likey, same folder, with the
+    draft link and sent marker kept. An undo of a schedule sends the hash the
+    schedule answered with, so a stale or doubled undo is a conflict."""
+    return with_index_row(set_essay_status(
+        essay_id,
+        "Writers Likey",
+        {"scheduled_at": ""},
+        payload.get("expected_mtime"),
+        payload.get("expected_content_hash"),
+    ))
+
+
+def did_not_air(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """The board note's "it did not air": the Monday passed and the essay did
+    not go out. Back to writers likey with its star date, and the slot stays
+    empty. Only an essay on the board can not-air."""
+    path = resolve_essay_path(essay_id)
+    frontmatter, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+    if current != "Ready for Air":
+        raise RefusedError("it is not on the board, so there is nothing to take down.", "not-on-the-board")
+    return unschedule_essay(essay_id, payload)
 
 
 def category_folders() -> list[str]:
@@ -3750,34 +3895,21 @@ class Handler(BaseHTTPRequestHandler):
                 ))
                 return
             if essay_id and action == "ready-for-air":
-                # The Ready for Air button: schedule (write scheduled_at to
-                # frontmatter, durable) AND advance the status in one action.
-                scheduled_at = str(payload.get("scheduled_at") or payload.get("scheduledAt") or "").strip()
-                if not scheduled_at:
-                    self.send_json({"error": "scheduled_at (an air date) is required"}, status=400)
-                    return
-                # The scheduling gate is enforced in save_essay_updates, which
-                # this reaches through set_essay_status. A writers room essay
-                # comes back as a 409 with the sentence the room shows.
-                self.send_json(set_essay_status(
-                    essay_id,
-                    "Ready for Air",
-                    {"scheduled_at": scheduled_at},
-                    payload.get("expected_mtime"),
-                    payload.get("expected_content_hash"),
-                ))
+                # Schedule (write scheduled_at to frontmatter, durable) AND
+                # advance the status in one action. A bad date is a 400; a
+                # live, rainy-day or writers room essay is a 409 with the
+                # sentence the room shows.
+                self.send_json(schedule_essay(essay_id, payload))
                 return
             if essay_id and action == "unschedule":
                 # Clear the air date and drop back to the schedulable pool.
                 # scheduled_at="" is deleted surgically by apply_frontmatter_edits;
                 # Writers Likey stays in the category folder (no move, no id churn).
-                self.send_json(set_essay_status(
-                    essay_id,
-                    "Writers Likey",
-                    {"scheduled_at": ""},
-                    payload.get("expected_mtime"),
-                    payload.get("expected_content_hash"),
-                ))
+                self.send_json(unschedule_essay(essay_id, payload))
+                return
+            if essay_id and action == "did-not-air":
+                # The board note after air day: it never went out.
+                self.send_json(did_not_air(essay_id, payload))
                 return
             if essay_id and action == "publish":
                 self.send_json(publish_essay(essay_id, payload))
