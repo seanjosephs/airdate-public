@@ -135,27 +135,3 @@ body {
   flex-direction: column;
   gap: 28px;
 }
-
-.room-head h1 {
-  margin: 0;
-  font: 700 28px/1.2 var(--font-ui);
-  letter-spacing: -0.5px;
-}
-
-.room-head p {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-/* The slot slices 2 to 6 fill. Until then it says so rather than looking
-   broken, because a blank page reads as a bug. */
-.room-placeholder {
-  padding: 28px;
-  border: 1px dashed var(--b2);
-  border-radius: var(--r-lg);
-  background: var(--s1);
-  color: var(--muted);
-  font-size: 14px;
-}
-.room-placeholder strong { color: var(--text); font-weight: 700; }
