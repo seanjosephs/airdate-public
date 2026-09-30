@@ -154,3 +154,71 @@ class ArrivalsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TotemArtTests(unittest.TestCase):
+    """Where a totem's art comes from: the writer's vault, then what we ship.
+
+    A fresh clone has no vault art, so the shipped set is what makes airdate
+    look right out of the box. A placeholder is the last resort, for a totem
+    key nothing ships art for.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        root = Path(cls.tmp.name)
+        (root / "vault").mkdir()
+        (root / "runtime").mkdir()
+        os.environ["OBSIDIAN_ESSAYS_DIR"] = str(root / "vault")
+        os.environ["AIR_DATE_DATA_DIR"] = str(root / "runtime")
+        import server  # noqa: PLC0415
+        cls.server = server
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_a_missing_vault_path_falls_back_to_the_shipped_art(self):
+        self.assertEqual(
+            self.server.totem_image_url("fox", "Essays/_assets/airdate/totems/fox-1024.webp", 0),
+            "/static/totems/fox-512.webp",
+        )
+
+    def test_no_vault_path_at_all_uses_the_shipped_art(self):
+        self.assertEqual(self.server.totem_image_url("phoenix", "", 4), "/static/totems/phoenix-512.webp")
+
+    def test_a_key_with_no_shipped_art_still_gets_a_placeholder(self):
+        self.assertEqual(self.server.totem_image_url("fire", "", 0), "/static/totems/placeholder-1.svg")
+
+    def test_all_five_shipped_totems_are_present(self):
+        for index, key in enumerate(("fox", "octopus", "bison", "elephant", "phoenix")):
+            with self.subTest(totem=key):
+                self.assertEqual(
+                    self.server.totem_image_url(key, "", index),
+                    f"/static/totems/{key}-512.webp",
+                )
+
+    def test_a_vault_path_that_resolves_beats_the_shipped_art(self):
+        # resolve_vault_asset does the real containment and suffix checks; here
+        # we only care that a resolving path is preferred over what we ship.
+        original = self.server.resolve_vault_asset
+        self.server.resolve_vault_asset = lambda rel: Path("/somewhere") / rel
+        try:
+            self.assertEqual(
+                self.server.totem_image_url("fox", "Essays/_assets/airdate/totems/fox-1024.webp", 0),
+                "/vault-asset/Essays/_assets/airdate/totems/fox-1024.webp",
+            )
+        finally:
+            self.server.resolve_vault_asset = original
+
+    def test_the_writers_art_is_preferred_for_a_custom_key_too(self):
+        original = self.server.resolve_vault_asset
+        self.server.resolve_vault_asset = lambda rel: Path("/somewhere") / rel
+        try:
+            self.assertEqual(
+                self.server.totem_image_url("fire", "Essays/_assets/fire.png", 0),
+                "/vault-asset/Essays/_assets/fire.png",
+            )
+        finally:
+            self.server.resolve_vault_asset = original

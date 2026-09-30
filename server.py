@@ -198,12 +198,17 @@ HIDDEN_TITLE_CONTAINS: list[str] = []
 HIDDEN_TOPLEVEL_TITLE_CONTAINS: list[str] = []
 THUMBNAIL_STYLE_PROMPT = airdate_config.DEFAULT_STYLE_PROMPT
 PUBLISH_DAY: str | None = None
+# The board: what a new essay's note looks like until it gets its own.
+BOARD_DEFAULT_PAD = "sticky"
+BOARD_DEFAULT_COLOR = "canary"
+BOARD_WEEKS_SHOWN = 3
 TAG_PRESETS: list[dict[str, Any]] = []
 LINKS: list[dict[str, str]] = []
 
 
 def apply_config(config: dict[str, Any], file_exists: bool, load_error: str = "") -> None:
     """Install a config (already merged with defaults) as the running settings."""
+    global BOARD_DEFAULT_PAD, BOARD_DEFAULT_COLOR, BOARD_WEEKS_SHOWN
     global CONFIG, CONFIG_FILE_EXISTS, CONFIG_LOAD_ERROR, CONFIG_ERRORS, VAULT_CHECK, SETUP_REQUIRED
     global CONFIG_FINGERPRINT, VAULT_DIR, ESSAYS_FOLDER, OBSIDIAN_ESSAYS_DIR, OBSIDIAN_VAULT_NAME
     global OBSIDIAN_SUBSTACK_ASSETS_DIR, SUBSTACK_PUBLICATION, PUBLICATION_NAME, CONNECTOR_PORT
@@ -255,6 +260,14 @@ def apply_config(config: dict[str, Any], file_exists: bool, load_error: str = ""
     THUMBNAIL_STYLE_PROMPT = str(effective["thumbnail"].get("style_prompt") or "").strip() or airdate_config.DEFAULT_STYLE_PROMPT
     day = effective["calendar"].get("publish_day")
     PUBLISH_DAY = day if day in airdate_config.WEEKDAYS else None
+
+    board = effective.get("board") or {}
+    BOARD_DEFAULT_PAD = str(board.get("default_pad") or "").strip() or "sticky"
+    BOARD_DEFAULT_COLOR = str(board.get("default_color") or "").strip() or "canary"
+    try:
+        BOARD_WEEKS_SHOWN = max(1, min(12, int(board.get("weeks_shown") or 3)))
+    except (TypeError, ValueError):
+        BOARD_WEEKS_SHOWN = 3
     TAG_PRESETS = [p for p in effective.get("tag_presets") or [] if isinstance(p, dict) and p.get("name")]
     LINKS = [l for l in effective.get("links") or [] if isinstance(l, dict) and l.get("label") and l.get("url")]
 
@@ -1509,6 +1522,27 @@ def apply_frontmatter_edits(text: str, changes: dict[str, dict[str, Any]]) -> st
     return text[:start] + "\n".join(new_lines) + tail
 
 
+def first_line_excerpt(body: str, limit: int = 180) -> str:
+    """The essay's actual opening line, for the script page on a card.
+
+    This is not `summary`. Summary prefers frontmatter and is what Substack
+    sends as the email preview; the card wants the first thing the writer
+    actually wrote. Headings, blockquote markers, list bullets and horizontal
+    rules are skipped, because none of them is a sentence."""
+    for raw in (body or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith(("#", ">", "---", "***", "|", "```")):
+            continue
+        line = re.sub(r"^[-*+]\s+", "", line)
+        line = re.sub(r"^\d+\.\s+", "", line)
+        line = re.sub(r"[*_`]", "", line).strip()
+        if line:
+            return line if len(line) <= limit else line[: limit - 1].rstrip() + "\u2026"
+    return ""
+
+
 def safe_excerpt(text: str, limit: int = 180) -> str:
     clean = re.sub(r"\s+", " ", text).strip()
     if len(clean) <= limit:
@@ -1945,6 +1979,16 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
                     "published_date": published_date,
                     "substack_url": substack_url,
                     "scheduled_at": str(frontmatter.get("scheduled_at") or "").strip(),
+                    # The room's fields. arrived_at drives the five ages of
+                    # paper; excerpt is the line on the script page and is
+                    # deliberately not `summary`; note_pad/note_color are the
+                    # essay's own board note, falling back to app settings.
+                    "arrived_at": arrival_for(essay_id, touched.isoformat()),
+                    "excerpt": first_line_excerpt(body),
+                    "substack_draft_url": str(frontmatter.get("substack_draft_url") or "").strip(),
+                    "hero_url": vault_asset_url(frontmatter.get("hero_image") or frontmatter.get("hero")),
+                    "note_pad": str(frontmatter.get("note_pad") or "").strip() or BOARD_DEFAULT_PAD,
+                    "note_color": str(frontmatter.get("note_color") or "").strip() or BOARD_DEFAULT_COLOR,
                     "needs_intake": needs_intake,
                     "tags": tags,
                     "word_count": word_count,
@@ -2214,6 +2258,16 @@ def setup_payload() -> dict[str, Any]:
     }
 
 
+def totem_image_url(key: str, vault_path: str, index: int) -> str:
+    """Where a totem's art comes from, in order of preference."""
+    if vault_path and resolve_vault_asset(vault_path) is not None:
+        return f"/vault-asset/{urllib_parse_quote_path(vault_path)}"
+    shipped = STATIC / "totems" / f"{key}-512.webp"
+    if shipped.is_file():
+        return f"/static/totems/{key}-512.webp"
+    return f"/static/totems/placeholder-{index % 5 + 1}.svg"
+
+
 def ui_config_payload() -> dict[str, Any]:
     """The writer's taxonomy and cadence, for the browser. No filesystem paths."""
     totems = []
@@ -2224,9 +2278,11 @@ def ui_config_payload() -> dict[str, Any]:
             "label": str(item.get("label") or key),
             "color": str(item.get("color") or ""),
             "role": str(item.get("role") or ""),
-            # A vault image the writer chose, else the slot's placeholder icon.
-            "image": f"/vault-asset/{urllib_parse_quote_path(image)}" if image
-            else f"/static/totems/placeholder-{index % 5 + 1}.svg",
+            # The writer's own vault art wins. Failing that, the art airdate
+            # ships, so a fresh clone looks right instead of showing five grey
+            # placeholders. The placeholder is the last resort, for a totem
+            # key with no shipped art at all.
+            "image": totem_image_url(key, image, index),
             "image_path": image,
         })
     return {
@@ -2246,6 +2302,17 @@ def ui_config_payload() -> dict[str, Any]:
         ],
         "links": [{"label": str(l["label"]), "url": str(l["url"])} for l in LINKS],
     }
+
+
+def vault_asset_url(value: Any) -> str:
+    """A vault-relative image path as a URL the browser can fetch, or "".
+
+    The card and the shelf need the hero image itself, not the boolean-ish
+    readiness signal that was the only hero hint on an index row before."""
+    path = str(value or "").strip()
+    if not path or path.startswith(("http://", "https://", "data:")):
+        return path
+    return f"/vault-asset/{urllib_parse_quote_path(path)}"
 
 
 def urllib_parse_quote_path(value: str) -> str:
@@ -3254,6 +3321,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.redirect("/airdate")
+                return
+            if path == "/airdate/room":
+                # The writers room, built beside the old page. Slice 7 makes
+                # /airdate serve this and deletes airdate.html.
+                self.serve_file(ROOT / "room.html", "text/html; charset=utf-8")
                 return
             if path == "/airdate":
                 # First run is handled in the page: it reads /api/app/status and

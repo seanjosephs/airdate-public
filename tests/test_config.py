@@ -365,7 +365,11 @@ class ServerSettingsTests(unittest.TestCase):
         server = self.configure(totems__items=items, totems__default="water")
         self.assertEqual(server.infer_totem("", "a.md", "A debate", [], ""), "fire")
         self.assertEqual(server.infer_totem("", "a.md", "Nothing here", [], ""), "water")
-        self.assertEqual(server.ui_config_payload()["totems"]["items"][0]["image"], "/vault-asset/Writing/Essays/_assets/fire.png")
+        # The configured file does not exist here, and "fire" is not one of the
+        # five totems airdate ships art for, so the placeholder is correct.
+        # A vault path that actually resolves still wins: see
+        # tests/test_room_foundation.py, TotemArtTests.
+        self.assertEqual(server.ui_config_payload()["totems"]["items"][0]["image"], "/static/totems/placeholder-1.svg")
 
     def test_categories_from_folders_and_config(self):
         server = self.configure(categories__items=[{"name": "Craft", "keywords": {"writing": 3}}])
