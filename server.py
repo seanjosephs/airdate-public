@@ -2454,6 +2454,18 @@ def resolve_essay_path(essay_id: str) -> Path:
     return path
 
 
+class SchedulingRefusedError(Exception):
+    """A write would put a writers room essay on the board.
+
+    Its own type, not a ValueError, so every route answers it the same way:
+    409 with {error, refused: "writers-room"}. The client tells it apart from a
+    file-changed 409 by the `refused` key."""
+
+    def __init__(self, sentence: str):
+        super().__init__(sentence)
+        self.payload = {"error": sentence, "refused": "writers-room", "ok": False}
+
+
 class EssayConflictError(Exception):
     def __init__(self, payload: dict[str, Any]):
         super().__init__(payload.get("message", "Essay changed on disk."))
@@ -2668,6 +2680,16 @@ def save_essay_updates(
     assert_expected_file_state(essay_id, path, text, expected_mtime, expected_content_hash)
     frontmatter, current_body = split_frontmatter(text)
     sanitized = sanitize_updates(updates)
+    # The scheduling gate. It lives here, at the write, rather than on one
+    # route: /ready-for-air used to be the only guarded door, while /set-status
+    # and /save both reached Ready for Air without it (sanitize_updates promotes
+    # a bare scheduled_at to Ready for Air). One rule at the write closes every
+    # path, including routes that do not exist yet.
+    if sanitized.get("status") == "Ready for Air":
+        current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+        refusal = scheduling_refusal(current)
+        if refusal:
+            raise SchedulingRefusedError(refusal)
     # Durable identity, stamped lazily on the write this call already performs
     # (no extra write, no extra mtime bump). Assigned AFTER sanitize_updates so a
     # client payload can never set or overwrite uid — "uid" is deliberately not
@@ -2696,6 +2718,11 @@ def save_essay_updates(
 
     atomic_write_text(path, new_text)
     if minted_uid:
+        # The id changes from the path hash to the uid on this write. Carry the
+        # arrival across BEFORE the rescan, which would otherwise find no entry
+        # under the new id and record now - handing an old essay fresh paper on
+        # its very first write, which is usually the star.
+        carry_arrival(essay_id, sanitized[UID_KEY])
         # The essay's id flips here (path hash -> uid). Refresh blocking, as the
         # other re-id sites do, so the client's very next /api/essays already
         # reports the canonical id — a background rescan loses that race and the
@@ -3536,16 +3563,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not scheduled_at:
                     self.send_json({"error": "scheduled_at (an air date) is required"}, status=400)
                     return
-                # The gate: a writers room essay cannot go on the board. The
-                # dimmed handle is a hint; this is the rule.
-                current = resolve_essay_path(essay_id)
-                fm, _ = split_frontmatter(current.read_text(encoding="utf-8", errors="ignore"))
-                refusal = scheduling_refusal(
-                    effective_status(current.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), fm)
-                )
-                if refusal:
-                    self.send_json({"error": refusal, "refused": "writers-room"}, status=409)
-                    return
+                # The scheduling gate is enforced in save_essay_updates, which
+                # this reaches through set_essay_status. A writers room essay
+                # comes back as a 409 with the sentence the room shows.
                 self.send_json(set_essay_status(
                     essay_id,
                     "Ready for Air",
@@ -3608,6 +3628,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "Request body must be valid JSON."}, status=400)
         except FileNotFoundError as exc:
             self.send_json({"error": str(exc)}, status=404)
+        except SchedulingRefusedError as exc:
+            self.send_json(exc.payload, status=409)
         except EssayConflictError as exc:
             self.send_json(exc.payload, status=409)
         except ValueError as exc:

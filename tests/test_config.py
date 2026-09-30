@@ -27,6 +27,15 @@ ENV_KEYS = (
 )
 
 
+
+# The default totem set. Tests of totem MECHANICS (fixed keys, explicit-only
+# inference, the thumbnail lens) read it from here rather than hard-coding a
+# particular five, so moving the defaults does not break them. The default set
+# itself is pinned in tests/test_room_foundation.py, DefaultTotemsTests.
+DEFAULT_TOTEMS = airdate_config.DEFAULT_CONFIG["totems"]["items"]
+DEFAULT_KEYS = [t["key"] for t in DEFAULT_TOTEMS]
+DEFAULT_LABELS = [t["label"] for t in DEFAULT_TOTEMS]
+
 class CleanEnv:
     """Hide the settings env vars for the duration of a test."""
 
@@ -113,7 +122,7 @@ class ConfigFileTests(unittest.TestCase):
     def test_form_keeps_totem_keys_fixed(self):
         config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
         out = airdate_config.settings_from_form(config, {
-            "totems": [{"key": "circle", "label": "Politics", "color": "#112233", "image": "/Essays/_assets/p.png"},
+            "totems": [{"key": DEFAULT_KEYS[0], "label": "Politics", "color": "#112233", "image": "/Essays/_assets/p.png"},
                        {"key": "not-a-slot", "label": "ignored"}],
             "totems_enabled": False,
             "publication": "me.substack.com/",
@@ -121,8 +130,8 @@ class ConfigFileTests(unittest.TestCase):
         })
         first = out["totems"]["items"][0]
         self.assertEqual((first["key"], first["label"], first["color"], first["image"]),
-                         ("circle", "Politics", "#112233", "Essays/_assets/p.png"))
-        self.assertEqual([t["key"] for t in out["totems"]["items"]], ["circle", "triangle", "square", "diamond", "star"])
+                         (DEFAULT_KEYS[0], "Politics", "#112233", "Essays/_assets/p.png"))
+        self.assertEqual([t["key"] for t in out["totems"]["items"]], DEFAULT_KEYS)
         self.assertFalse(out["totems"]["enabled"])
         self.assertEqual(out["substack"]["publication"], "https://me.substack.com")
         self.assertEqual(out["vault"]["name"], "Some Vault")
@@ -290,14 +299,16 @@ class ServerSettingsTests(unittest.TestCase):
     def test_totem_pick_writes_through_the_save_path(self):
         server, note, essay_id = self.totem_note("Pick.md", "")
         state = server.file_state(note)
-        server.save_essay_updates(essay_id, {"totem": "Triangle"}, None, state["mtime"], state["content_hash"])
-        self.assertEqual(self.note_totem(server, note), "triangle")
+        # Picked by its label, as the picker sends it; stored as the key.
+        picked = DEFAULT_KEYS[1]
+        server.save_essay_updates(essay_id, {"totem": DEFAULT_LABELS[1]}, None, state["mtime"], state["content_hash"])
+        self.assertEqual(self.note_totem(server, note), picked)
         essays, _ = server.discover_essays()
-        self.assertEqual(next(e for e in essays if e["relative_path"] == "Politics/Pick.md")["totem_raw"], "triangle")
+        self.assertEqual(next(e for e in essays if e["relative_path"] == "Politics/Pick.md")["totem_raw"], picked)
         # A stale file state refuses, as it does for the editor.
         with self.assertRaises(server.EssayConflictError):
-            server.save_essay_updates(essay_id, {"totem": "star"}, None, state["mtime"], state["content_hash"])
-        self.assertEqual(self.note_totem(server, note), "triangle")
+            server.save_essay_updates(essay_id, {"totem": DEFAULT_KEYS[-1]}, None, state["mtime"], state["content_hash"])
+        self.assertEqual(self.note_totem(server, note), picked)
 
     def test_unknown_totem_is_shown_and_kept_until_the_writer_picks(self):
         server, note, essay_id = self.totem_note("Foreign.md", "totem: elephant\n")
@@ -348,14 +359,19 @@ class ServerSettingsTests(unittest.TestCase):
         self.assertNotIn("totem", server.sanitize_updates({"totem": "circle", "title": "x"}))
         self.assertEqual(server.ui_config_payload()["totems"]["items"], [])
 
-    def test_placeholder_totems_are_explicit_only(self):
+    def test_default_totems_are_explicit_only(self):
+        # The defaults ship with no keywords, so nothing is inferred: a totem
+        # is set only when the writer names one.
         server = self.configure()
+        last = DEFAULT_KEYS[-1]
         self.assertEqual(server.infer_totem("", "a.md", "Grief", ["love"], "body"), "")
-        self.assertEqual(server.infer_totem("Star", "a.md", "t", [], ""), "star")
-        self.assertEqual(server.sanitize_updates({"totem": "star"})["totem"], "star")
-        self.assertNotIn("totem", server.sanitize_updates({"totem": "fox"}))
+        self.assertEqual(server.infer_totem(DEFAULT_LABELS[-1], "a.md", "t", [], ""), last)
+        self.assertEqual(server.sanitize_updates({"totem": last})["totem"], last)
+        # A key outside the configured set is dropped, not stored.
+        self.assertNotIn("totem", server.sanitize_updates({"totem": "circle"}))
+        # The first default draws its shipped art, not a placeholder.
         icons = [t["image"] for t in server.ui_config_payload()["totems"]["items"]]
-        self.assertEqual(icons[0], "/static/totems/placeholder-1.svg")
+        self.assertEqual(icons[0], f"/static/totems/{DEFAULT_KEYS[0]}-512.webp")
 
     def test_custom_totems_infer_from_keywords_and_default(self):
         items = [
@@ -380,9 +396,9 @@ class ServerSettingsTests(unittest.TestCase):
 
     def test_thumbnail_prompt_uses_the_writers_publication(self):
         server = self.configure(substack__publication_name="The Weekly Thing")
-        prompt = server.build_thumbnail_prompt({"title": "T", "summary": "S"}, {"title": "T", "totem": "circle"})
+        prompt = server.build_thumbnail_prompt({"title": "T", "summary": "S"}, {"title": "T", "totem": DEFAULT_KEYS[0]})
         self.assertIn("thumbnail for The Weekly Thing.", prompt)
-        self.assertIn("Totem lens: Circle.", prompt)
+        self.assertIn(f"Totem lens: {DEFAULT_LABELS[0]}.", prompt)
 
     def test_vault_asset_stays_inside_the_vault(self):
         image = self.vault / "Writing" / "Essays" / "_assets" / "icon.png"

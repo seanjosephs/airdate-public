@@ -19,6 +19,26 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def point_server_at(server, root: Path) -> Path:
+    """Repoint the cached server module at a fresh vault under `root`.
+
+    server.py reads its folders at import and the module is shared by every
+    test class in the run, so an earlier class's temp vault - already deleted -
+    is what it would otherwise scan. apply_config is how the existing suites
+    move it (see test_config.ServerSettingsTests.configure). Returns the essays
+    folder notes should be written into."""
+    import copy as _copy
+    import airdate_config as _cfg
+    vault = root / "vault"
+    (vault / ".obsidian").mkdir(parents=True, exist_ok=True)
+    (vault / "Essays").mkdir(parents=True, exist_ok=True)
+    config = _cfg.DEFAULT_CONFIG and _copy.deepcopy(_cfg.DEFAULT_CONFIG)
+    config["vault"]["path"] = str(vault)
+    config["vault"]["essays_folder"] = "Essays"
+    server.apply_config(config, True)
+    return Path(server.OBSIDIAN_ESSAYS_DIR)
+
+
 class LifecycleTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -190,3 +210,69 @@ class SchedulingGateTests(LifecycleTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GateHoldsOnEveryPathTests(LifecycleTestCase):
+    """The scheduling gate is enforced where the write happens, not per route.
+
+    It used to guard /ready-for-air only. /set-status and /save both reached
+    Ready for Air without it: /set-status directly, and /save because a
+    scheduled_at with no status is promoted to Ready for Air when the payload
+    is cleaned. One rule in save_essay_updates closes every path at once,
+    including ones that do not exist yet.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.essays = point_server_at(cls.server, Path(cls.tmp.name))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.load_and_apply_config()
+        super().tearDownClass()
+
+    def note(self, status):
+        path = self.essays / f"Gate {status}.md"
+        path.write_text(f'---\ntitle: "Gate"\nstatus: "{status}"\n---\nbody\n', encoding="utf-8")
+        rows = self.server.discover_essays()
+        rows = rows[0] if isinstance(rows, tuple) else rows
+        essay = next(r for r in rows if r["relative_path"] == path.name)
+        return essay["id"], path
+
+    def status_line(self, path):
+        return next(l for l in path.read_text().splitlines() if l.startswith("status"))
+
+    def test_set_status_cannot_schedule_a_writers_room_essay(self):
+        essay_id, path = self.note("Writers Room")
+        with self.assertRaises(self.server.SchedulingRefusedError):
+            self.server.set_essay_status(essay_id, "Ready for Air", None, None, None)
+        self.assertEqual(self.status_line(path), 'status: "Writers Room"')
+
+    def test_save_cannot_schedule_one_through_scheduled_at(self):
+        essay_id, path = self.note("Writers Room")
+        with self.assertRaises(self.server.SchedulingRefusedError):
+            self.server.save_essay_updates(essay_id, {"scheduled_at": "2026-10-05"})
+        self.assertEqual(self.status_line(path), 'status: "Writers Room"')
+        self.assertNotIn("scheduled_at", path.read_text())
+
+    def test_the_refusal_carries_the_sentence_and_the_marker(self):
+        essay_id, _ = self.note("Writers Room")
+        with self.assertRaises(self.server.SchedulingRefusedError) as caught:
+            self.server.set_essay_status(essay_id, "Ready for Air", None, None, None)
+        self.assertEqual(caught.exception.payload["refused"], "writers-room")
+        self.assertEqual(
+            caught.exception.payload["error"],
+            self.server.scheduling_refusal("Writers Room"),
+        )
+
+    def test_writers_likey_can_still_be_scheduled(self):
+        essay_id, path = self.note("Writers Likey")
+        self.server.set_essay_status(essay_id, "Ready for Air", {"scheduled_at": "2026-10-05"}, None, None)
+        self.assertEqual(self.status_line(path), 'status: "Ready for Air"')
+
+    def test_other_edits_to_a_writers_room_essay_still_save(self):
+        # The gate is about scheduling, not about touching a room essay at all.
+        essay_id, path = self.note("Writers Room")
+        self.server.save_essay_updates(essay_id, {"subtitle": "a new line"})
+        self.assertIn("a new line", path.read_text())

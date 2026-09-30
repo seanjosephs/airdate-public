@@ -58,11 +58,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "enabled": True,
         "default": None,
         "items": [
-            {"key": "circle", "label": "Circle", "color": "#8f79ff", "role": "", "image": "", "keywords": {}},
-            {"key": "triangle", "label": "Triangle", "color": "#d9653b", "role": "", "image": "", "keywords": {}},
-            {"key": "square", "label": "Square", "color": "#3f9a6e", "role": "", "image": "", "keywords": {}},
-            {"key": "diamond", "label": "Diamond", "color": "#3a7bd5", "role": "", "image": "", "keywords": {}},
-            {"key": "star", "label": "Star", "color": "#d4a017", "role": "", "image": "", "keywords": {}},
+            # The five airdate ships art for (static/totems/<key>-512.webp), so a
+            # fresh clone shows the art rather than five placeholders. Colours
+            # are the design tokens. Roles and keywords stay blank: the marks
+            # ship, the meaning is the writer's to give them.
+            {"key": "fox", "label": "Fox", "color": "#FF5B45", "role": "", "image": "", "keywords": {}},
+            {"key": "octopus", "label": "Octopus", "color": "#3FD9EC", "role": "", "image": "", "keywords": {}},
+            {"key": "bison", "label": "Bison", "color": "#8FD16A", "role": "", "image": "", "keywords": {}},
+            {"key": "elephant", "label": "Elephant", "color": "#8EA2FF", "role": "", "image": "", "keywords": {}},
+            {"key": "phoenix", "label": "Phoenix", "color": "#B98CFF", "role": "", "image": "", "keywords": {}},
         ],
     },
     "categories": {"mode": "folders", "items": []},
@@ -105,6 +109,11 @@ def _merge(defaults: Any, value: Any) -> Any:
     if isinstance(defaults, dict):
         if not isinstance(value, dict):
             return copy.deepcopy(defaults)
+        # An empty default dict has no fixed shape: it is an open map the writer
+        # fills (editor.sections). Keeping only the default's keys would throw
+        # every entry away on load, which is exactly what used to happen.
+        if not defaults:
+            return copy.deepcopy(value)
         merged = {key: _merge(default, value.get(key, default)) for key, default in defaults.items()}
         return merged
     return copy.deepcopy(value)

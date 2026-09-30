@@ -30,8 +30,14 @@ body {
 :focus-visible {
   outline: var(--focus-dark);
   outline-offset: 2px;
-  border-radius: var(--r-sm);
 }
+/* On paper the ring is ink. The first three catch a note, page or sticky that
+   is itself focusable (the post-it is a button); the last three catch a control
+   inside one. The designer's tokens had only the second set, which misses the
+   post-it entirely. */
+.paper:focus-visible,
+.note:focus-visible,
+.sticky:focus-visible,
 .paper :focus-visible,
 .note :focus-visible,
 .sticky :focus-visible { outline: var(--focus-paper); }

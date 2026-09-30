@@ -117,7 +117,7 @@ summary: "A short fixture for Obsidian sync."
 date: 2026-06-20
 tags: ["essay", "smoke"]
 status: developing
-totem: circle
+totem: fox
 ---
 
 This is a short publishable essay body.
@@ -134,7 +134,7 @@ summary: "A long source conversation fixture."
 date: 2026-06-20
 tags: ["essay", "source"]
 status: developing
-totem: square
+totem: bison
 ---
 
 {long_body}
@@ -148,7 +148,7 @@ summary: "A linked draft fixture."
 date: 2026-06-20
 tags: ["essay", "source"]
 status: developing
-totem: square
+totem: bison
 source_role: draft
 draft_of: "Sources/RAW_Long Source.md"
 ---
@@ -397,10 +397,17 @@ def main() -> int:
         assert_true(saved_config["vault"]["name"] == vault_dir.name and saved_config["calendar"]["publish_day"] == "monday",
                     f"config.json did not record the settings: {saved_config}")
         totem_slots = setup_result.get("config", {}).get("totems", {}).get("items", [])
-        assert_true([t["key"] for t in totem_slots] == ["circle", "triangle", "square", "diamond", "star"],
-                    f"placeholder totems missing: {totem_slots}")
-        assert_true(all(t["image"].startswith("/static/totems/placeholder-") for t in totem_slots), "placeholder totem icons missing")
-        checks.append("first run: setup gate, vault validation, config.json written, placeholder totems on")
+        # A fresh install starts with the five totems airdate ships art for, and
+        # draws that art rather than placeholders. The keys are read from the
+        # config defaults so this follows them if they ever move.
+        sys.path.insert(0, str(ROOT))
+        import airdate_config  # noqa: PLC0415
+        default_keys = [t["key"] for t in airdate_config.DEFAULT_CONFIG["totems"]["items"]]
+        assert_true([t["key"] for t in totem_slots] == default_keys,
+                    f"default totems missing: {totem_slots}")
+        assert_true(all(t["image"] == f"/static/totems/{t['key']}-512.webp" for t in totem_slots),
+                    f"default totems are not drawing their shipped art: {[t['image'] for t in totem_slots]}")
+        checks.append("first run: setup gate, vault validation, config.json written, default totems draw shipped art")
 
         # Tag presets save through the settings form and come back in the UI config.
         dup_status, _, dup = json_request(base, "/api/settings", {"tag_presets": [{"name": "Craft", "tags": "a"}, {"name": "craft", "tags": "b"}]})
@@ -420,11 +427,11 @@ def main() -> int:
         pick = essays[0]
         _, _, pick_detail = json_request(base, f"/api/essays/{pick['id']}")
         pick_status, _, _ = json_request(base, f"/api/essays/{pick['id']}/save", {
-            "updates": {"totem": "star"}, "expected_mtime": pick_detail["mtime"], "expected_content_hash": pick_detail["content_hash"]})
+            "updates": {"totem": "phoenix"}, "expected_mtime": pick_detail["mtime"], "expected_content_hash": pick_detail["content_hash"]})
         _, _, picked = json_request(base, f"/api/essays/{pick['id']}")
-        assert_true(pick_status == 200 and picked["frontmatter"].get("totem") == "star", f"totem pick did not save: {picked.get('frontmatter')}")
+        assert_true(pick_status == 200 and picked["frontmatter"].get("totem") == "phoenix", f"totem pick did not save: {picked.get('frontmatter')}")
         stale_status, _, _ = json_request(base, f"/api/essays/{pick['id']}/save", {
-            "updates": {"totem": "circle"}, "expected_mtime": pick_detail["mtime"], "expected_content_hash": pick_detail["content_hash"]})
+            "updates": {"totem": "fox"}, "expected_mtime": pick_detail["mtime"], "expected_content_hash": pick_detail["content_hash"]})
         assert_true(stale_status == 409, f"a totem pick with a stale file state was accepted: {stale_status}")
         none_status, _, _ = json_request(base, f"/api/essays/{pick['id']}/save", {
             "updates": {"totem": "none"}, "expected_mtime": picked["mtime"], "expected_content_hash": picked["content_hash"]})
@@ -502,8 +509,12 @@ def main() -> int:
             "/static/airdate.js": "javascript",
             "/static/airdate.css": "text/css",
             "/static/tokens.css": "text/css",
+            # Placeholders stay: the last resort for a totem with no shipped art.
             "/static/totems/placeholder-1.svg": "image/svg+xml",
             "/static/totems/placeholder-5.svg": "image/svg+xml",
+            # What a fresh install actually requests now.
+            "/static/totems/fox-512.webp": "image/webp",
+            "/static/totems/phoenix-512.webp": "image/webp",
         }
         for path, expected in assets.items():
             status, headers, body = request(base, path)
@@ -644,7 +655,7 @@ def main() -> int:
         prompt_text = prompt_payload.get("prompt", "")
         assert_true("text-free Substack essay thumbnail for Smoke Weekly" in prompt_text and selected["title"] in prompt_text,
                     f"thumbnail prompt lost its style spine, publication name or the essay title: {prompt_text!r}")
-        assert_true("Totem lens: Circle" in prompt_text, f"thumbnail prompt lost the totem label: {prompt_text!r}")
+        assert_true("Totem lens: Fox" in prompt_text, f"thumbnail prompt lost the totem label: {prompt_text!r}")
         gone_status, _, _ = json_request(base, f"/api/essays/{selected_id}/thumbnail", {"publish": {}})
         assert_true(gone_status == 404, f"old thumbnail generator route still answers: {gone_status}")
         source_prompt_status, _, source_prompt = json_request(base, f"/api/essays/{source['id']}/thumbnail-prompt", {"publish": {}})
@@ -975,7 +986,7 @@ title: "Lifecycle Smoke Fixture"
 summary: "A fixture for the status lifecycle."
 category: "Smoke"
 status: developing
-totem: circle
+totem: fox
 ---
 
 Lifecycle fixture body — must survive every move byte-for-byte.
@@ -1046,7 +1057,7 @@ Lifecycle fixture body — must survive every move byte-for-byte.
 title: "Foreign Uid Fixture"
 category: "Smoke"
 status: "Writers Room"
-totem: circle
+totem: fox
 uid: 2026/01/07-1200
 ---
 
@@ -1078,7 +1089,7 @@ A note carrying someone else's uid convention.
 title: "{target.stem}"
 category: "Smoke"
 status: "Writers Room"
-totem: circle
+totem: fox
 airdate_uid: "{shared}"
 ---
 

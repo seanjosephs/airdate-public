@@ -23,6 +23,26 @@ sys.path.insert(0, str(ROOT))
 import airdate_config  # noqa: E402
 
 
+def point_server_at(server, root: Path) -> Path:
+    """Repoint the cached server module at a fresh vault under `root`.
+
+    server.py reads its folders at import and the module is shared by every
+    test class in the run, so an earlier class's temp vault - already deleted -
+    is what it would otherwise scan. apply_config is how the existing suites
+    move it (see test_config.ServerSettingsTests.configure). Returns the essays
+    folder notes should be written into."""
+    import copy as _copy
+    import airdate_config as _cfg
+    vault = root / "vault"
+    (vault / ".obsidian").mkdir(parents=True, exist_ok=True)
+    (vault / "Essays").mkdir(parents=True, exist_ok=True)
+    config = _cfg.DEFAULT_CONFIG and _copy.deepcopy(_cfg.DEFAULT_CONFIG)
+    config["vault"]["path"] = str(vault)
+    config["vault"]["essays_folder"] = "Essays"
+    server.apply_config(config, True)
+    return Path(server.OBSIDIAN_ESSAYS_DIR)
+
+
 class ConfigMergesForwardTests(unittest.TestCase):
     """A config.json written before the room existed still loads."""
 
@@ -261,3 +281,153 @@ class ResetRoomTests(unittest.TestCase):
         result = self.server.reset_room({"confirm": True})
         self.assertEqual(result, {"ok": True, "cleared": 2})
         self.assertEqual(self.server.load_arrivals(), {})
+
+
+class ArrivalSurvivesAMintTests(unittest.TestCase):
+    """The first write to an old note mints its uid, which changes its id.
+
+    carry_arrival existed for exactly this and was never called, so that first
+    write - most often the star - handed the essay brand-new paper.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        root = Path(cls.tmp.name)
+        (root / "vault").mkdir()
+        (root / "runtime").mkdir()
+        os.environ["OBSIDIAN_ESSAYS_DIR"] = str(root / "vault")
+        os.environ["AIR_DATE_DATA_DIR"] = str(root / "runtime")
+        import server  # noqa: PLC0415
+        from unittest import mock  # noqa: PLC0415
+        cls.server = server
+        cls.vault = point_server_at(server, root)
+        # The arrivals sidecar path is also fixed at import; give this class
+        # its own, and start from an empty cache.
+        cls._patch = mock.patch.object(server, "ARRIVALS_LOG", root / "runtime" / "arrivals.json")
+        cls._patch.start()
+        server._ARRIVALS_CACHE = None
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._patch.stop()
+        cls.server._ARRIVALS_CACHE = None
+        cls.server.load_and_apply_config()
+        cls.tmp.cleanup()
+
+    def old_note(self, name):
+        path = self.vault / name
+        path.write_text(f'---\ntitle: "{name}"\n---\nbody\n', encoding="utf-8")  # no uid yet
+        rows = self.server.discover_essays()
+        rows = rows[0] if isinstance(rows, tuple) else rows
+        essay = next(r for r in rows if r["relative_path"] == name)
+        arrivals = self.server.load_arrivals()
+        arrivals[essay["id"]] = "2026-01-01T00:00:00+00:00"
+        self.server.save_arrivals(arrivals)
+        return essay["id"]
+
+    def arrival_after(self, name):
+        rows = self.server.discover_essays()
+        rows = rows[0] if isinstance(rows, tuple) else rows
+        return next(r for r in rows if r["relative_path"] == name)["arrived_at"]
+
+    def test_a_status_change_that_mints_keeps_the_paper(self):
+        old_id = self.old_note("Mint A.md")
+        result = self.server.set_essay_status(old_id, "Writers Likey", None, None, None)
+        self.assertNotEqual(result.get("new_id"), old_id)  # the id really did change
+        self.assertEqual(self.arrival_after("Mint A.md"), "2026-01-01T00:00:00+00:00")
+
+    def test_an_ordinary_save_that_mints_keeps_the_paper(self):
+        old_id = self.old_note("Mint B.md")
+        self.server.save_essay_updates(old_id, {"subtitle": "first touch"})
+        self.assertEqual(self.arrival_after("Mint B.md"), "2026-01-01T00:00:00+00:00")
+
+
+class OpenMapConfigTests(unittest.TestCase):
+    """editor.sections holds whatever sections the writer switched. Its default
+    is empty, and _merge used to keep only keys a default already had - so it
+    could never hold anything."""
+
+    def test_editor_sections_survive_a_load(self):
+        tmp = tempfile.TemporaryDirectory()
+        try:
+            d = Path(tmp.name)
+            airdate_config.config_path(d).parent.mkdir(parents=True, exist_ok=True)
+            airdate_config.config_path(d).write_text(
+                json.dumps({"editor": {"mode": "custom", "sections": {"seo_social": True, "notes": False}}}),
+                encoding="utf-8",
+            )
+            config, _, _ = airdate_config.load_config(d)
+            self.assertEqual(config["editor"]["sections"], {"seo_social": True, "notes": False})
+        finally:
+            tmp.cleanup()
+
+    def test_unknown_top_level_keys_are_still_dropped(self):
+        # The open-map rule is for empty default dicts only, not a free-for-all.
+        tmp = tempfile.TemporaryDirectory()
+        try:
+            d = Path(tmp.name)
+            airdate_config.config_path(d).parent.mkdir(parents=True, exist_ok=True)
+            airdate_config.config_path(d).write_text(json.dumps({"surprise": {"a": 1}}), encoding="utf-8")
+            config, _, _ = airdate_config.load_config(d)
+            self.assertNotIn("surprise", config)
+        finally:
+            tmp.cleanup()
+
+
+class DefaultTotemsTests(unittest.TestCase):
+    """A fresh install starts with the five totems airdate ships art for.
+
+    Blank roles and keywords: the art and colours are the default set, the
+    taxonomy is the writer's own to fill in."""
+
+    EXPECTED = {
+        "fox": "#FF5B45", "octopus": "#3FD9EC", "bison": "#8FD16A",
+        "elephant": "#8EA2FF", "phoenix": "#B98CFF",
+    }
+
+    def test_the_default_keys_are_the_shipped_five(self):
+        keys = [t["key"] for t in airdate_config.DEFAULT_CONFIG["totems"]["items"]]
+        self.assertEqual(keys, list(self.EXPECTED))
+
+    def test_the_colours_match_the_design_tokens(self):
+        for item in airdate_config.DEFAULT_CONFIG["totems"]["items"]:
+            with self.subTest(totem=item["key"]):
+                self.assertEqual(item["color"].upper(), self.EXPECTED[item["key"]].upper())
+
+    def test_no_taxonomy_ships(self):
+        for item in airdate_config.DEFAULT_CONFIG["totems"]["items"]:
+            with self.subTest(totem=item["key"]):
+                self.assertEqual(item["role"], "")
+                self.assertEqual(item["keywords"], {})
+                self.assertEqual(item["image"], "")
+
+    def test_every_default_has_shipped_art(self):
+        for item in airdate_config.DEFAULT_CONFIG["totems"]["items"]:
+            with self.subTest(totem=item["key"]):
+                self.assertTrue((ROOT / "static" / "totems" / f"{item['key']}-512.webp").is_file())
+
+    def test_the_example_config_matches(self):
+        example = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
+        self.assertEqual([t["key"] for t in example["totems"]["items"]], list(self.EXPECTED))
+
+
+class RoomFocusCssTests(unittest.TestCase):
+    """Two faults in the shared focus rule, found in the slice 2 review."""
+
+    CSS = (ROOT / "static" / "room" / "room.css").read_text(encoding="utf-8")
+
+    def focus_block(self):
+        start = self.CSS.index(":focus-visible {")
+        return self.CSS[start: self.CSS.index("}", start)]
+
+    def test_focus_does_not_change_a_controls_shape(self):
+        # A border-radius here reshaped whatever took focus: nav corners jumped
+        # from 8px to 5px. The outline follows the element's own radius anyway.
+        self.assertNotIn("border-radius", self.focus_block())
+
+    def test_a_sticky_itself_gets_the_paper_ring(self):
+        # ".sticky :focus-visible" only matches things INSIDE a sticky. The
+        # post-it is itself a focusable sticky.
+        self.assertIn(".sticky:focus-visible", self.CSS)
+        self.assertIn(".note:focus-visible", self.CSS)
