@@ -96,6 +96,22 @@
       }
     ]
   },
+  "board": {
+    "default_pad": "sticky",
+    "default_color": "canary",
+    "weeks_shown": 3
+  },
+  "editor": {
+    "mode": "simplified",
+    "sections": {}
+  },
+  "red_pen": {
+    "enabled": true,
+    "lines": []
+  },
+  "paper": {
+    "fresh_on_promotion": false
+  },
   "tag_presets": [
     {
       "name": "Craft",

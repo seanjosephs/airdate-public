@@ -73,6 +73,11 @@ CONTENT_TYPES = {
 VAULT_ASSET_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 UPLOADS = DRAFTS / "assets"
 CONTACT_LOG = STATE_DIR / "creative_contact.json"
+# When each essay first showed up in airdate, keyed by essay id. The five ages
+# of paper on a script card count from here, not from the file's mtime, which
+# moves every time the writer saves. Runtime only: nothing about arrival is
+# ever written into the vault.
+ARRIVALS_LOG = STATE_DIR / "arrivals.json"
 # Written by the connector's "Pair with airdate" command: {port, token}. The
 # token is the only capability airdate holds; the Substack session itself
 # stays in Obsidian's secret storage.
@@ -3097,6 +3102,65 @@ def send_essay_to_substack(
         except Exception as exc:
             result["status_after_send_error"] = str(exc)
     return result
+
+
+_ARRIVALS_CACHE: dict[str, str] | None = None
+
+
+def load_arrivals() -> dict[str, str]:
+    """The arrivals sidecar, read once and held."""
+    global _ARRIVALS_CACHE
+    if _ARRIVALS_CACHE is None:
+        try:
+            data = json.loads(ARRIVALS_LOG.read_text(encoding="utf-8"))
+            _ARRIVALS_CACHE = {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            _ARRIVALS_CACHE = {}
+    return _ARRIVALS_CACHE
+
+
+def save_arrivals(arrivals: dict[str, str]) -> None:
+    global _ARRIVALS_CACHE
+    _ARRIVALS_CACHE = dict(arrivals)
+    ARRIVALS_LOG.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(ARRIVALS_LOG, json.dumps(arrivals, indent=2, sort_keys=True))
+
+
+def arrival_for(essay_id: str, seen_at: str) -> str:
+    """When this essay arrived, recording `seen_at` the first time it is asked.
+
+    The clock only ever goes up. A later sighting does not move it forward, and
+    an earlier one does not drag it back: rescheduling, re-indexing and a uid
+    mint all have to leave the paper exactly as old as it was. The only thing
+    that resets it is the writer asking for it, in settings."""
+    key = str(essay_id or "").strip()
+    if not key:
+        return seen_at
+    arrivals = load_arrivals()
+    existing = arrivals.get(key)
+    if existing:
+        return existing
+    arrivals[key] = seen_at
+    save_arrivals(arrivals)
+    return seen_at
+
+
+def carry_arrival(old_id: str, new_id: str) -> None:
+    """Carry an arrival across a uid mint so minting does not freshen paper."""
+    old_key, new_key = str(old_id or "").strip(), str(new_id or "").strip()
+    if not old_key or not new_key or old_key == new_key:
+        return
+    arrivals = load_arrivals()
+    stamp = arrivals.get(old_key)
+    if not stamp or arrivals.get(new_key):
+        return
+    arrivals[new_key] = stamp
+    save_arrivals(arrivals)
+
+
+def reset_arrivals() -> None:
+    """Settings' "reset the writers room": every essay's paper starts fresh."""
+    save_arrivals({})
 
 
 def load_contact_log() -> dict[str, Any]:

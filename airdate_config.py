@@ -66,6 +66,30 @@ DEFAULT_CONFIG: dict[str, Any] = {
         ],
     },
     "categories": {"mode": "folders", "items": []},
+    # The cork board across the top of the room.
+    "board": {
+        # What a new essay's note looks like until the writer gives it its own.
+        "default_pad": "sticky",       # sticky | paper | index
+        "default_color": "canary",     # canary | blue | orange | pink | green
+        "weeks_shown": 3,
+    },
+    # How much of the essay page the editor shows. Asked once in setup,
+    # changed behind the gear, and it applies to every essay.
+    "editor": {
+        "mode": "simplified",          # simplified | complete | custom
+        "sections": {},                # per-section overrides; empty = follow mode
+    },
+    # The red-pen jabs on old script pages. Twenty ship; a writer can add
+    # their own lines or turn the whole thing off.
+    "red_pen": {
+        "enabled": True,
+        "lines": [],
+    },
+    # Paper ages from when an essay first arrived in airdate. By default that
+    # clock never resets - not on a reschedule, not on a promotion.
+    "paper": {
+        "fresh_on_promotion": False,
+    },
     "tag_presets": [],
     "links": [],
 }
