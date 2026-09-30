@@ -357,6 +357,12 @@ def _strip_trailing_hashtags(line: str) -> str:
 
 
 def preprocess(body: str) -> tuple[str, list[dict[str, Any]]]:
+    """Layer 1 repairs; see preprocess_with_line_map. Returns (body, findings)."""
+    repaired, findings, _ = preprocess_with_line_map(body)
+    return repaired, findings
+
+
+def preprocess_with_line_map(body: str) -> tuple[str, list[dict[str, Any]], list[int]]:
     """Layer 1: text→text repairs that need no ProseMirror knowledge.
 
     Stage 1 scope:
@@ -367,22 +373,29 @@ def preprocess(body: str) -> tuple[str, list[dict[str, Any]]]:
         literal "## text") and after it (or it eats the prose beneath).
       - Drop Obsidian tag lines, which otherwise ship as an H1.
 
-    Returns (rewritten_body, findings). Fenced code is never touched.
+    Returns (rewritten_body, findings, line_map). Fenced code is never touched.
+    line_map[i] is the 1-based line of `body` that line i+1 of the rewritten
+    body came from, so a finding made on the rewritten text can name the line
+    the writer actually wrote. A blank line the repair inserted maps to the
+    heading it separates.
     """
     findings: list[dict[str, Any]] = []
     if not body:
-        return body, findings
+        return body, findings, []
 
     # Pass 1 — hashtag removal.
     kept: list[str] = []
+    kept_src: list[int] = []
     in_fence = False
     for index, raw in enumerate(body.split("\n"), start=1):
         if _is_fence(raw):
             in_fence = not in_fence
             kept.append(raw)
+            kept_src.append(index)
             continue
         if in_fence:
             kept.append(raw)
+            kept_src.append(index)
             continue
         if is_hashtag_line(raw):
             findings.append(_finding(
@@ -398,46 +411,58 @@ def preprocess(body: str) -> tuple[str, list[dict[str, Any]]]:
                 f"Removed trailing tags: {removed[:60]!r}",
             ))
             kept.append(stripped)
+            kept_src.append(index)
             continue
         kept.append(raw)
+        kept_src.append(index)
 
     # Pass 2 — heading isolation.
     out: list[str] = []
+    out_src: list[int] = []
     in_fence = False
     for position, line in enumerate(kept):
+        source = kept_src[position]
         if _is_fence(line):
             in_fence = not in_fence
             out.append(line)
+            out_src.append(source)
             continue
         if not in_fence and HEADING_RE.match(line):
             following = kept[position + 1] if position + 1 < len(kept) else ""
             if out and out[-1].strip():
                 out.append("")
+                out_src.append(source)
             out.append(line)
+            out_src.append(source)
             if following.strip():
                 out.append("")
+                out_src.append(source)
                 findings.append(_finding(
                     "heading_weld", LOSSY, position + 1,
                     f"Separated heading from the prose beneath it: {line.strip()[:60]!r}",
                 ))
             continue
         out.append(line)
+        out_src.append(source)
 
     # Collapse blank runs outside fences — the parser splits on any blank line,
     # so extra blanks are noise, and this keeps the inserted separators tidy.
     collapsed: list[str] = []
+    collapsed_src: list[int] = []
     in_fence = False
-    for line in out:
+    for line, source in zip(out, out_src):
         if _is_fence(line):
             in_fence = not in_fence
             collapsed.append(line)
+            collapsed_src.append(source)
             continue
         if not in_fence and not line.strip() and collapsed and not collapsed[-1].strip():
             continue
         collapsed.append(line)
+        collapsed_src.append(source)
 
     findings.sort(key=lambda f: (f["line"], f["kind"]))
-    return "\n".join(collapsed), findings
+    return "\n".join(collapsed), findings, collapsed_src
 
 
 def summarize(findings: list[dict[str, Any]]) -> dict[str, Any]:
