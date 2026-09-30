@@ -7,11 +7,17 @@
   <link rel="icon" href="/static/brand/airdate-icon-256.png" type="image/png">
   <link rel="stylesheet" href="/static/room/tokens.css?v=2">
   <link rel="stylesheet" href="/static/room/room.css?v=2">
-  <link rel="stylesheet" href="/static/room/cards.css?v=1">
+  <link rel="stylesheet" href="/static/room/cards.css?v=2">
+  <link rel="stylesheet" href="/static/room/board.css?v=1">
   <script src="/static/room/api.js?v=1" defer></script>
-  <script src="/static/room/cards.js?v=1" defer></script>
+  <script src="/static/room/cards.js?v=2" defer></script>
   <script src="/static/room/keys.js?v=1" defer></script>
-  <script src="/static/room/pool.js?v=1" defer></script>
+  <script src="/static/room/pool.js?v=2" defer></script>
+  <script src="/static/room/dates.js?v=1" defer></script>
+  <script src="/static/room/board.js?v=1" defer></script>
+  <script src="/static/room/feedback.js?v=1" defer></script>
+  <script src="/static/room/board-view.js?v=1" defer></script>
+  <script src="/static/room/placing.js?v=1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#room-main">skip to the essays</a>
@@ -54,6 +60,37 @@
   </aside>
 
   <main class="room-main" id="room-main" tabindex="-1">
+    <section class="board" id="board" aria-labelledby="board-heading">
+      <div class="board-head">
+        <h2 id="board-heading">the board</h2>
+        <span class="board-sign" role="img" aria-label="air dates: mondays. one essay a week.">air dates &middot; mondays &middot; one a week</span>
+        <span class="board-grow"></span>
+        <div class="board-pager">
+          <button type="button" class="board-page" data-page="-1" aria-label="earlier weeks">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <span class="board-range" id="board-range" aria-live="polite"></span>
+          <button type="button" class="board-page" data-page="1" aria-label="later weeks">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="board-cork">
+        <ol class="board-slots" id="board-slots" aria-label="mondays"></ol>
+      </div>
+
+      <div class="board-legend" id="board-legend" role="status">
+        <span class="legend-key"><kbd>A</kbd><span>lifts the note</span></span>
+        <span class="legend-key"><kbd aria-label="left arrow">&larr;</kbd><kbd aria-label="right arrow">&rarr;</kbd><span>move between open mondays</span></span>
+        <span class="legend-key"><kbd>enter</kbd><span>or</span><kbd>S</kbd><span>sets it</span></span>
+        <span class="legend-key"><kbd>esc</kbd><span>puts it back</span></span>
+        <span class="board-grow"></span>
+        <span class="legend-placing" id="board-legend-placing" aria-hidden="true"></span>
+        <span class="visually-hidden" id="board-legend-say"></span>
+      </div>
+    </section>
+
     <section class="pool" aria-labelledby="pool-heading">
       <div class="pool-head">
         <div class="pool-title-row">
