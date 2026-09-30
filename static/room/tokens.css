@@ -36,7 +36,8 @@
   --elephant: #8EA2FF; --phoenix: #B98CFF;
 
   /* stamp inks */
-  --ink-room: #27408B; --ink-ready: #C44A00; --ink-live: #B3123A;
+  /* ready was #C44A00: 4.19:1 on the paper scrap, fails AA (measured 09-24). */
+  --ink-room: #27408B; --ink-ready: #A83E00; --ink-live: #B3123A;
 
   /* length bars, short to long */
   --bar-1: #A8913A; --bar-2: #E0B93B; --bar-3: #A6D84A; --bar-4: #3BFF7A;
@@ -47,6 +48,14 @@
   /* Courier bold stands in for both; neither font is shipped. */
   --font-typed: "Courier Prime", "Courier New", monospace;
   --font-stamp: "Courier Prime", "Courier New", monospace;
+
+  /* Red TEXT on dark uses --red-text; --danger is 4.56 on s3, a pass by a
+     hair, so it is for borders and icons only. */
+  --red-text: #FF7A7A;
+  /* Focus is amber on dark and ink on paper. Both are 3px: the ring has to
+     read against cork, cream and a sticky, not only against the page. */
+  --focus-dark: 3px solid #FFB24D;
+  --focus-paper: 3px solid #15120E;
 }
 h1, h2, h3, h4, label, legend { text-wrap: balance; }
 button, .chip, .pill { white-space: nowrap; }

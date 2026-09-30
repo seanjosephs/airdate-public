@@ -24,12 +24,17 @@ body {
 }
 
 /* Every control shows where the keyboard is. The baseline audit's first
-   blocker was that you could not reach an essay without a mouse. */
+   blocker was that you could not reach an essay without a mouse.
+   Amber on dark, ink on paper: in placing mode this same ring is what marks
+   the candidate Monday, so it has to read against cork and cream too. */
 :focus-visible {
-  outline: 2px solid var(--blue);
+  outline: var(--focus-dark);
   outline-offset: 2px;
   border-radius: var(--r-sm);
 }
+.paper :focus-visible,
+.note :focus-visible,
+.sticky :focus-visible { outline: var(--focus-paper); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
