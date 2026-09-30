@@ -854,10 +854,11 @@ function lifecycleControlsMarkup(essay, cls = 'card-lifecycle') {
     const when = essay.scheduled_at ? ` <span class="rfa-when">${escapeHtml(formatPublishedDate(essay.scheduled_at) || essay.scheduled_at)}</span>` : '';
     btns.push(`<button class="lifecycle-btn rfa-btn" type="button" data-rfa-id="${essay.id}" title="Change the air date">reschedule${when}</button>`);
     btns.push(`<button class="lifecycle-btn back-btn" type="button" data-unschedule-id="${essay.id}" title="Clear the air date and move it back to Writers Likey">unschedule</button>`);
-  } else if (current === 'Live') {
-    // Publish is the record-a-Substack-publish action; it only makes sense once
-    // the draft has actually gone out (Live).
-    btns.push(`<button class="lifecycle-btn publish-btn" type="button" data-publish-id="${essay.id}" title="Mark published on Substack">publish</button>`);
+    // Record a publish the writer performed on Substack. Live now MEANS
+    // published, so this belongs one stage earlier than it used to: a
+    // scheduled essay whose draft has gone out is the thing that becomes live.
+    // The room replaces this with the board note's "is it live?" field.
+    btns.push(`<button class="lifecycle-btn publish-btn" type="button" data-publish-id="${essay.id}" title="Paste the post link and mark it live">mark live</button>`);
   }
   if (current !== 'Archived') {
     btns.push(`<button class="lifecycle-btn archive-btn" type="button" data-archive-id="${essay.id}" title="Move to Archive">archive</button>`);
@@ -2498,17 +2499,17 @@ function bindEvents() {
     if (result.ok) {
       // The server promotes edit_url onto the result; no stdout re-parse.
       const editUrl = String(result.edit_url || '').trim();
-      const liveNote = result.status_after_send === 'Live' ? ' status is now live.' : '';
+      const liveNote = result.draft_recorded ? ' the draft link is saved on the note.' : '';
       if (editUrl) {
         setEditorStatusWithLink('draft created: ', editUrl, 'open in Substack ↗', `.${liveNote}${warningsNote}`, 'good');
         renderEditorDraftLink(editUrl);
       } else {
         setEditorStatus(`draft created in Substack.${liveNote}${warningsNote}`, 'good');
       }
-      if (result.status_after_send === 'Live') {
-        // The server flipped status → Live and rewrote the file; adopt the new
-        // file state so the open editor doesn't 409 on its next save.
-        if (editorForm.elements.status) editorForm.elements.status.value = 'Live';
+      if (result.draft_recorded) {
+        // The send wrote the draft id and url onto the note; adopt the new file
+        // state so the open editor doesn't 409 on its next save. The phase is
+        // deliberately unchanged: sending a draft is not publishing.
         refreshEditorBaselineFromSave(result);
       }
       touchEssay(state.selectedId, 'send_to_substack');

@@ -812,8 +812,8 @@ def main() -> int:
                     "successful send did not persist the Substack draft ID")
         assert_true('substack_draft_url: "https://example.substack.com/p/connector-draft-1"' in sent_markdown,
                     "successful send did not persist the Substack draft URL")
-        assert_true('status: "Live"' in sent_markdown,
-                    "successful send did not persist Live status")
+        assert_true('status: "Live"' not in sent_markdown,
+                    "a send stamped Live: sending a draft is not publishing, and live now means published")
         assert_true(len(connector_captures) == sends_before + 1, f"connector saw {len(connector_captures) - sends_before} sends, expected 1")
         capture = connector_captures[-1]
         assert_true(set(capture) == {"file", "markdown", "stored_draft_id"},

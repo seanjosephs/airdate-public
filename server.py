@@ -159,7 +159,7 @@ def public_path(path: Path) -> str:
 
 
 LONG_SOURCE_WORD_THRESHOLD = int(env_first("AIR_DATE_LONG_SOURCE_WORD_THRESHOLD", default="10000"))
-STATUS_SET = {"Writers Room", "Writers Likey", "Ready for Air", "Live", "Published", "Archived"}
+STATUS_SET = {"Writers Room", "Writers Likey", "Ready for Air", "Live", "Archived"}
 SOURCE_ROLE_SET = {"source", "draft", "standalone"}
 
 
@@ -1555,16 +1555,17 @@ def ensure_totem(value: Any) -> str:
 
 
 def normalize_status(value: Any) -> str:
-    # Lifecycle: Writers Room -> Writers Likey -> Ready for Air -> Live -> Published.
+    # Lifecycle: Writers Room -> Writers Likey -> Ready for Air -> Live.
     # Writers Room = the default: any essay that exists is in the writers room,
     # so an absent/blank status means Writers Room (there is no "Inbox" status;
     # un-filed essays surface via the needs-intake flag, not a status).
     # Writers Likey = writing done, ready to be scheduled (no date yet) — the
     # pool you drag onto the calendar. Ready for Air = scheduled + on the
-    # calendar (set by the Ready for Air button/drag); Live = draft sent to
-    # Substack; Published = the writer pressed publish there. Archived sits outside the
-    # flow. "airdate" is the tool's name, never a status: the old working status
-    # "Air Date" aliases to "Ready for Air".
+    # calendar (set by the Ready for Air button/drag); Live = published on
+    # Substack. There is no "Published" status any more: live means published,
+    # and the old word survives only as a folder on disk and as an alias here.
+    # Archived sits outside the flow. "airdate" is the tool's name, never a
+    # status: the old working status "Air Date" aliases to "Ready for Air".
     if not value:
         return "Writers Room"
     raw = str(value).strip()
@@ -1595,8 +1596,8 @@ def normalize_status(value: Any) -> str:
         "air-date": "Ready for Air",
         "airdate": "Ready for Air",
         "live": "Live",
-        "released": "Published",
-        "published": "Published",
+        "released": "Live",
+        "published": "Live",
         "archived": "Archived",
         "archive": "Archived",
     }
@@ -1646,29 +1647,64 @@ def infer_totem(
     return TOTEM_DEFAULT
 
 
+def scheduling_refusal(status: Any) -> str | None:
+    """Why this essay cannot go on the board, or None if it can.
+
+    Writers room essays cannot be scheduled. The card dims its drag handle and
+    placing mode declines, but those are hints — this is the rule, so a direct
+    POST cannot put an unstarred essay on a Monday either. The sentence comes
+    back in the refusal so the interface can show it without inventing wording."""
+    if normalize_status(status) == "Writers Room":
+        return "star it for writers likey before it can go on the board."
+    return None
+
+
+def has_live_post_link(frontmatter: dict[str, Any]) -> bool:
+    """Proof that an essay is actually published: a real http(s) post link.
+
+    A draft id is not proof — the draft exists on Substack but nobody can read
+    it. This is the one piece of evidence that turns an essay live, whether it
+    is pasted on the board or found in an old note."""
+    url = str(frontmatter.get("substack_url") or "").strip()
+    return bool(re.match(r"^https?://", url))
+
+
 def effective_status(relative_path: str, frontmatter: dict[str, Any]) -> str:
     """The single source of truth for an essay's lifecycle status.
 
     Folder wins for the two terminal states: a file physically in Published/ IS
-    Published and a file in Archive/ IS Archived, no matter what the frontmatter
+    live and a file in Archive/ IS Archived, no matter what the frontmatter
     says — that reconciliation is the whole point (it kills the bug where a
-    Published/ essay showed a working status with a live Publish button).
+    published essay showed a working status with a live Publish button). The
+    folder keeps its old name; only the word the app uses changed.
 
-    Off the terminal folders, the frontmatter status carries the working state
-    (Inbox -> Writers Room -> Ready for Air -> Live). A frontmatter-declared
-    Published/Archived that hasn't been physically moved yet is still honored
-    here; set_essay_status relocates it on the next write."""
+    Off the terminal folders the frontmatter status carries the working state,
+    with one re-reading. Old notes wrote "Live" to mean "draft sent", which is
+    not what live means now, so that one word is believed only when the note
+    carries a real post link; a draft id alone, or nothing, reads as Ready for
+    Air. An old "Published" gets no such treatment: it was the writer's own
+    claim that the essay went out, and airdate takes them at their word.
+    Nothing is rewritten in the vault; set_essay_status relocates and restamps
+    on the next write."""
     rp = relative_path.lower()
     top = rp.split("/", 1)[0] if "/" in rp else ""
     if top == "published" or "/published/" in rp:
-        return "Published"
+        return "Live"
     if top == "archive" or "/archive/" in rp:
         return "Archived"
     raw = frontmatter.get("status")
     if raw and str(raw).strip():
-        return normalize_status(raw)
+        status = normalize_status(raw)
+        # Only the ambiguous old word is re-read. "Published" is believed.
+        if (
+            status == "Live"
+            and str(raw).strip().lower() == "live"
+            and not has_live_post_link(frontmatter)
+        ):
+            return "Ready for Air"
+        return status
     if frontmatter.get("published") is True:
-        return "Published"
+        return "Live"
     return "Writers Room"
 
 
@@ -1701,7 +1737,7 @@ def classify_essay(relative_path: str, title: str, frontmatter: dict[str, Any]) 
     status = effective_status(relative_path, frontmatter)
     if status == "Archived":
         return "archived"
-    if status == "Published":
+    if status == "Live":
         return "shelf"
     return "active"
 
@@ -2647,12 +2683,15 @@ def move_essay_file(path: Path, target_dir: Path) -> Path:
 
 def folder_for_status(status: str, frontmatter: dict[str, Any], relative_path: str) -> Path | None:
     """Where a file belongs for its status; None = leave it where it is.
-    Published/Archived pull files into their folders; a working status pulls a
-    shelved/archived file back out into its category folder (stamped on the way in)."""
+    Live/Archived pull files into their folders; a working status pulls a
+    shelved/archived file back out into its category folder (stamped on the way
+    in). The folders keep their old names — a live essay still lands in
+    Published/ — because renaming them would move every essay on disk to buy
+    nothing the writer can see."""
     top = relative_path.split("/", 1)[0].lower() if "/" in relative_path else ""
     in_published = top == "published"
     in_archive = top == "archive"
-    if status == "Published":
+    if status == "Live":
         return None if in_published else OBSIDIAN_ESSAYS_DIR / "Published"
     if status == "Archived":
         return None if in_archive else OBSIDIAN_ESSAYS_DIR / "Archive"
@@ -2727,9 +2766,9 @@ def set_essay_status(
 
 
 def publish_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """Bookkeeping for a publish the writer performed on Substack themselves: stamp the
-    live URL + date, set status Published, move the file to Published/. The app
-    itself never publishes anything."""
+    """Bookkeeping for a publish the writer performed on Substack themselves:
+    stamp the live URL + date, set status Live, move the file to Published/.
+    The app itself never publishes anything."""
     substack_url = str(payload.get("substack_url") or "").strip()
     if not re.match(r"^https?://", substack_url):
         raise ValueError("substack_url must be the full http(s) link to the live post.")
@@ -2738,7 +2777,7 @@ def publish_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         published_date = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
     return set_essay_status(
         essay_id,
-        "Published",
+        "Live",
         {"published_date": published_date, "substack_url": substack_url},
         payload.get("expected_mtime"),
         payload.get("expected_content_hash"),
@@ -3035,7 +3074,11 @@ def send_essay_to_substack(
         try:
             # finish_transport_result already lifted draft_id/edit_url from
             # the transport's stdout onto the result.
-            remote_updates: dict[str, Any] = {"status": "Live"}
+            # A send creates a DRAFT. It does not change the phase: live now
+            # means published, and only the writer pasting the post link can
+            # say that. The draft id below is the "sent" marker, and
+            # effective_status reads it as Ready for Air, never as live.
+            remote_updates: dict[str, Any] = {}
             draft_id = _stringify(result.get("draft_id")).strip()
             draft_url = _stringify(result.get("edit_url")).strip()
             if draft_id:
@@ -3047,7 +3090,7 @@ def send_essay_to_substack(
                 result["draft_id"] = draft_id
             if draft_url:
                 result["edit_url"] = draft_url
-            result["status_after_send"] = "Live"
+            result["draft_recorded"] = True
             result["mtime"] = live_state["mtime"]
             result["mtime_iso"] = live_state["mtime_iso"]
             result["content_hash"] = live_state["content_hash"]
@@ -3338,6 +3381,16 @@ class Handler(BaseHTTPRequestHandler):
                 scheduled_at = str(payload.get("scheduled_at") or payload.get("scheduledAt") or "").strip()
                 if not scheduled_at:
                     self.send_json({"error": "scheduled_at (an air date) is required"}, status=400)
+                    return
+                # The gate: a writers room essay cannot go on the board. The
+                # dimmed handle is a hint; this is the rule.
+                current = resolve_essay_path(essay_id)
+                fm, _ = split_frontmatter(current.read_text(encoding="utf-8", errors="ignore"))
+                refusal = scheduling_refusal(
+                    effective_status(current.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), fm)
+                )
+                if refusal:
+                    self.send_json({"error": refusal, "refused": "writers-room"}, status=409)
                     return
                 self.send_json(set_essay_status(
                     essay_id,
