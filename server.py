@@ -31,6 +31,34 @@ STATIC = ROOT / "static"
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
+# The red pen: twenty lines for script pages past three months, shipped here
+# rather than in config so an install always has them. The writer's own lines
+# (config red_pen.lines) are added after these; red_pen.enabled turns all of it
+# off. A line that names the coffee ring or the crayon is only ever written on
+# the oldest paper, the one that has them.
+RED_PEN_JABS = (
+    "it's not the odyssey. publish it or throw it away.",
+    "this draft is old enough to have opinions about you.",
+    "the coffee ring is load bearing now.",
+    "even tolstoy hit send eventually.",
+    "you've rewritten the first line more than you've read the last one.",
+    "perfect is a rumor. monday is real.",
+    "this page has seen two moons. it would like to see a reader.",
+    "it's an essay, not a will. nobody dies if it's wrong.",
+    "somebody needs this one. they can't read your desk.",
+    "dust is not an editing technique.",
+    "you be a writer. writers publish.",
+    "the umbrella is right there. rain check it or air it.",
+    "this script has a better attendance record than most plans.",
+    "nobody ever said, i wish they'd sat on that essay longer.",
+    "still here. still good. still not published.",
+    "the crayon is all that's left. it still writes.",
+    "fear of the send button is not a genre.",
+    "one more polish and it becomes a different essay.",
+    "you already said the hard part. the rest is a button.",
+    "direction, not distance. move it one slot.",
+)
+
 
 def env_first(*names: str, default: Any = "") -> Any:
     for name in names:
@@ -78,6 +106,10 @@ CONTACT_LOG = STATE_DIR / "creative_contact.json"
 # moves every time the writer saves. Runtime only: nothing about arrival is
 # ever written into the vault.
 ARRIVALS_LOG = STATE_DIR / "arrivals.json"
+# When the writer put the star on each essay's post-it, keyed by essay id. The
+# writers likey stamp carries this date. Runtime only, like arrivals: the star
+# is a status in the note, but its date is airdate's own bookkeeping.
+STARRED_LOG = STATE_DIR / "starred.json"
 # Written by the connector's "Pair with airdate" command: {port, token}. The
 # token is the only capability airdate holds; the Substack session itself
 # stays in Obsidian's secret storage.
@@ -202,6 +234,10 @@ PUBLISH_DAY: str | None = None
 BOARD_DEFAULT_PAD = "sticky"
 BOARD_DEFAULT_COLOR = "canary"
 BOARD_WEEKS_SHOWN = 3
+# The red pen on old script pages, and whether a star gives an essay fresh paper.
+RED_PEN_ENABLED = True
+RED_PEN_LINES: list[str] = []
+PAPER_FRESH_ON_PROMOTION = False
 TAG_PRESETS: list[dict[str, Any]] = []
 LINKS: list[dict[str, str]] = []
 
@@ -209,6 +245,7 @@ LINKS: list[dict[str, str]] = []
 def apply_config(config: dict[str, Any], file_exists: bool, load_error: str = "") -> None:
     """Install a config (already merged with defaults) as the running settings."""
     global BOARD_DEFAULT_PAD, BOARD_DEFAULT_COLOR, BOARD_WEEKS_SHOWN
+    global RED_PEN_ENABLED, RED_PEN_LINES, PAPER_FRESH_ON_PROMOTION
     global CONFIG, CONFIG_FILE_EXISTS, CONFIG_LOAD_ERROR, CONFIG_ERRORS, VAULT_CHECK, SETUP_REQUIRED
     global CONFIG_FINGERPRINT, VAULT_DIR, ESSAYS_FOLDER, OBSIDIAN_ESSAYS_DIR, OBSIDIAN_VAULT_NAME
     global OBSIDIAN_SUBSTACK_ASSETS_DIR, SUBSTACK_PUBLICATION, PUBLICATION_NAME, CONNECTOR_PORT
@@ -268,6 +305,14 @@ def apply_config(config: dict[str, Any], file_exists: bool, load_error: str = ""
         BOARD_WEEKS_SHOWN = max(1, min(12, int(board.get("weeks_shown") or 3)))
     except (TypeError, ValueError):
         BOARD_WEEKS_SHOWN = 3
+    red_pen = effective.get("red_pen") or {}
+    RED_PEN_ENABLED = red_pen.get("enabled") is not False
+    RED_PEN_LINES = [
+        line.strip() for line in red_pen.get("lines") or []
+        if isinstance(line, str) and line.strip()
+    ]
+    paper = effective.get("paper") or {}
+    PAPER_FRESH_ON_PROMOTION = paper.get("fresh_on_promotion") is True
     TAG_PRESETS = [p for p in effective.get("tag_presets") or [] if isinstance(p, dict) and p.get("name")]
     LINKS = [l for l in effective.get("links") or [] if isinstance(l, dict) and l.get("label") and l.get("url")]
 
@@ -1984,6 +2029,10 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
                     # deliberately not `summary`; note_pad/note_color are the
                     # essay's own board note, falling back to app settings.
                     "arrived_at": arrival_for(essay_id, touched.isoformat()),
+                    # When the post-it got its star, for the writers likey
+                    # stamp. "" when never starred, or starred before airdate
+                    # kept the date.
+                    "starred_at": load_starred().get(essay_id, ""),
                     "excerpt": first_line_excerpt(body),
                     "substack_draft_url": str(frontmatter.get("substack_draft_url") or "").strip(),
                     "hero_url": vault_asset_url(frontmatter.get("hero_image") or frontmatter.get("hero")),
@@ -2046,7 +2095,7 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
 # to STATE_DIR so the API can answer from it immediately while a background
 # thread re-scans (stale-while-revalidate). Delete the file to force a rescan.
 ESSAY_INDEX_FILE = STATE_DIR / "essay_index.json"
-ESSAY_INDEX_VERSION = 5  # 5: keyed to the settings fingerprint as well as the folder
+ESSAY_INDEX_VERSION = 6  # 6: rows carry starred_at
 ESSAY_REFRESH_MIN_INTERVAL = 5.0  # seconds between background re-scans
 
 _essay_cache_cond = threading.Condition()
@@ -2301,6 +2350,9 @@ def ui_config_payload() -> dict[str, Any]:
             for p in TAG_PRESETS
         ],
         "links": [{"label": str(l["label"]), "url": str(l["url"])} for l in LINKS],
+        # The twenty that ship, then the writer's own. The card picks one per
+        # essay; the client decides which fit which paper.
+        "red_pen": {"enabled": RED_PEN_ENABLED, "lines": [*RED_PEN_JABS, *RED_PEN_LINES]},
     }
 
 
@@ -2454,16 +2506,23 @@ def resolve_essay_path(essay_id: str) -> Path:
     return path
 
 
-class SchedulingRefusedError(Exception):
-    """A write would put a writers room essay on the board.
+class RefusedError(Exception):
+    """airdate will not do this, and says why in a sentence the room shows.
 
     Its own type, not a ValueError, so every route answers it the same way:
-    409 with {error, refused: "writers-room"}. The client tells it apart from a
-    file-changed 409 by the `refused` key."""
+    409 with {error, refused: <marker>}. The client tells it apart from a
+    file-changed 409 by the `refused` key; the marker says which rule."""
+
+    def __init__(self, sentence: str, marker: str):
+        super().__init__(sentence)
+        self.payload = {"error": sentence, "refused": marker, "ok": False}
+
+
+class SchedulingRefusedError(RefusedError):
+    """A write would put a writers room essay on the board."""
 
     def __init__(self, sentence: str):
-        super().__init__(sentence)
-        self.payload = {"error": sentence, "refused": "writers-room", "ok": False}
+        super().__init__(sentence, "writers-room")
 
 
 class EssayConflictError(Exception):
@@ -2723,6 +2782,7 @@ def save_essay_updates(
         # under the new id and record now - handing an old essay fresh paper on
         # its very first write, which is usually the star.
         carry_arrival(essay_id, sanitized[UID_KEY])
+        carry_star(essay_id, sanitized[UID_KEY])
         # The essay's id flips here (path hash -> uid). Refresh blocking, as the
         # other re-id sites do, so the client's very next /api/essays already
         # reports the canonical id — a background rescan loses that race and the
@@ -3271,6 +3331,135 @@ def reset_room(payload: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "cleared": count}
 
 
+# --- The star ----------------------------------------------------------------
+# The post-it on a script card. Its status lives in the note (Writers Likey);
+# the date it was pressed lives here, beside arrivals, and never in the vault.
+_STARRED_CACHE: dict[str, str] | None = None
+
+
+def load_starred() -> dict[str, str]:
+    """The star-date sidecar, read once and held."""
+    global _STARRED_CACHE
+    if _STARRED_CACHE is None:
+        try:
+            data = json.loads(STARRED_LOG.read_text(encoding="utf-8"))
+            _STARRED_CACHE = {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            _STARRED_CACHE = {}
+    return _STARRED_CACHE
+
+
+def save_starred(starred: dict[str, str]) -> None:
+    global _STARRED_CACHE
+    _STARRED_CACHE = dict(starred)
+    STARRED_LOG.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(STARRED_LOG, json.dumps(starred, indent=2, sort_keys=True))
+
+
+def carry_star(old_id: str, new_id: str) -> None:
+    """Move a star date across a uid mint, as carry_arrival does for paper.
+
+    A move, not a copy: the old id is a path hash nobody will ask for again,
+    and a stale entry under it would only confuse a later unstar."""
+    old_key, new_key = str(old_id or "").strip(), str(new_id or "").strip()
+    if not old_key or not new_key or old_key == new_key:
+        return
+    starred = dict(load_starred())
+    stamp = starred.pop(old_key, None)
+    if not stamp:
+        return
+    starred.setdefault(new_key, stamp)
+    save_starred(starred)
+
+
+def index_row_for(essay_id: str) -> dict[str, Any] | None:
+    """The catalog row for an essay, by any token that names it."""
+    essays, _ = get_essay_index()
+    return next(
+        (row for row in essays
+         if essay_id in (row.get("id"), row.get("uid"), row.get("legacy_path_id"))),
+        None,
+    )
+
+
+# Why a star cannot move an essay in each phase it does not cover. One
+# sentence, lowercase, shown by the room verbatim.
+STAR_REFUSALS = {
+    "Ready for Air": "it is on the board, so its star stays until it is unscheduled.",
+    "Live": "it is live, so its star is part of the record now.",
+    "Archived": "it is saved for a rainy day. bring it back to the room first.",
+}
+
+
+def star_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Press the post-it: writers room -> writers likey, or back.
+
+    Deliberately narrow. Any other phase is refused with a sentence, so a star
+    can never pull an essay off the board or out of the shelf. Pressing it into
+    the state it is already in is a no-op success, because a double click is
+    not an error. The write goes through set_essay_status, so the file-conflict
+    check and the uid mint (with its arrival and star carry) apply."""
+    starred = payload.get("starred")
+    if not isinstance(starred, bool):
+        raise ValueError("starred must be true or false.")
+    path = resolve_essay_path(essay_id)
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    frontmatter, _ = split_frontmatter(text)
+    current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+    if current not in ("Writers Room", "Writers Likey"):
+        raise RefusedError(STAR_REFUSALS.get(current, "only a writers room essay can take a star."),
+                           current.lower().replace(" ", "-"))
+
+    target = "Writers Likey" if starred else "Writers Room"
+    if current == target:
+        row = index_row_for(essay_id)
+        new_id = (row or {}).get("id") or essay_id
+        return {"ok": True, "changed": False, "starred": starred, "status": current,
+                "old_id": essay_id, "new_id": new_id, "essay": row}
+
+    # The sidecars change first, under the id the caller holds, so a uid mint
+    # inside the write carries them and the rescan that follows reads them.
+    # If the write fails they are put back exactly as they were.
+    starred_before = dict(load_starred())
+    arrivals_before = dict(load_arrivals())
+    now = datetime.now(timezone.utc).isoformat()
+    marks = dict(starred_before)
+    if starred:
+        marks[essay_id] = now
+    else:
+        marks.pop(essay_id, None)
+    save_starred(marks)
+    if starred and PAPER_FRESH_ON_PROMOTION:
+        # The writer asked for fresh paper on promotion. Off by default: the
+        # clock otherwise only ever goes up.
+        arrivals = dict(arrivals_before)
+        arrivals[essay_id] = now
+        save_arrivals(arrivals)
+    try:
+        result = set_essay_status(
+            essay_id,
+            target,
+            None,
+            payload.get("expected_mtime"),
+            payload.get("expected_content_hash"),
+        )
+    except BaseException:
+        save_starred(starred_before)
+        if starred and PAPER_FRESH_ON_PROMOTION:
+            save_arrivals(arrivals_before)
+        raise
+    new_id = result.get("new_id") or essay_id
+    return {
+        "ok": True,
+        "changed": True,
+        "starred": starred,
+        "status": target,
+        "old_id": essay_id,
+        "new_id": new_id,
+        "essay": index_row_for(new_id),
+    }
+
+
 def load_contact_log() -> dict[str, Any]:
     if not CONTACT_LOG.exists():
         return {"total": 0, "events": []}
@@ -3547,6 +3736,10 @@ class Handler(BaseHTTPRequestHandler):
                 act = str(payload.get("action") or "contact")
                 self.send_json(track_contact(essay_id, act))
                 return
+            if essay_id and action == "star":
+                # The post-it on a card: writers room <-> writers likey only.
+                self.send_json(star_essay(essay_id, payload))
+                return
             if essay_id and action == "set-status":
                 self.send_json(set_essay_status(
                     essay_id,
@@ -3628,7 +3821,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "Request body must be valid JSON."}, status=400)
         except FileNotFoundError as exc:
             self.send_json({"error": str(exc)}, status=404)
-        except SchedulingRefusedError as exc:
+        except RefusedError as exc:
             self.send_json(exc.payload, status=409)
         except EssayConflictError as exc:
             self.send_json(exc.payload, status=409)
