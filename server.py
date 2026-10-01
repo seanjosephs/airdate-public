@@ -906,8 +906,8 @@ BODY_BLOCKER_LABELS = {
 
 
 def preflight_publish_payload(publish_payload: dict[str, Any]) -> dict[str, Any]:
-    blockers: list[dict[str, str]] = []
-    warnings: list[dict[str, str]] = []
+    blockers: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
     checks: list[dict[str, Any]] = []
     metadata_checks: list[dict[str, Any]] = []
 
@@ -983,8 +983,16 @@ def preflight_publish_payload(publish_payload: dict[str, Any]) -> dict[str, Any]
     # Scan the body as it will actually be SENT (after the Layer-1 repairs), so
     # preflight predicts the real outcome instead of flagging damage that the
     # send path already fixes.
-    repaired_body, _ = obsidian_markdown.preprocess(_stringify(publish_payload.get("body")))
+    repaired_body, _, line_map = obsidian_markdown.preprocess_with_line_map(_stringify(publish_payload.get("body")))
     fidelity_findings = obsidian_markdown.scan(repaired_body)
+
+    # A finding is made on the repaired text, whose lines have moved: airdate
+    # dropped tag lines and put blank lines around headings. Name the line the
+    # writer wrote instead, counted from the first non-blank line of the
+    # script, and carry it as a number so the room can put the writer on it.
+    def written_line(finding: dict[str, Any]) -> int:
+        line = int(finding["line"])
+        return line_map[line - 1] if 0 < line <= len(line_map) else line
 
     # Tier-3a Stage 2 + 4a: every BLOCKER-severity finding stops the send.
     #
@@ -1001,26 +1009,31 @@ def preflight_publish_payload(publish_payload: dict[str, Any]) -> dict[str, Any]
     blocking_findings = [f for f in fidelity_findings if f["severity"] == obsidian_markdown.BLOCKER]
     for finding in blocking_findings[:BODY_BLOCKER_LIMIT]:
         label = BODY_BLOCKER_LABELS.get(finding["kind"], finding["kind"].replace("_", " "))
+        line = written_line(finding)
         blockers.append({
-            "key": f"body_{finding['kind']}_{finding['line']}",
+            "key": f"body_{finding['kind']}_{line}",
             "field": "",
-            "label": f"{label} (line {finding['line']})",
-            "message": f"line {finding['line']}: {finding['detail']}",
+            "line": line,
+            "label": f"{label} (line {line})",
+            "message": f"line {line}: {finding['detail']}",
         })
     if len(blocking_findings) > BODY_BLOCKER_LIMIT:
         extra = len(blocking_findings) - BODY_BLOCKER_LIMIT
         blockers.append({
             "key": "body_blockers_more",
             "field": "",
+            "count": extra,
             "label": f"+{extra} more",
             "message": f"...and {extra} more blocking body-fidelity findings.",
         })
 
     other_findings = [f for f in fidelity_findings if f["severity"] != obsidian_markdown.BLOCKER]
     for finding in other_findings[:BODY_WARNING_LIMIT]:  # cap the noise; the summary carries the rest
+        line = written_line(finding)
         warnings.append({
             "key": f"body_{finding['kind']}",
-            "message": f"line {finding['line']}: {finding['detail']}",
+            "line": line,
+            "message": f"line {line}: {finding['detail']}",
         })
     fidelity_summary = obsidian_markdown.summarize(fidelity_findings)
     if len(other_findings) > BODY_WARNING_LIMIT:

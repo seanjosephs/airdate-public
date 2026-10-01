@@ -1,5 +1,5 @@
 // The essay editor page: drawing it, reading what the writer does, and the
-// round trips (build spec §8, slice 4a).
+// round trips (build spec §8; slice 4a the page and save, 4b send).
 //
 // The rules live in editor.js and are tested there. This file only moves
 // values between the page and that state object, which is the single source
@@ -31,10 +31,22 @@
   let conflictShown = false;
   let heightTimer = 0;
   let countFrame = 0;
+  // Send (slice 4b). `substack` is the last /api/substack/status: undefined
+  // while it is being read, null when it could not be.
+  let substack;
+  let readiness = { state: 'loading', rows: [], source: false, connection: [], at: null };
+  let checkToken = 0;
+  let statusToken = 0;
+  let sending = false;
+  let refused = false;
+  let madeDraft = null;
 
   const CHIP_X = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const DOT = '<span class="ed-state-dot" aria-hidden="true"></span>';
   const CHECK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const WARN = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></svg>';
+  const GO = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg>';
+  const OUT = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 5h5v5M19 5l-8 8M11 7H6v11h11v-5"/></svg>';
 
   function $(id) { return document.getElementById(id); }
   const esc = (value) => Cards.escapeHtml(value);
@@ -109,6 +121,8 @@
     Feedback.clear(els.feedback);
     Feedback.clear(els.heroFeedback);
     Feedback.clear(els.resizeFeedback);
+    Feedback.clear(els.moreFeedback);
+    Feedback.clear(els.readinessFeedback);
     hide();
     state = null;
     essay = null;
@@ -191,7 +205,7 @@
         window.history.replaceState(null, '', Editor.editorUrl(state.id));
       }
       els.title.focus();
-      loadSubstack(token);
+      runChecks();
     } catch (error) {
       if (token !== opening) return;
       hide();
@@ -323,6 +337,8 @@
     els.airHint.textContent = air.hint;
     els.airHint.hidden = !air.hint;
     drawNote();
+    drawGates();
+    drawDraftLink();
   }
 
   function drawNote() {
@@ -381,6 +397,7 @@
     // Measured once the page is showing, so an unremembered height reads true.
     drawScriptHeight();
     els.form.removeAttribute('aria-busy');
+    resetSend();
     refreshState();
   }
 
@@ -552,7 +569,7 @@
   }
 
   async function save() {
-    if (!state || saving) return false;
+    if (!state || saving || sending) return false;
     commitTagInput();
     if (conflictShown) {
       els.conflictSay.focus();
@@ -582,6 +599,7 @@
       drawHeader();
       drawRail();
       drawReadOnly();
+      runReadiness();
       return true;
     } catch (error) {
       if (token !== opening || !state) return false;
@@ -698,6 +716,7 @@
       drawHero();
       refreshState();
       Feedback.plaque(els.heroFeedback, { tone: 'green', text: 'the image is in your vault and the note points to it.' });
+      runReadiness();
     } catch (error) {
       if (token !== opening || !state) return;
       if (error && error.kind === 'file-changed') {
@@ -740,37 +759,617 @@
     });
   }
 
-  // ---- substack -------------------------------------------------------------
+  // ---- substack: the connection line ----------------------------------------
 
-  function hostOf(url) {
-    return String(url || '').replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  function drawConnection() {
+    const line = Editor.connectionLine(substack, refused);
+    els.conn.className = `ed-conn is-${line.tone === 'connected' ? 'connected' : line.tone === 'checking' ? 'checking' : 'off'}`;
+    els.connName.textContent = line.name;
+    els.connSub.textContent = line.sub;
   }
 
-  async function loadSubstack(token) {
-    els.conn.className = 'ed-conn is-checking';
-    els.connName.textContent = 'checking substack…';
-    els.connSub.textContent = '';
+  async function loadSubstack() {
+    const token = ++statusToken;
+    const openToken = opening;
+    substack = undefined;
+    drawConnection();
+    drawGates();
+    let next = null;
     try {
-      const status = await Api.getJson('/api/substack/status');
-      if (token !== opening) return;
-      const connector = (status && status.connector) || {};
-      if (status && status.connected) {
-        els.conn.className = 'ed-conn is-connected';
-        els.connName.textContent = 'substack connected';
-        els.connSub.textContent = status.publication_configured ? hostOf(status.publication) : 'add your substack address in settings.';
-        return;
-      }
-      els.conn.className = 'ed-conn is-off';
-      els.connName.textContent = 'substack not connected';
-      if (!connector.paired) els.connSub.textContent = 'pair the airdate connector in obsidian.';
-      else if (!connector.available) els.connSub.textContent = 'open obsidian with the airdate connector on.';
-      else els.connSub.textContent = 'connect substack through obsidian.';
+      next = await Api.getJson('/api/substack/status');
+    } catch (error) {
+      next = null;
+    }
+    if (token !== statusToken || openToken !== opening) return substack;
+    substack = next && typeof next === 'object' ? next : null;
+    drawConnection();
+    drawGates();
+    return substack;
+  }
+
+  // ---- readiness: the list --------------------------------------------------
+
+  function runChecks() {
+    return Promise.all([loadSubstack(), runReadiness()]);
+  }
+
+  // What a preflight is told: what a save would write now.
+  function preflightPayload() {
+    const payload = { publish: Editor.publishValues(state) };
+    if (state.body !== state.bodyBaseline) payload.body = state.body;
+    return payload;
+  }
+
+  async function runReadiness() {
+    if (!state) return;
+    const token = ++checkToken;
+    const openToken = opening;
+    readiness = { ...readiness, state: 'loading' };
+    els.check.setAttribute('aria-busy', 'true');
+    drawReadinessHead();
+    drawGates();
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(state.id)}/preflight`, preflightPayload());
+      if (token !== checkToken || openToken !== opening || !state) return;
+      applyPreflight(result);
+    } catch (error) {
+      if (token !== checkToken || openToken !== opening || !state) return;
+      readiness = { state: 'error', rows: [], source: false, connection: [], at: new Date() };
+      drawReadiness();
+      const text = error && error.kind === 'network'
+        ? 'airdate is not answering, so readiness was not checked. try again.'
+        : `readiness was not checked. ${String((error && error.message) || 'try again.').toLowerCase()}`;
+      els.readinessHead.className = 'ed-readiness-head is-bad';
+      els.readinessHead.innerHTML = `${WARN}<span></span>`;
+      els.readinessHead.querySelector('span').textContent = text;
+    } finally {
+      if (token === checkToken) els.check.removeAttribute('aria-busy');
+      drawGates();
+    }
+  }
+
+  function applyPreflight(result) {
+    const list = Editor.readinessList(result, state.values, visibility, state.body);
+    readiness = { state: 'done', rows: list.rows, source: list.source, connection: list.connection, at: new Date() };
+    madeDraft = null;
+    drawReadiness();
+    drawGates();
+  }
+
+  function drawReadinessHead() {
+    const head = els.readinessHead;
+    if (readiness.state === 'loading') {
+      head.className = 'ed-readiness-head';
+      head.textContent = 'checking…';
+      return;
+    }
+    if (readiness.state !== 'done') return;
+    const count = readiness.rows.length;
+    head.className = `ed-readiness-head ${count ? 'is-bad' : 'is-good'}`;
+    head.innerHTML = `${count ? WARN : CHECK}<span></span>`;
+    head.querySelector('span').textContent = Editor.readinessHeading(count, readiness.at);
+  }
+
+  function rowMarkup(row, index) {
+    const words = `<span class="ed-ready-dot" aria-hidden="true"></span><span class="ed-ready-text">${esc(row.text)}</span>`;
+    if (row.kind === 'source') {
+      return `<li><button type="button" class="ed-ready-row" data-make-draft="1">${words}`
+        + `<span class="ed-ready-go">${esc(row.action)}${GO}</span></button></li>`;
+    }
+    const target = row.target ? $(row.target) : null;
+    if (!target || !isShown(target)) return `<li><p class="ed-ready-row is-static">${words}</p></li>`;
+    const line = Number.isInteger(row.line) ? ` data-line="${row.line}"` : '';
+    return `<li><a class="ed-ready-row" href="#${esc(row.target)}" data-target="${esc(row.target)}" data-row="${index}"${line}>${words}`
+      + `<span class="ed-ready-go">${esc(row.action || 'go to it')}${GO}</span></a></li>`;
+  }
+
+  function isShown(el) {
+    return Boolean(el && el.isConnected && !el.closest('[hidden]'));
+  }
+
+  function drawReadiness() {
+    drawReadinessHead();
+    els.readinessList.innerHTML = readiness.rows.map(rowMarkup).join('');
+    els.readinessList.hidden = !readiness.rows.length;
+    drawProblems();
+  }
+
+  // The same sentence under the field, with an amber border. Plain text:
+  // the list is the live region, so nothing is read out twice.
+  function drawProblems() {
+    for (const el of els.root.querySelectorAll('.ed-problem')) el.remove();
+    for (const el of els.root.querySelectorAll('.has-problem')) el.classList.remove('has-problem');
+    for (const row of readiness.rows) {
+      if (!row.target || row.target === 'ed-save') continue;
+      const target = $(row.target);
+      const holder = target && target.closest('.ed-field, .ed-fieldset, .ed-script');
+      if (!holder || !isShown(holder)) continue;
+      holder.classList.add('has-problem');
+      const note = document.createElement('p');
+      note.className = 'ed-problem';
+      note.textContent = row.text;
+      holder.appendChild(note);
+    }
+  }
+
+  function reducedMotion() {
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  // A row's link: scroll to the field, focus it, and for a line of the
+  // script put the caret there. Never the address bar: the room keeps its own
+  // state in the hash.
+  function goToRow(link) {
+    const target = $(link.dataset.target);
+    if (!target) return;
+    const holder = target.closest('.ed-field, .ed-fieldset, .ed-script') || target;
+    holder.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
+    target.focus({ preventScroll: true });
+    if (link.dataset.line && target === els.script && state) {
+      const range = Editor.lineRange(state.body, Number(link.dataset.line));
+      els.script.setSelectionRange(range.start, range.end);
+    }
+  }
+
+  // A source note is never sent. Its row makes the linked draft, which is a
+  // new note: this one is not touched.
+  async function makeLinkedDraft(button) {
+    if (!state) return;
+    const token = opening;
+    button.setAttribute('aria-busy', 'true');
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(state.id)}/create-draft`, {});
+      if (token !== opening || !state) return;
+      madeDraft = { id: String(result.draft_essay_id || ''), title: String((result.draft && result.draft.title) || 'the draft') };
+      const item = button.closest('li');
+      item.innerHTML = `<p class="ed-ready-row is-static is-good"><span class="ed-ready-text">made a linked draft: ${esc(madeDraft.title)}. </span>`
+        + `<a class="ed-ready-open" href="${esc(Editor.editorUrl(madeDraft.id))}" data-open-draft="${esc(madeDraft.id)}">open it</a></p>`;
+      const row = result.draft && result.draft.row;
+      if (row) document.dispatchEvent(new CustomEvent('room:essay', { detail: { oldId: '', essay: row, source: 'editor' } }));
+      item.querySelector('a').focus();
     } catch (error) {
       if (token !== opening) return;
-      els.conn.className = 'ed-conn is-off';
-      els.connName.textContent = 'substack status unknown';
-      els.connSub.textContent = 'airdate could not check. it looks again when you next open an essay.';
+      const text = error && error.kind === 'network'
+        ? 'airdate is not answering, so no draft was made. try again.'
+        : `no draft was made. ${String((error && error.message) || 'try again.').toLowerCase()}`;
+      Feedback.plaque(els.readinessFeedback, { tone: 'red', text });
+    } finally {
+      button.removeAttribute('aria-busy');
     }
+  }
+
+  // ---- send: the button and its line ------------------------------------------
+
+  function currentGates() {
+    return Editor.sendGates({
+      substack,
+      status: phaseEssay().status,
+      readiness: { state: readiness.state, count: Editor.blockingCount(readiness.rows), source: readiness.source },
+      connection: readiness.connection,
+    });
+  }
+
+  function drawGates() {
+    if (!state || !els.send) return;
+    const gates = currentGates();
+    els.send.disabled = sending || !gates.open;
+    els.send.classList.toggle('is-busy', sending);
+    if (sending) els.send.setAttribute('aria-busy', 'true');
+    else els.send.removeAttribute('aria-busy');
+    els.sendLabel.textContent = sending ? 'sending to substack' : 'send to substack';
+    const why = !sending && !gates.open ? gates.line : '';
+    els.sendWhyText.textContent = why;
+    els.sendWhy.hidden = !why;
+    const resultShown = !els.sendResult.hidden;
+    els.sendCaption.hidden = Boolean(why) || resultShown;
+    els.send.setAttribute('aria-describedby', why ? 'ed-send-why' : resultShown ? 'ed-send-result' : 'ed-send-caption');
+  }
+
+  function drawDraftLink() {
+    const url = String((state && state.frontmatter && state.frontmatter.substack_draft_url) || '').trim();
+    const show = /^https:\/\//i.test(url) && els.sendResult.hidden;
+    els.draftLink.hidden = !show;
+    if (show) els.draftLinkA.href = url;
+  }
+
+  function clearResult() {
+    els.sendResult.hidden = true;
+    els.sendResult.className = 'ed-send-result';
+    els.sendResult.removeAttribute('role');
+    els.sendResult.innerHTML = '';
+  }
+
+  function resetSend() {
+    sending = false;
+    refused = false;
+    madeDraft = null;
+    readiness = { state: 'loading', rows: [], source: false, connection: [], at: null };
+    clearResult();
+    els.readinessHead.textContent = '';
+    els.readinessList.innerHTML = '';
+    for (const el of els.root.querySelectorAll('.ed-problem')) el.remove();
+    for (const el of els.root.querySelectorAll('.has-problem')) el.classList.remove('has-problem');
+    setMore(false);
+    hidePreview();
+    drawGates();
+    drawDraftLink();
+  }
+
+  function showSuccess(result) {
+    const done = Editor.sendSuccess(result);
+    els.sendResult.className = 'ed-send-result is-good';
+    els.sendResult.setAttribute('role', 'status');
+    let html = `<p class="ed-send-result-say">${CHECK}<span>${esc(done.text)}</span></p>`;
+    if (done.url) html += `<p class="ed-send-result-actions"><a class="ed-send-open" href="${esc(done.url)}" target="_blank" rel="noopener">open the draft in substack${OUT}</a></p>`;
+    if (done.warnings.length) {
+      const noun = done.warnings.length === 1 ? 'thing substack did not take' : 'things substack did not take';
+      html += `<p class="ed-send-result-more">${done.warnings.length} ${noun}: ${done.warnings.map(esc).join(' · ')}</p>`;
+    }
+    els.sendResult.innerHTML = html;
+    els.sendResult.hidden = false;
+  }
+
+  function actionMarkup(action, failure) {
+    if (action === 'connect') return '<button type="button" class="ed-fail-button" data-send-action="connect">sign in through obsidian</button>';
+    if (action === 'retry') return '<button type="button" class="ed-fail-button is-primary" data-send-action="retry">try again</button>';
+    if (action === 'forget') return '<button type="button" class="ed-fail-button" data-send-action="forget">forget the link and send again</button>';
+    if (action === 'open-substack') {
+      const url = Editor.substackCheckUrl(substack, state && state.frontmatter);
+      return url ? `<a class="ed-fail-button" href="${esc(url)}" target="_blank" rel="noopener">open substack${OUT}</a>` : '';
+    }
+    return '';
+  }
+
+  function showFailure(failure) {
+    els.sendResult.className = 'ed-send-result is-bad';
+    els.sendResult.setAttribute('role', 'alert');
+    els.sendResult.dataset.stale = failure.stale || '';
+    const actions = failure.actions.map((action) => actionMarkup(action, failure)).join('');
+    els.sendResult.innerHTML = `<p class="ed-send-result-say">${WARN}<span>${esc(failure.sentence)}</span></p>`
+      + (actions ? `<div class="ed-send-result-actions">${actions}</div>` : '')
+      + '<p class="ed-send-result-more" data-send-note hidden></p>';
+    els.sendResult.hidden = false;
+  }
+
+  function sendNote(text) {
+    const note = els.sendResult.querySelector('[data-send-note]');
+    if (!note) return;
+    note.textContent = text;
+    note.hidden = !text;
+  }
+
+  // Signs in again through the Obsidian connector. True only when the
+  // session is back: a sign-in window that merely opened is not a connection.
+  async function reconnect() {
+    try {
+      const result = await Api.postJson('/api/substack/connect', {});
+      return { ok: Boolean(result && result.ok && !result.pending), pending: Boolean(result && result.pending) };
+    } catch (error) {
+      return { ok: false, pending: false, error };
+    }
+  }
+
+  // The whole press: save first (the server does it as part of the send),
+  // adopt what that save left whatever becomes of the send, and try once more
+  // only after a refused session the writer has signed back in to.
+  async function send() {
+    if (!state || sending || saving) return;
+    commitTagInput();
+    if (conflictShown) {
+      els.conflictSay.focus();
+      return;
+    }
+    if (!currentGates().open) return;
+    const token = opening;
+    const hadFocus = document.activeElement === els.send;
+    sending = true;
+    clearResult();
+    drawGates();
+    drawDraftLink();
+    refreshState();
+    let result = null;
+    let attempts = 0;
+    let signIn = null;
+    try {
+      for (;;) {
+        attempts += 1;
+        const sent = Editor.snapshot(state);
+        const payload = Editor.savePayload(state);
+        const oldId = state.id;
+        const request = {
+          updates: payload.updates,
+          expected_mtime: payload.expected_mtime,
+          expected_content_hash: payload.expected_content_hash,
+        };
+        if ('body' in payload) request.body = payload.body;
+        result = await Api.postJson(`/api/essays/${encodeURIComponent(oldId)}/send`, request);
+        if (token !== opening || !state) {
+          leftBehind(result);
+          return;
+        }
+        const saved = result && result.saved_state && result.saved_state.mtime != null;
+        state = Editor.adoptSend(state, sent, payload, result);
+        if (saved) savedAt = new Date();
+        followId(oldId);
+        if (result && !result.ok && result.error_kind === 'auth' && attempts === 1) {
+          signIn = await reconnect();
+          if (token !== opening || !state) return;
+          if (Editor.shouldRetrySend(result, attempts, signIn.ok)) continue;
+        }
+        break;
+      }
+      await finishSend(result, signIn);
+    } catch (error) {
+      if (token !== opening || !state) {
+        leftBehind({ error_kind: error && error.kind === 'network' ? 'network' : 'http', message: error && error.message });
+        return;
+      }
+      if (error && error.kind === 'file-changed') {
+        showConflict();
+      } else {
+        const kind = error && ['network', 'setup', 'refused'].includes(error.kind) ? error.kind : 'http';
+        const outcome = error && error.kind === 'not-found'
+          ? { error_kind: 'refused', message: 'the note is no longer in your essays folder' }
+          : { error_kind: kind, message: error && error.message };
+        showFailure(Editor.sendFailure(outcome, substack, 0));
+      }
+    } finally {
+      if (token === opening && state) {
+        sending = false;
+        drawHeader();
+        drawRail();
+        drawReadOnly();
+        refreshState();
+        // A disabled button drops focus; hand it to what answered.
+        if (hadFocus && (document.activeElement === document.body || !document.activeElement)) {
+          if (!els.sendResult.hidden) els.sendResult.focus();
+          else if (!els.send.disabled) els.send.focus();
+        }
+      }
+    }
+  }
+
+  async function finishSend(result, signIn) {
+    if (result && result.ok) {
+      refused = false;
+      drawConnection();
+      showSuccess(result);
+      refreshRow();
+      return;
+    }
+    const kind = String((result && result.error_kind) || 'transport');
+    if (kind === 'blocked' && result.preflight) applyPreflight(result.preflight);
+    if (kind === 'auth') {
+      refused = true;
+      drawConnection();
+    }
+    // A failure before the connector is worded from the connection as it is now.
+    if (kind === 'transport' && !(result && result.transport)) await loadSubstack();
+    showFailure(Editor.sendFailure(result, substack, readiness.rows.length));
+    if (kind === 'auth' && signIn) {
+      if (signIn.pending) sendNote('the substack sign-in is open in obsidian. finish it there, then try again.');
+      else if (signIn.error) sendNote('obsidian did not open the substack sign-in. sign in through obsidian, then try again.');
+    }
+  }
+
+  // The fresh card for the pool and the board: a sent essay reads differently.
+  async function refreshRow() {
+    if (!state) return;
+    const id = state.id;
+    const token = opening;
+    try {
+      const detail = await Api.getJson(`/api/essays/${encodeURIComponent(id)}`);
+      if (token !== opening || !state) return;
+      if (detail && detail.row) announceRow(id, detail.row);
+    } catch (error) {
+      // The card catches up on the next index read.
+    }
+  }
+
+  // The editor closed before the reply: the sentence goes on the slip.
+  function leftBehind(result) {
+    if (result && result.ok) {
+      Feedback.slip({ tone: 'green', text: 'the draft is in substack. airdate did not publish it.' });
+      return;
+    }
+    Feedback.slip({ tone: 'red', text: Editor.sendFailure(result || {}, substack, 0).sentence });
+  }
+
+  // ---- send: forgetting a draft link Substack no longer has -------------------
+  //
+  // Asked in the page. Clearing the link is the writer saying the draft was
+  // deleted; if it was published instead, a new draft would copy a live post.
+
+  function askForget(stale) {
+    els.sendResult.className = 'ed-send-result is-bad';
+    els.sendResult.setAttribute('role', 'alert');
+    els.sendResult.innerHTML = `<p class="ed-send-result-say">${WARN}<span>forget draft ${esc(stale)} and send this as a new draft? `
+      + 'do it only if you deleted that draft in substack. if it was published, a new draft would copy a post that is already live.</span></p>'
+      + '<div class="ed-send-result-actions">'
+      + '<button type="button" class="ed-fail-button is-primary" data-send-action="forget-yes">forget it and send</button>'
+      + '<button type="button" class="ed-fail-button" data-send-action="forget-no">keep the link</button>'
+      + '</div><p class="ed-send-result-more" data-send-note hidden></p>';
+    els.sendResult.dataset.stale = stale;
+    els.sendResult.hidden = false;
+    els.sendResult.querySelector('[data-send-action="forget-no"]').focus();
+  }
+
+  async function forgetAndSend() {
+    if (!state) return;
+    const token = opening;
+    const button = els.sendResult.querySelector('[data-send-action="forget-yes"]');
+    if (button) button.setAttribute('aria-busy', 'true');
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(state.id)}/forget-draft-link`, {
+        expected_mtime: state.fileState.mtime,
+        expected_content_hash: state.fileState.content_hash,
+      });
+      if (token !== opening || !state) return;
+      const oldId = state.id;
+      state = Editor.adoptForget(state, result);
+      followId(oldId);
+      drawDraftLink();
+      await send();
+    } catch (error) {
+      if (token !== opening || !state) return;
+      if (error && error.kind === 'file-changed') {
+        clearResult();
+        drawGates();
+        showConflict();
+        return;
+      }
+      sendNote(error && error.kind === 'network'
+        ? 'airdate is not answering, so the link is still on the note. try again.'
+        : 'the link is still on the note. try again.');
+    } finally {
+      if (button) button.removeAttribute('aria-busy');
+    }
+  }
+
+  async function onSendAction(event) {
+    const button = event.target.closest('[data-send-action]');
+    if (!button || !state) return;
+    const action = button.dataset.sendAction;
+    if (action === 'retry') {
+      send();
+    } else if (action === 'connect') {
+      button.setAttribute('aria-busy', 'true');
+      const signIn = await reconnect();
+      button.removeAttribute('aria-busy');
+      if (signIn.ok) {
+        refused = false;
+        drawConnection();
+        sendNote('substack is signed in again. try again.');
+      } else if (signIn.pending) {
+        sendNote('the substack sign-in is open in obsidian. finish it there, then try again.');
+      } else {
+        sendNote('obsidian did not open the substack sign-in. check that obsidian is open with the airdate connector on.');
+      }
+    } else if (action === 'forget') {
+      askForget(els.sendResult.dataset.stale || '');
+    } else if (action === 'forget-no') {
+      clearResult();
+      drawGates();
+      drawDraftLink();
+      els.send.focus();
+    } else if (action === 'forget-yes') {
+      forgetAndSend();
+    }
+  }
+
+  // ---- more: the thumbnail prompt and the markdown preview --------------------
+
+  function setMore(open) {
+    els.moreButton.setAttribute('aria-expanded', String(open));
+    els.morePanel.hidden = !open;
+  }
+
+  function hidePreview() {
+    els.previewBox.hidden = true;
+    els.previewText.textContent = '';
+  }
+
+  async function copyThumbnailPrompt() {
+    if (!state) return;
+    const token = opening;
+    els.thumbPrompt.setAttribute('aria-busy', 'true');
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(state.id)}/thumbnail-prompt`, {
+        publish: Editor.publishValues(state),
+      });
+      if (token !== opening) return;
+      const prompt = String((result && result.prompt) || '').trim();
+      if (!prompt) throw new Error('airdate made an empty prompt.');
+      try {
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') throw new Error('no clipboard');
+        await navigator.clipboard.writeText(prompt);
+        // The ChatGPT bridge (Product Bible #8): copy the prompt, open ChatGPT,
+        // and the writer drags the image back onto the hero. Kept by Sean on
+        // 2026-09-30 over the design's copy-only "for your image tool". It
+        // opens only after the copy worked, as the old page did.
+        window.open('https://chatgpt.com', '_blank', 'noopener');
+        Feedback.plaque(els.moreFeedback, { tone: 'green', text: 'the prompt is on your clipboard and chatgpt is open. make the image there, then drop it on the hero.' });
+      } catch (error) {
+        showPreview(prompt, 'the thumbnail prompt');
+        els.previewText.focus();
+        Feedback.plaque(els.moreFeedback, { tone: 'amber', text: 'the browser would not copy it. the prompt is below, so copy it with the keyboard.' });
+      }
+    } catch (error) {
+      if (token !== opening) return;
+      const text = error && error.kind === 'network'
+        ? 'airdate is not answering, so there is no prompt. try again.'
+        : `there is no prompt. ${String((error && error.message) || 'try again.').toLowerCase()}`;
+      Feedback.plaque(els.moreFeedback, { tone: 'red', text });
+    } finally {
+      els.thumbPrompt.removeAttribute('aria-busy');
+    }
+  }
+
+  function showPreview(text, label) {
+    els.previewText.textContent = text;
+    els.previewText.setAttribute('aria-label', label);
+    els.previewBox.hidden = false;
+  }
+
+  async function previewMarkdown() {
+    if (!state) return;
+    const token = opening;
+    els.preview.setAttribute('aria-busy', 'true');
+    try {
+      const payload = Editor.savePayload(state);
+      const request = { updates: payload.updates };
+      if ('body' in payload) request.body = payload.body;
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(state.id)}/preview`, request);
+      if (token !== opening) return;
+      Feedback.clear(els.moreFeedback);
+      showPreview(String((result && result.preview_markdown) || ''), 'markdown preview');
+      els.previewText.focus();
+    } catch (error) {
+      if (token !== opening) return;
+      const text = error && error.kind === 'network'
+        ? 'airdate is not answering, so there is no preview. try again.'
+        : `there is no preview. ${String((error && error.message) || 'try again.').toLowerCase()}`;
+      Feedback.plaque(els.moreFeedback, { tone: 'red', text });
+    } finally {
+      els.preview.removeAttribute('aria-busy');
+    }
+  }
+
+  function bindSend() {
+    els.send.addEventListener('click', send);
+    els.sendResult.addEventListener('click', onSendAction);
+    els.check.addEventListener('click', runChecks);
+    els.readinessList.addEventListener('click', (event) => {
+      const make = event.target.closest('[data-make-draft]');
+      if (make) {
+        makeLinkedDraft(make);
+        return;
+      }
+      const openDraft = event.target.closest('[data-open-draft]');
+      if (openDraft) {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        const id = openDraft.dataset.openDraft;
+        if (state && Editor.writerEdited(state)) {
+          Feedback.plaque(els.readinessFeedback, { tone: 'amber', text: 'save this essay or close it first, then open the draft.' });
+          return;
+        }
+        close();
+        open(id, { push: true });
+        return;
+      }
+      const link = event.target.closest('a[data-target]');
+      if (!link) return;
+      event.preventDefault();
+      goToRow(link);
+    });
+    els.moreButton.addEventListener('click', () => setMore(els.moreButton.getAttribute('aria-expanded') !== 'true'));
+    els.thumbPrompt.addEventListener('click', copyThumbnailPrompt);
+    els.preview.addEventListener('click', previewMarkdown);
+    els.previewHide.addEventListener('click', () => {
+      hidePreview();
+      els.preview.focus();
+    });
   }
 
   // ---- wiring ---------------------------------------------------------------
@@ -874,6 +1473,7 @@
 
     bindHero();
     bindResize();
+    bindSend();
 
     // A plain click on a card title opens the editor in place. A modified
     // click or a middle click is the browser's: a new tab loads the room with
@@ -978,6 +1578,26 @@
     els.notePin = $('ed-note-pin');
     els.noteTitle = $('ed-note-title');
     els.noteDate = $('ed-note-date');
+    els.send = $('ed-send');
+    els.sendLabel = $('ed-send-label');
+    els.sendWhy = $('ed-send-why');
+    els.sendWhyText = $('ed-send-why-text');
+    els.sendCaption = $('ed-send-caption');
+    els.sendResult = $('ed-send-result');
+    els.draftLink = $('ed-draft-link');
+    els.draftLinkA = $('ed-draft-link-a');
+    els.check = $('ed-check');
+    els.readinessHead = $('ed-readiness-head');
+    els.readinessList = $('ed-readiness-list');
+    els.readinessFeedback = $('ed-readiness-feedback');
+    els.moreButton = $('ed-more-button');
+    els.morePanel = $('ed-more-panel');
+    els.thumbPrompt = $('ed-thumb-prompt');
+    els.preview = $('ed-preview');
+    els.moreFeedback = $('ed-more-feedback');
+    els.previewBox = $('ed-preview-box');
+    els.previewText = $('ed-preview-text');
+    els.previewHide = $('ed-preview-hide');
     els.pads = Array.from(els.root.querySelectorAll('.ed-pad'));
     els.colors = Array.from(els.root.querySelectorAll('.ed-color'));
     bind();
