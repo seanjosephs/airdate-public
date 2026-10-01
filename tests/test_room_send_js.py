@@ -476,3 +476,30 @@ return {{ fm: next.frontmatter, file: next.fileState }};
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PressSaveDoesNotBlockSendTests(unittest.TestCase):
+    """Sean, 2026-09-30: the 'press save' row does not block send.
+
+    Pressing send saves first, which fills in exactly the details that row is
+    about, so blocking on it only forces a save and then a send. The row stays
+    in the list - it is still true and worth seeing - it just does not shut the
+    button. Every other row still blocks."""
+
+    def test_the_press_save_row_is_not_counted_as_blocking(self):
+        rows = [{"key": "persisted", "text": "press save: 3 details are not in the note yet"}]
+        self.assertEqual(run(f"return E.blockingCount({js(rows)});"), 0)
+
+    def test_a_real_problem_still_counts(self):
+        rows = [
+            {"key": "persisted", "text": "press save: 3 details are not in the note yet"},
+            {"key": "hero", "text": "no hero image yet"},
+        ]
+        self.assertEqual(run(f"return E.blockingCount({js(rows)});"), 1)
+
+    def test_a_press_save_only_list_leaves_the_readiness_gate_open(self):
+        self.assertIsNone(run("return E.readinessGate({state: 'ready', count: 0});"))
+
+    def test_nothing_at_all_blocks_nothing(self):
+        self.assertEqual(run("return E.blockingCount([]);"), 0)
+        self.assertEqual(run("return E.blockingCount(null);"), 0)

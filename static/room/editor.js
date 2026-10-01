@@ -748,6 +748,15 @@
   }
 
   // Gate 3. readiness: { state: 'loading' | 'error' | 'done', count, source }.
+  // How many readiness rows shut the send button. The 'press save' row is not
+  // one of them: pressing send saves first, which fills in exactly those
+  // details, so it would only force a save and then a send. It stays in the
+  // list, because it is still true; it just does not block. (Sean, 2026-09-30.)
+  function blockingCount(rows) {
+    if (!Array.isArray(rows)) return 0;
+    return rows.filter((row) => row && row.key !== 'persisted').length;
+  }
+
   function readinessGate(readiness) {
     const r = readiness || {};
     if (r.state === 'loading' || !r.state) return { problem: 'checking readiness', action: 'wait a moment', clause: 'wait for readiness', pending: true };
@@ -1004,6 +1013,7 @@
   }
 
   return {
+    blockingCount,
     FIELDS,
     NEVER_SEND,
     CONTROL_DEFAULTS,

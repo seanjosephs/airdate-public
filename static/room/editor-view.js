@@ -944,7 +944,7 @@
     return Editor.sendGates({
       substack,
       status: phaseEssay().status,
-      readiness: { state: readiness.state, count: readiness.rows.length, source: readiness.source },
+      readiness: { state: readiness.state, count: Editor.blockingCount(readiness.rows), source: readiness.source },
       connection: readiness.connection,
     });
   }
@@ -1283,7 +1283,12 @@
       try {
         if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') throw new Error('no clipboard');
         await navigator.clipboard.writeText(prompt);
-        Feedback.plaque(els.moreFeedback, { tone: 'green', text: 'the prompt is on your clipboard. make the image, then drop it on the hero.' });
+        // The ChatGPT bridge (Product Bible #8): copy the prompt, open ChatGPT,
+        // and the writer drags the image back onto the hero. Kept by Sean on
+        // 2026-09-30 over the design's copy-only "for your image tool". It
+        // opens only after the copy worked, as the old page did.
+        window.open('https://chatgpt.com', '_blank', 'noopener');
+        Feedback.plaque(els.moreFeedback, { tone: 'green', text: 'the prompt is on your clipboard and chatgpt is open. make the image there, then drop it on the hero.' });
       } catch (error) {
         showPreview(prompt, 'the thumbnail prompt');
         els.previewText.focus();
@@ -1334,13 +1339,6 @@
     els.send.addEventListener('click', send);
     els.sendResult.addEventListener('click', onSendAction);
     els.check.addEventListener('click', runChecks);
-    els.attach.addEventListener('click', () => {
-      if (conflictShown) {
-        els.conflictSay.focus();
-        return;
-      }
-      els.heroFile.click();
-    });
     els.readinessList.addEventListener('click', (event) => {
       const make = event.target.closest('[data-make-draft]');
       if (make) {
@@ -1592,7 +1590,6 @@
     els.readinessHead = $('ed-readiness-head');
     els.readinessList = $('ed-readiness-list');
     els.readinessFeedback = $('ed-readiness-feedback');
-    els.attach = $('ed-attach');
     els.moreButton = $('ed-more-button');
     els.morePanel = $('ed-more-panel');
     els.thumbPrompt = $('ed-thumb-prompt');
