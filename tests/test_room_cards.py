@@ -220,7 +220,7 @@ class StarDateSidecarTests(StarRouteCase):
     def test_a_failed_write_leaves_no_star_date(self):
         essay_id = self.note("Busy.md", uid="4a" * 16)
         with self.assertRaises(self.server.EssayConflictError):
-            self.server.star_essay(essay_id, {"starred": True, "expected_content_hash": "stale"})
+            self.server.star_essay(essay_id, {"starred": True, "expected_content_hash": "0" * 64})
         self.assertNotIn(essay_id, self.server.load_starred())
         self.assertIn("title", self.text("Busy.md"))
         self.assertNotIn("Writers Likey", self.text("Busy.md"))
@@ -324,7 +324,8 @@ class StarHttpTests(StarRouteCase):
             with urllib.request.urlopen(request, timeout=10) as response:
                 return response.status, json.loads(response.read())
         except urllib.error.HTTPError as exc:
-            return exc.code, json.loads(exc.read())
+            with exc:
+                return exc.code, json.loads(exc.read())
 
     def test_a_star_answers_200_with_the_row(self):
         essay_id = self.note("Wire.md", uid="8a" * 16)

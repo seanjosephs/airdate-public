@@ -4,6 +4,18 @@
 (function installAirdateWizard(root) {
   const el = (id) => document.getElementById(id);
 
+  // The wizard is a modal. Everything else on the page stops taking focus and
+  // clicks while it is open (the editor does the same with its background),
+  // so Tab cannot walk out of it into the sidebar. Returns the function that
+  // gives the page back exactly as it was: what was inert before stays inert.
+  function shelter(wizard) {
+    const changed = [...document.body.children].filter((node) => node !== wizard && !node.inert);
+    for (const node of changed) node.inert = true;
+    return function release() {
+      for (const node of changed) node.inert = false;
+    };
+  }
+
   function open({ status, getJson, postJson, escapeHtml, onFinish }) {
     const wizard = el('wizard');
     const form = el('wizard-form');
@@ -13,6 +25,7 @@
     const pathsEditable = Boolean(setup.paths_editable);
     let index = 0;
     let busy = false;
+    let release = () => {};
 
     function setMessage(message, kind = '') {
       const node = el('wizard-messages');
@@ -40,8 +53,6 @@
         })),
       };
       if (pathsEditable) out.vault_path = f.vault_path.value.trim();
-      // The room adds a "metadata" step (editor.mode); the old page has none,
-      // so f.editor_mode is undefined there and this stays a no-op.
       if (f.editor_mode) out.editor_mode = f.editor_mode.value;
       return out;
     }
@@ -62,7 +73,7 @@
         ['totems', p.totems_enabled ? p.totems.map((t) => t.label).join(', ') : 'off'],
         ['tags', p.tag_presets.length ? p.tag_presets.map((t) => t.name).join(', ') : 'no presets yet'],
         ...(form.elements.editor_mode ? [['metadata', p.editor_mode === 'complete' ? 'complete' : 'simplified']] : []),
-        ['calendar', p.publish_day ? `${p.publish_day}s` : 'off'],
+        ['board', p.publish_day ? `${p.publish_day}s` : 'off'],
       ];
       el('wizard-summary').innerHTML = rows
         .map(([name, value]) => `<div><dt>${escapeHtml(name)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
@@ -139,6 +150,7 @@
       }
       wizard.classList.add('hidden');
       document.body.classList.remove('wizard-open');
+      release();
       await onFinish();
     }
 
@@ -184,15 +196,17 @@
       <img src="${escapeHtml(slot.image)}" alt="">
       <input name="totem_label" value="${escapeHtml(slot.label)}" aria-label="Totem name" autocomplete="off">
       <input name="totem_color" type="color" value="${escapeHtml(slot.color || '#8092b0')}" aria-label="Totem color">
-      <input class="setup-totem-image" name="totem_image" value="${escapeHtml(slot.image_path || '')}" placeholder="icon: path in your vault, or blank for the placeholder" aria-label="Totem icon path" autocomplete="off" spellcheck="false">
+      <input class="setup-totem-image" name="totem_image" value="${escapeHtml(slot.image_path || '')}" placeholder="art: a path in your vault, or blank for airdate's own art" aria-label="Totem icon path" autocomplete="off" spellcheck="false">
     </div>`).join('');
 
     root.AirdatePresets.mount(el('wizard-presets'), status.config?.tag_presets || []);
 
     wizard.classList.remove('hidden');
     document.body.classList.add('wizard-open');
+    release = shelter(wizard);
     show(0);
   }
 
-  root.AirdateWizard = { open };
+  root.AirdateWizard = { open, shelter };
+  if (typeof module === 'object' && module.exports) module.exports = root.AirdateWizard;
 })(typeof globalThis === 'object' ? globalThis : this);

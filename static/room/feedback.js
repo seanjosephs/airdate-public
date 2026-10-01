@@ -1,7 +1,6 @@
 // What airdate says after the writer does something (build spec §7.2).
 //
-// This replaces the old page's showRailSoonStatus, which wrote to an element
-// that never existed, so its sentences reached nobody. Two places only:
+// Two places only:
 //
 //   the plaque  under the thing just touched (a slot, a note, a card). First
 //               choice, always, while that thing is on screen.

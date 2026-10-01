@@ -998,7 +998,7 @@ def main() -> int:
         checks.append("Send failure truth: connector auth/timeout/no-session reach the editor typed")
         check_connector_classification(checks)
 
-        # --- Status lifecycle: set-status → ready-for-air → unschedule → archive ---
+        # --- Status lifecycle: star → ready-for-air → unschedule → archive → back-to-room ---
         (essays_dir / "Smoke" / "Lifecycle Fixture.md").write_text(
             """---
 title: "Lifecycle Smoke Fixture"
@@ -1019,7 +1019,14 @@ Lifecycle fixture body — must survive every move byte-for-byte.
         life_id = life["id"]
 
         st, _, res = json_request(base, f"/api/essays/{life_id}/set-status", {"status": "Writers Likey"})
-        assert_true(st == 200 and res.get("status") == "Writers Likey", f"set-status → Writers Likey failed: {res}")
+        assert_true(st == 404, f"/set-status is gone, but it answered {st}: {res}")
+
+        st, _, res = json_request(base, f"/api/essays/{life_id}/unschedule", {})
+        assert_true(st == 409 and res.get("refused") == "not-on-the-board",
+                    f"unschedule of an essay that is not on the board was not refused: {st} {res}")
+
+        st, _, res = json_request(base, f"/api/essays/{life_id}/star", {"starred": True})
+        assert_true(st == 200 and res.get("status") == "Writers Likey", f"star → Writers Likey failed: {res}")
         life_id = str(res.get("new_id") or life_id)
 
         st, _, res = json_request(base, f"/api/essays/{life_id}/ready-for-air", {"scheduled_at": "2026-08-03"})
@@ -1039,7 +1046,16 @@ Lifecycle fixture body — must survive every move byte-for-byte.
         assert_true(st == 200 and res.get("status") == "Archived", f"archive failed: {res}")
         assert_true(res.get("moved") is True and "Archive/" in res.get("relative_path", ""),
                     f"archive did not move the file into Archive/: {res}")
-        checks.append("Status lifecycle (set-status → ready-for-air → unschedule → archive + folder move) passed")
+        life_id = str(res.get("new_id") or life_id)
+
+        st, _, res = json_request(base, f"/api/essays/{life_id}/back-to-room", {})
+        assert_true(st == 200 and res.get("status") == "Writers Likey", f"back-to-room failed: {res}")
+        assert_true(res.get("moved") is True and res.get("relative_path", "").startswith("Smoke/"),
+                    f"back-to-room did not bring the file back to its category folder: {res}")
+        life_id = str(res.get("new_id") or life_id)
+        _, _, detail = json_request(base, f"/api/essays/{life_id}")
+        assert_true("Lifecycle fixture body" in (detail.get("body") or ""), "lifecycle body was lost across moves")
+        checks.append("Status lifecycle (star → ready-for-air → unschedule → archive → back-to-room + folder moves) passed")
 
         # --- Durable uid: stamped once, stable, resolvable by either token ---
         _, _, listing = json_request(base, "/api/essays?scope=all")

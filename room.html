@@ -4,33 +4,33 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>airdate</title>
-  <link rel="icon" href="/static/brand/airdate-icon-256.png" type="image/png">
+  <link rel="icon" href="/static/brand/airdate-icon-256.png?v=1" type="image/png">
   <link rel="stylesheet" href="/static/room/tokens.css?v=2">
   <link rel="stylesheet" href="/static/room/room.css?v=4">
   <link rel="stylesheet" href="/static/room/cards.css?v=3">
   <link rel="stylesheet" href="/static/room/board.css?v=1">
   <link rel="stylesheet" href="/static/room/editor.css?v=5">
-  <link rel="stylesheet" href="/static/room/settings.css?v=4">
+  <link rel="stylesheet" href="/static/room/settings.css?v=5">
   <link rel="stylesheet" href="/static/room/shelf.css?v=2">
   <link rel="stylesheet" href="/static/room/rainy-day.css?v=1">
   <script src="/static/room/api.js?v=1" defer></script>
-  <script src="/static/room/cards.js?v=6" defer></script>
-  <script src="/static/room/keys.js?v=1" defer></script>
-  <script src="/static/room/feedback.js?v=1" defer></script>
-  <script src="/static/room/pool.js?v=5" defer></script>
-  <script src="/static/room/dates.js?v=2" defer></script>
-  <script src="/static/room/board.js?v=2" defer></script>
-  <script src="/static/room/board-view.js?v=2" defer></script>
-  <script src="/static/room/placing.js?v=2" defer></script>
+  <script src="/static/room/cards.js?v=7" defer></script>
+  <script src="/static/room/keys.js?v=2" defer></script>
+  <script src="/static/room/feedback.js?v=2" defer></script>
+  <script src="/static/room/pool.js?v=8" defer></script>
+  <script src="/static/room/dates.js?v=3" defer></script>
+  <script src="/static/room/board.js?v=3" defer></script>
+  <script src="/static/room/board-view.js?v=3" defer></script>
+  <script src="/static/room/placing.js?v=3" defer></script>
   <script src="/static/room/editor.js?v=4" defer></script>
   <script src="/static/airdate-tour.js?v=6" defer></script>
-  <script src="/static/room/editor-view.js?v=6" defer></script>
+  <script src="/static/room/editor-view.js?v=7" defer></script>
   <script src="/static/airdate-presets.js?v=1" defer></script>
-  <script src="/static/airdate-wizard.js?v=4" defer></script>
-  <script src="/static/room/settings.js?v=5" defer></script>
+  <script src="/static/airdate-wizard.js?v=5" defer></script>
+  <script src="/static/room/settings.js?v=6" defer></script>
   <script src="/static/room/shelf.js?v=5" defer></script>
   <script src="/static/room/shelf-view.js?v=1" defer></script>
-  <script src="/static/room/rainy-day.js?v=2" defer></script>
+  <script src="/static/room/rainy-day.js?v=3" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#room-main">skip to the essays</a>
@@ -95,7 +95,7 @@
 
       <div class="board-legend" id="board-legend" role="status">
         <span class="legend-key"><kbd>A</kbd><span>lifts the note</span></span>
-        <span class="legend-key"><kbd aria-label="left arrow">&larr;</kbd><kbd aria-label="right arrow">&rarr;</kbd><span>move between open mondays</span></span>
+        <span class="legend-key"><kbd aria-label="left arrow">&larr;</kbd><kbd aria-label="right arrow">&rarr;</kbd><span id="board-legend-move">move between open days</span></span>
         <span class="legend-key"><kbd>enter</kbd><span>or</span><kbd>S</kbd><span>sets it</span></span>
         <span class="legend-key"><kbd>esc</kbd><span>puts it back</span></span>
         <span class="board-grow"></span>
@@ -807,8 +807,7 @@
     </section>
   </div>
 
-  <!-- The first-run wizard (slice 5), reusing static/airdate-wizard.js as is:
-       nine steps carried from the old page, plus one new "metadata" step.
+  <!-- The first-run wizard, driven by static/airdate-wizard.js: ten steps.
        Opened by settings.js when /api/app/status says setup.wizard is true. -->
   <div class="wizard hidden" id="wizard" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
     <form class="wizard-shell" id="wizard-form" novalidate>
@@ -819,7 +818,7 @@
 
       <section class="wizard-step" data-step="welcome" data-label="welcome">
         <h2 class="wizard-title">welcome to airdate</h2>
-        <p>airdate is a catalog for the essays in your obsidian vault.</p>
+        <p>airdate is a writers room for the essays in your obsidian vault.</p>
         <p>it walks each one from first draft to ready, and gives it a day on your board.</p>
         <p>it creates substack drafts. it never publishes, schedules or emails.</p>
         <details class="wizard-disclosure">
@@ -899,7 +898,7 @@
           <span><strong>complete</strong><small>everything simplified has, plus advanced, email and comments, seo and social, thumbnail and internal notes. SETUP.md calls this "the full version (complete metadata)".</small></span></label>
       </section>
 
-      <section class="wizard-step" data-step="calendar" data-label="calendar">
+      <section class="wizard-step" data-step="calendar" data-label="board">
         <h2 class="wizard-title">your board</h2>
         <p>pick the day you publish. the board gives you one slot per week on that day.</p>
         <label class="setup-field">

@@ -105,9 +105,9 @@ it with Control-C. To use another port: `AIR_DATE_PORT=8788 ./run-airdate.comman
 
 ## First run
 
-The first time airdate opens, a setup wizard walks you through it one step at
-a time, with back and next. Nothing is saved until you press finish, with one
-exception noted in step 2.
+The first time airdate opens, a setup wizard walks you through ten steps, one
+at a time, with back and next. Nothing is saved until you press finish, with
+one exception noted in step 2.
 
 1. **Welcome**: what airdate does, and the promise that it only ever creates
    drafts.
@@ -124,20 +124,25 @@ exception noted in step 2.
    each folder inside your essays folder a category, and an essay outside any
    folder asks to be filed. No turns categories off and nothing asks to be
    filed.
-5. **Your totems**: five placeholder marks (circle, triangle, square, diamond,
-   star) for telling your kinds of work apart. Rename them, recolor them, and
-   swap any icon for an image in your vault, such as
+5. **Your totems**: five marks for telling your kinds of work apart, with art
+   airdate ships: fox, octopus, bison, elephant and phoenix. Rename them,
+   recolor them, and swap any one's art for an image in your vault, such as
    `Essays/_assets/airdate/fox.png`. Or turn them off.
 6. **Your tags**: optional tag presets, each a name, a color and up to five
-   tags. The editor adds a preset's tags in one click. It starts empty.
-7. **Your board**: your publish day, with Monday preselected. One weekday
+   tags. The editor adds a preset's tags in one click. It starts with three
+   examples (Craft, Culture and Ideas) to edit, delete or add to.
+7. **How much metadata**: simplified (title, subtitle, summary, the script
+   and post settings) or complete (all of that, plus advanced, email and
+   comments, SEO and social, thumbnail and internal notes). Change it later
+   behind the gear in the editor.
+8. **Your board**: your publish day, with Monday preselected. One weekday
    gives you a board with one slot per week on that day. "none" hides the
    board, and with it the way to give an essay an air date.
-8. **Connect Substack**: the three Obsidian steps from the next section, the
+9. **Connect Substack**: the three Obsidian steps from the next section, the
    folder the connector is copied to, and a live check of each step. "I'll do
    this later" is fine; sending stays blocked until it is done.
-9. **Finish**: a summary of your choices. Finish writes
-   `.airdate-data/config.json` and opens your essays.
+10. **Finish**: a summary of your choices. Finish writes
+    `.airdate-data/config.json` and opens your essays.
 
 A short tour follows, once, on the essays view: up to nine stops, each
 pointing at one part of the room. A stop with nothing to point at is skipped
@@ -176,8 +181,9 @@ describes what it stores and what it will run. Then, in Obsidian:
 3. Command palette: **Connect Substack for airdate**, and sign in to Substack
    in the window that opens (Google sign-in works).
 
-Reload airdate's settings page. It should say it is connected through
-Obsidian. Obsidian has to be open for sending to work.
+Reload airdate's settings page. Under "your publication" it should say
+"substack connected", followed by your publication's address once one is set.
+Obsidian has to be open for sending to work.
 
 To sign out, or to switch to a different Substack account, run **Disconnect
 Substack for airdate**, then **Connect Substack for airdate** again.
@@ -221,6 +227,9 @@ Reloading the app itself does not reload the plugin.
   `free_unlock_at`, `canonical_url`, `seo_title`, `seo_description`,
   `social_title`, `social_description`, `social_image`, `hero`,
   `hero_image`, `source_note`, `thumbnail_prompt`, `thumbnail_alt`, `notes`,
+  `note_pad` and `note_color` (how the essay's note looks on the board),
+  `previous_status` and `archived_at` (stamped when you save an essay for a
+  rainy day, cleared when it comes back to the room or goes live), and
   `airdate_uid`. A note with no frontmatter is fine; it gets some the first
   time you file or save it.
 - **`airdate_uid`** is a 32-character id airdate stamps on a note the first

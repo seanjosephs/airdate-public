@@ -51,7 +51,7 @@
   const PAD_COLORS = new Set(['canary', 'blue', 'orange', 'pink', 'green']);
 
   const STAR_PATH = 'M20 4.5 L24.6 15.2 L36.5 16 L27.4 23.8 L30.6 35.5 L20 29 L9.8 35.8 L12.8 23.6 L3.5 16.4 L15.3 15.3 Z';
-  // The gem the old page draws for "open in obsidian", at the card's 26px.
+  // The gem for "open in obsidian", at the card's 26px.
   const OBSIDIAN_GEM = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 4 9l3 13h10l3-13z"/><path d="M12 2 7 22"/><path d="M12 2 17 22"/><path d="M4 9h16"/></svg>';
   const AIR_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.5 6.5 0 0 0 0 9M16.5 7.5a6.5 6.5 0 0 1 0 9M4.5 4.5a10.5 10.5 0 0 0 0 15M19.5 4.5a10.5 10.5 0 0 1 0 15"/></svg>';
   const HANDLE_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M5 7h14M5 12h14M5 17h14"/></svg>';

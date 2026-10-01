@@ -263,7 +263,8 @@ class ParkHttpTests(ParkRouteCase):
             with urllib.request.urlopen(request, timeout=10) as response:
                 return response.status, json.loads(response.read())
         except urllib.error.HTTPError as exc:
-            return exc.code, json.loads(exc.read())
+            with exc:
+                return exc.code, json.loads(exc.read())
 
     def get(self, path):
         with urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}", timeout=10) as response:
@@ -328,10 +329,14 @@ class UndoUsesTheIdParkingReturnsTests(ParkRouteCase):
         back = self.server.back_to_room(parked["new_id"], {})
         self.assertEqual(back["row"]["status"], "Writers Likey")
 
-    def test_the_pre_park_id_no_longer_resolves(self):
+    def test_the_pre_park_id_is_gone_from_the_index(self):
         # Why the client must not keep the old id: the file moved and was
-        # given a uid, so the path-hash id points at nothing.
+        # given a uid, so the path-hash id names no row and no file. Only the
+        # server's in-memory list of retired ids still follows it (so a double
+        # click lands on the parked note), and that is lost on a restart.
         old_id = self.note("Gone From Here.md", status="Writers Room")
-        self.server.park_essay(old_id, {})
-        with self.assertRaises(Exception):
-            self.server.back_to_room(old_id, {})
+        parked = self.server.park_essay(old_id, {})
+        essays, id_map = self.server.refresh_essay_index()
+        self.assertNotIn(old_id, id_map)
+        self.assertIsNone(self.server.index_row_for(old_id))
+        self.assertEqual(self.server.current_id(old_id), parked["new_id"])
