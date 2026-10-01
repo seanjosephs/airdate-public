@@ -53,6 +53,29 @@
     return Math.max(1, Math.min(12, n));
   }
 
+  // The writer's publish day: config.publish_day ("monday".."sunday") or ''
+  // when it is unset, which hides the board entirely.
+  function publishDay() {
+    const day = state.config && state.config.publish_day;
+    return typeof day === 'string' ? day : '';
+  }
+
+  function boardEnabled() {
+    return Boolean(publishDay());
+  }
+
+  // The configured publish day as a weekday number (Dates.weekAnchorOf's
+  // convention), defaulting to monday so a missing or unrecognized value
+  // never breaks the board's own arithmetic.
+  function anchorWeekday() {
+    const n = Dates.weekdayNumber(publishDay());
+    return n >= 0 ? n : 1;
+  }
+
+  function weekdayName() {
+    return publishDay() || 'monday';
+  }
+
   function byId(id) {
     return state.essays.find((essay) => String(essay.id) === String(id)) || null;
   }
@@ -73,7 +96,7 @@
 
   function mondayOfEssay(essay) {
     const air = Board.airDayOf(essay);
-    return air ? Dates.mondayOf(air) : '';
+    return air ? Dates.weekAnchorOf(air, anchorWeekday()) : '';
   }
 
   // ---- keeping the pool and the board in step -------------------------------
@@ -118,10 +141,29 @@
     return span.innerHTML;
   }
 
+  // The sign and the slot list's label name the configured weekday. "none"
+  // hides the board outright: nothing airs on a day that is not set.
+  function renderChrome() {
+    const enabled = boardEnabled();
+    if (els.board) {
+      els.board.hidden = !enabled;
+      els.board.style.display = enabled ? '' : 'none';
+    }
+    if (!enabled) return;
+    const plural = `${weekdayName()}s`;
+    if (els.sign) {
+      els.sign.textContent = `air dates · ${plural} · one a week`;
+      els.sign.setAttribute('aria-label', `air dates: ${plural}. one essay a week.`);
+    }
+    if (els.slots) els.slots.setAttribute('aria-label', plural);
+  }
+
   function render() {
     if (!state.loaded) return;
-    state.index = Board.weekIndex(state.essays);
-    const mondays = Board.windowMondays(state.today, weeksShown(), state.offset, state.index);
+    renderChrome();
+    if (!boardEnabled()) return;
+    state.index = Board.weekIndex(state.essays, anchorWeekday());
+    const mondays = Board.windowMondays(state.today, weeksShown(), state.offset, state.index, anchorWeekday());
     const ctx = {
       today: state.today,
       index: state.index,
@@ -196,7 +238,7 @@
 
   // The week's other note, if it still holds one after a note left.
   function remaining(monday) {
-    const entries = Board.weekIndex(state.essays).get(monday) || [];
+    const entries = Board.weekIndex(state.essays, anchorWeekday()).get(monday) || [];
     return entries.length ? entries[0].essay : null;
   }
 
@@ -245,7 +287,7 @@
     if (!essay || state.busy.has(String(id))) return false;
     clearPlaque(monday);
     if (Board.isPast(monday, state.today)) {
-      report(monday, 'amber', Board.say.past(monday));
+      report(monday, 'amber', Board.say.past(monday, weekdayName()));
       return false;
     }
     const taken = (state.index.get(monday) || []).find((entry) => String(entry.essay.id) !== String(id));
@@ -263,7 +305,7 @@
       const row = (result && result.row) || { ...essay, status: 'Ready for Air', scheduled_at: monday };
       state.busy.delete(String(id));
       replaceEssay(id, row);
-      state.offset = Board.offsetShowing(monday, state.today, weeksShown(), state.offset);
+      state.offset = Board.offsetShowing(monday, state.today, weeksShown(), state.offset, anchorWeekday());
       render();
       land(monday);
       report(monday, 'green', Board.say.scheduled(monday), {
@@ -423,7 +465,7 @@
       report(monday, 'amber', Board.say.undoPast(monday));
       return;
     }
-    state.index = Board.weekIndex(state.essays);
+    state.index = Board.weekIndex(state.essays, anchorWeekday());
     if (!Board.isOpen(monday, state.today, state.index)) {
       report(monday, 'amber', Board.say.undoTaken(monday));
       return;
@@ -433,7 +475,7 @@
       if (hash) payload.expected_content_hash = hash;
       const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/ready-for-air`, payload);
       replaceEssay(id, result && result.row ? result.row : { ...byId(id), status: 'Ready for Air', scheduled_at: prior });
-      state.offset = Board.offsetShowing(monday, state.today, weeksShown(), state.offset);
+      state.offset = Board.offsetShowing(monday, state.today, weeksShown(), state.offset, anchorWeekday());
       render();
       report(monday, 'green', Board.say.undoneUnschedule(monday));
     } catch (error) {
@@ -606,7 +648,7 @@
 
   // Page so a Monday is on the board, then return its drop zone.
   function reveal(monday) {
-    const next = Board.offsetShowing(monday, state.today, weeksShown(), state.offset);
+    const next = Board.offsetShowing(monday, state.today, weeksShown(), state.offset, anchorWeekday());
     if (next !== state.offset) {
       state.offset = next;
       render();
@@ -617,6 +659,7 @@
   function start() {
     els.board = $('board');
     els.slots = $('board-slots');
+    els.sign = $('board-sign');
     els.range = $('board-range');
     els.say = $('board-legend-say');
     els.placingLabel = $('board-legend-placing');
@@ -635,7 +678,9 @@
     ready: () => state.loaded,
     essay: byId,
     today: () => state.today,
-    index: () => Board.weekIndex(state.essays),
+    index: () => Board.weekIndex(state.essays, anchorWeekday()),
+    anchor: anchorWeekday,
+    weekdayName,
     placing: () => state.placing,
     setPlacing,
     offset: () => state.offset,

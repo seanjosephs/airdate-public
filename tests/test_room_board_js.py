@@ -87,6 +87,24 @@ class ClockTests(unittest.TestCase):
             with self.subTest(day=day):
                 self.assertEqual(run(f"dates.mondayOf({js(day)})"), monday)
 
+    def test_weekday_numbers_match_the_config_names(self):
+        self.assertEqual(run('dates.weekdayNumber("sunday")'), 0)
+        self.assertEqual(run('dates.weekdayNumber("monday")'), 1)
+        self.assertEqual(run('dates.weekdayNumber("Tuesday")'), 2)
+        self.assertEqual(run('dates.weekdayNumber("saturday")'), 6)
+        self.assertEqual(run('dates.weekdayNumber("whenever")'), -1)
+        self.assertEqual(run('dates.weekdayNumber("")'), -1)
+
+    def test_the_anchor_of_a_week_follows_the_publish_day(self):
+        # A wednesday (2026-09-30): the tuesday anchor is the day before, the
+        # thursday anchor is the next day, and an out-of-range anchor falls
+        # back to monday, same as calling weekAnchorOf with none at all.
+        self.assertEqual(run('dates.weekAnchorOf("2026-09-30", 2)'), "2026-09-29")
+        self.assertEqual(run('dates.weekAnchorOf("2026-09-30", 4)'), "2026-09-24")
+        self.assertEqual(run('dates.weekAnchorOf("2026-09-30", 0)'), "2026-09-27")
+        self.assertEqual(run('dates.weekAnchorOf("2026-09-30")'), run('dates.weekAnchorOf("2026-09-30", 1)'))
+        self.assertEqual(run('dates.weekAnchorOf("2026-09-30", 1)'), run('dates.mondayOf("2026-09-30")'))
+
     def test_day_arithmetic_crosses_a_clock_change(self):
         self.assertEqual(run('dates.addDays("2026-10-26", 7)'), "2026-11-02")
         self.assertEqual(run('dates.daysBetween("2026-10-30", "2026-11-02")'), 3)
@@ -138,6 +156,20 @@ class WeekTests(unittest.TestCase):
 
     def test_the_range_label(self):
         self.assertEqual(run('board.rangeLabel(["2026-09-21", "2026-10-12"])'), "sep 21 to oct 12")
+
+    def test_a_non_monday_publish_day_moves_the_whole_board(self):
+        # thursday = weekday 4. An essay airing friday 2026-10-02 belongs to
+        # the thursday-anchored week starting 2026-10-01, and the window,
+        # firstOpen and offsetShowing all follow the same anchor.
+        rows = [essay(scheduled_at="2026-10-02")]
+        self.assertEqual(run(f"[...board.weekIndex({js(rows)}, 4).keys()]"), ["2026-10-01"])
+        mondays = run(f"board.windowMondays({js(TODAY)}, 3, 0, new Map(), 4)")
+        self.assertEqual(mondays, ["2026-09-17", "2026-09-24", "2026-10-01", "2026-10-08"])
+        self.assertEqual(run(f"board.firstOpen({js(TODAY)}, new Map(), 4)"), "2026-10-01")
+        self.assertEqual(run(f'board.offsetShowing("2026-10-01", {js(TODAY)}, 3, 0, 4)'), 0)
+        # Omitting the anchor keeps monday, so every existing caller is unchanged.
+        self.assertEqual(run(f"board.windowMondays({js(TODAY)}, 3, 0, new Map())"),
+                         run(f"board.windowMondays({js(TODAY)}, 3, 0, new Map(), 1)"))
 
 
 class OpenMondayTests(unittest.TestCase):
@@ -241,6 +273,14 @@ class SentenceTests(unittest.TestCase):
                          "could not unschedule. obsidian did not save the note. try again.")
         self.assertEqual(run('board.say.failed("schedule", { kind: "network" })'),
                          "could not put it on the board. airdate is not answering. try again.")
+
+    def test_the_past_and_open_sentences_name_the_configured_weekday(self):
+        self.assertEqual(run('board.say.past("2026-10-01", "thursday")'), "thu oct 1 has passed. pick a thursday from today on.")
+        self.assertEqual(run('board.say.noOpen("thursday")'), "there is no open thursday to put it on. unschedule one first.")
+        self.assertEqual(run('board.say.noEarlier("2026-10-01", "thursday")'), "no open thursday before thu oct 1. it stays there.")
+        # Omitting it keeps monday, so the existing sentences are unchanged.
+        self.assertEqual(run('board.say.past("2026-10-05")'), "mon oct 5 has passed. pick a monday from today on.")
+        self.assertEqual(run('board.say.noOpen()'), "there is no open monday to put it on. unschedule one first.")
 
     def test_every_sentence_is_lowercase_and_ends_with_a_stop(self):
         sentences = run("""[

@@ -42,12 +42,15 @@
   }
 
   // monday -> [{essay, air, phase}], ready before live, then by air date.
-  function weekIndex(essays) {
+  // `anchor` is the configured publish day as a weekday number (0 sunday .. 6
+  // saturday, Dates.weekdayNumber's convention); it defaults to monday so
+  // every existing caller keeps today's behavior.
+  function weekIndex(essays, anchor) {
     const index = new Map();
     for (const essay of Array.isArray(essays) ? essays : []) {
       const air = airDayOf(essay);
       if (!air) continue;
-      const monday = Dates.mondayOf(air);
+      const monday = Dates.weekAnchorOf(air, anchor);
       const entry = { essay, air, phase: essay.status === 'Live' ? 'live' : 'ready' };
       if (!index.has(monday)) index.set(monday, []);
       index.get(monday).push(entry);
@@ -72,8 +75,8 @@
   }
 
   // The nearest open Monday at or after today.
-  function firstOpen(today, index) {
-    let monday = Dates.mondayOf(today);
+  function firstOpen(today, index, anchor) {
+    let monday = Dates.weekAnchorOf(today, anchor);
     if (isPast(monday, today)) monday = Dates.addDays(monday, 7);
     for (let i = 0; i < SEARCH_WEEKS; i += 1) {
       if (isOpen(monday, today, index)) return monday;
@@ -99,9 +102,9 @@
   // this week, moved by the pager's `offset`. On the home page it also keeps
   // any older week whose note is still asking "is it live?", so nothing that
   // aired unrecorded falls off the board.
-  function windowMondays(today, weeksShown, offset, index) {
+  function windowMondays(today, weeksShown, offset, index, anchor) {
     const count = Math.max(1, Math.floor(Number(weeksShown) || 3));
-    const base = Dates.addDays(Dates.mondayOf(today), -7 + 7 * (Number(offset) || 0));
+    const base = Dates.addDays(Dates.weekAnchorOf(today, anchor), -7 + 7 * (Number(offset) || 0));
     const mondays = [];
     for (let i = 0; i <= count; i += 1) mondays.push(Dates.addDays(base, 7 * i));
     if (!offset) {
@@ -117,9 +120,9 @@
   }
 
   // The pager offset that brings `monday` into the consecutive weeks.
-  function offsetShowing(monday, today, weeksShown, offset) {
+  function offsetShowing(monday, today, weeksShown, offset, anchor) {
     const count = Math.max(1, Math.floor(Number(weeksShown) || 3));
-    const base = Dates.addDays(Dates.mondayOf(today), -7);
+    const base = Dates.addDays(Dates.weekAnchorOf(today, anchor), -7);
     const at = Math.round(Dates.daysBetween(base, monday) / 7);
     const current = Number(offset) || 0;
     if (at < current) return at;
@@ -221,7 +224,7 @@
   const say = {
     scheduled: (monday) => `on the board. airs ${Dates.formatDay(monday)}.`,
     taken: (monday, title) => `${Dates.formatDay(monday)} is taken. unschedule ${lower(title)} first.`,
-    past: (monday) => `${Dates.formatDay(monday)} has passed. pick a monday from today on.`,
+    past: (monday, weekdayName) => `${Dates.formatDay(monday)} has passed. pick a ${weekdayName || 'monday'} from today on.`,
     unscheduled: (monday) => `back in the pool. ${Dates.formatDay(monday)} is open again.`,
     live: (title) => `live. ${lower(title)} moved to the shelf.`,
     notAPost: () => 'that is not a substack post link.',
@@ -231,8 +234,8 @@
     putBack: () => 'put back. nothing changed.',
     lifting: (title, monday) => `placing ${lower(title)}. ${Dates.formatDay(monday)} is open. left and right move, enter sets, escape puts it back.`,
     moved: (monday) => `${Dates.formatDay(monday)} is open.`,
-    noEarlier: (monday) => `no open monday before ${Dates.formatDay(monday)}. it stays there.`,
-    noOpen: () => 'there is no open monday to put it on. unschedule one first.',
+    noEarlier: (monday, weekdayName) => `no open ${weekdayName || 'monday'} before ${Dates.formatDay(monday)}. it stays there.`,
+    noOpen: (weekdayName) => `there is no open ${weekdayName || 'monday'} to put it on. unschedule one first.`,
     cannotLift: (status) => (status === 'Writers Room'
       ? 'star it for writers likey before it can go on the board.'
       : 'it is on the board already. unschedule it from its note to move it.'),

@@ -118,9 +118,25 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "paper": {
         "fresh_on_promotion": False,
     },
-    "tag_presets": [],
+    # Three generic examples a writer edits or deletes; never the writer's own
+    # taxonomy. An explicit empty list in config.json stays empty (_merge
+    # replaces lists wholesale), and a writer's own presets are never
+    # overwritten by these.
+    "tag_presets": [
+        {"name": "Craft", "color": "#3a7bd5", "tags": ["writing", "process", "editing"]},
+        {"name": "Culture", "color": "#d9653b", "tags": ["film", "music", "books"]},
+        {"name": "Ideas", "color": "#4caf7d", "tags": ["draft", "brainstorm", "question"]},
+    ],
     "links": [],
 }
+
+BOARD_PADS = ("sticky", "paper", "index")
+BOARD_COLORS = ("canary", "blue", "orange", "pink", "green")
+BOARD_WEEKS_MIN = 1
+BOARD_WEEKS_MAX = 12
+# A writer's own red-pen lines, beyond the twenty airdate ships. Sensibly
+# capped so a pasted essay can never turn into hundreds of jabs.
+RED_PEN_LINES_MAX = 100
 
 
 def config_path(data_dir: Path) -> Path:
@@ -371,6 +387,37 @@ def validate_config(config: dict[str, Any]) -> list[str]:
         elif not isinstance(link.get("url"), str) or not re.match(r"^https?://", link["url"]):
             errors.append(f"links[{index}].url must start with http:// or https://.")
 
+    board = config.get("board", {})
+    if not isinstance(board, dict):
+        errors.append("board must be an object.")
+        board = {}
+    if board.get("default_pad") not in BOARD_PADS:
+        errors.append("board.default_pad must be \"sticky\", \"paper\" or \"index\".")
+    if board.get("default_color") not in BOARD_COLORS:
+        errors.append("board.default_color must be canary, blue, orange, pink or green.")
+    weeks_shown = board.get("weeks_shown")
+    if (
+        not isinstance(weeks_shown, int) or isinstance(weeks_shown, bool)
+        or not BOARD_WEEKS_MIN <= weeks_shown <= BOARD_WEEKS_MAX
+    ):
+        errors.append(f"board.weeks_shown must be a whole number from {BOARD_WEEKS_MIN} to {BOARD_WEEKS_MAX}.")
+
+    red_pen = config.get("red_pen", {})
+    if not isinstance(red_pen, dict):
+        errors.append("red_pen must be an object.")
+        red_pen = {}
+    if not isinstance(red_pen.get("enabled"), bool):
+        errors.append("red_pen.enabled must be true or false.")
+    lines = red_pen.get("lines", [])
+    if not _is_str_list(lines) or any(not line.strip() for line in lines):
+        errors.append("red_pen.lines must be a list of non-empty lines.")
+    elif len(lines) > RED_PEN_LINES_MAX:
+        errors.append(f"red_pen.lines holds too many of your own lines; keep it to {RED_PEN_LINES_MAX} or fewer.")
+
+    paper = config.get("paper", {})
+    if not isinstance(paper, dict) or not isinstance(paper.get("fresh_on_promotion"), bool):
+        errors.append("paper.fresh_on_promotion must be true or false.")
+
     errors.extend(validate_editor(config.get("editor", {})))
     return errors
 
@@ -475,5 +522,41 @@ def settings_from_form(current: dict[str, Any], form: dict[str, Any]) -> dict[st
                 item["color"] = str(edit.get("color") or "").strip()
             if "image" in edit:
                 item["image"] = str(edit.get("image") or "").strip().lstrip("/")
+    board = dict(out.get("board") or {})
+    if "board_default_pad" in form:
+        board["default_pad"] = str(form.get("board_default_pad") or "").strip()
+    if "board_default_color" in form:
+        board["default_color"] = str(form.get("board_default_color") or "").strip()
+    if "board_weeks_shown" in form:
+        value = form.get("board_weeks_shown")
+        try:
+            board["weeks_shown"] = int(value)
+        except (TypeError, ValueError):
+            # Left as whatever the writer sent, so validate_config can name it.
+            board["weeks_shown"] = value
+    out["board"] = board
+
+    red_pen = dict(out.get("red_pen") or {})
+    if "red_pen_enabled" in form:
+        red_pen["enabled"] = bool(form.get("red_pen_enabled"))
+    if "red_pen_lines" in form:
+        raw_lines = form.get("red_pen_lines")
+        if isinstance(raw_lines, str):
+            raw_lines = raw_lines.split("\n")
+        red_pen["lines"] = [str(line).strip() for line in raw_lines or [] if str(line).strip()]
+    out["red_pen"] = red_pen
+
+    paper = dict(out.get("paper") or {})
+    if "paper_fresh_on_promotion" in form:
+        paper["fresh_on_promotion"] = bool(form.get("paper_fresh_on_promotion"))
+    out["paper"] = paper
+
+    if "editor_mode" in form:
+        mode = str(form.get("editor_mode") or "").strip().lower()
+        if mode in EDITOR_MODES:
+            editor = dict(out.get("editor") or {})
+            editor["mode"] = mode
+            out["editor"] = editor
+
     out["config_version"] = CONFIG_VERSION
     return out

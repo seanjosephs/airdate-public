@@ -6,22 +6,26 @@
   <title>airdate</title>
   <link rel="icon" href="/static/brand/airdate-icon-256.png" type="image/png">
   <link rel="stylesheet" href="/static/room/tokens.css?v=2">
-  <link rel="stylesheet" href="/static/room/room.css?v=2">
+  <link rel="stylesheet" href="/static/room/room.css?v=3">
   <link rel="stylesheet" href="/static/room/cards.css?v=2">
   <link rel="stylesheet" href="/static/room/board.css?v=1">
   <link rel="stylesheet" href="/static/room/editor.css?v=3">
+  <link rel="stylesheet" href="/static/room/settings.css?v=3">
   <script src="/static/room/api.js?v=1" defer></script>
   <script src="/static/room/cards.js?v=3" defer></script>
   <script src="/static/room/keys.js?v=1" defer></script>
   <script src="/static/room/pool.js?v=2" defer></script>
-  <script src="/static/room/dates.js?v=1" defer></script>
-  <script src="/static/room/board.js?v=1" defer></script>
+  <script src="/static/room/dates.js?v=2" defer></script>
+  <script src="/static/room/board.js?v=2" defer></script>
   <script src="/static/room/feedback.js?v=1" defer></script>
-  <script src="/static/room/board-view.js?v=1" defer></script>
-  <script src="/static/room/placing.js?v=1" defer></script>
+  <script src="/static/room/board-view.js?v=2" defer></script>
+  <script src="/static/room/placing.js?v=2" defer></script>
   <script src="/static/room/editor.js?v=3" defer></script>
   <script src="/static/airdate-tour.js?v=5" defer></script>
   <script src="/static/room/editor-view.js?v=3" defer></script>
+  <script src="/static/airdate-presets.js?v=1" defer></script>
+  <script src="/static/airdate-wizard.js?v=4" defer></script>
+  <script src="/static/room/settings.js?v=2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#room-main">skip to the essays</a>
@@ -67,7 +71,7 @@
     <section class="board" id="board" aria-labelledby="board-heading">
       <div class="board-head">
         <h2 id="board-heading">the board</h2>
-        <span class="board-sign" role="img" aria-label="air dates: mondays. one essay a week.">air dates &middot; mondays &middot; one a week</span>
+        <span class="board-sign" id="board-sign" role="img" aria-label="air dates: mondays. one essay a week.">air dates &middot; mondays &middot; one a week</span>
         <span class="board-grow"></span>
         <div class="board-pager">
           <button type="button" class="board-page" data-page="-1" aria-label="earlier weeks">
@@ -95,7 +99,7 @@
       </div>
     </section>
 
-    <section class="pool" aria-labelledby="pool-heading">
+    <section class="pool" id="pool-section" aria-labelledby="pool-heading">
       <div class="pool-head">
         <div class="pool-title-row">
           <h1 id="pool-heading">essays</h1>
@@ -142,6 +146,172 @@
       </div>
 
       <div class="pool-columns" id="pool"></div>
+    </section>
+
+    <!-- The settings view (slice 5): one page, Permanent Marker section
+         heads. settings.js reads /api/app/status and writes through the
+         existing /api/settings* routes; nothing here saves until "save
+         settings" is pressed. -->
+    <section class="set-view" id="settings-view" aria-labelledby="set-heading" hidden>
+      <div class="set-bar">
+        <h1 id="set-heading">settings</h1>
+        <span class="set-saved" id="set-saved" aria-live="polite"></span>
+        <span class="room-grow"></span>
+        <button type="button" class="set-save" id="set-save">save settings</button>
+      </div>
+      <p class="set-messages" id="set-messages" role="status" aria-live="polite"></p>
+
+      <div class="set-grid">
+        <section class="set-card" aria-labelledby="set-h-vault">
+          <h2 class="set-head" id="set-h-vault">your vault</h2>
+          <p class="set-sub">the obsidian vault and the folder inside it that holds your essays.</p>
+          <label class="set-field" id="set-vault-path-field">
+            <span>obsidian vault folder</span>
+            <small>the full path to the folder that contains <code>.obsidian</code>. no picker can open a dialog for an arbitrary path, so this is a plain field.</small>
+            <input id="set-vault-path" autocomplete="off" spellcheck="false" placeholder="/Users/you/Documents/My Vault">
+          </label>
+          <p class="set-note" id="set-vault-path-note" hidden>the vault folder is set in config.json on the machine running airdate.</p>
+          <label class="set-field">
+            <span>essays folder</span>
+            <small>inside the vault; every note under it is an essay. use . if your essays sit at the vault root.</small>
+            <input id="set-essays-folder" autocomplete="off" spellcheck="false" placeholder="Essays">
+          </label>
+          <label class="set-field">
+            <span>vault name</span>
+            <small>as obsidian shows it. used for "open in obsidian" links.</small>
+            <input id="set-vault-name" autocomplete="off" spellcheck="false">
+          </label>
+          <p class="set-status" id="set-vault-status" role="status"></p>
+        </section>
+
+        <section class="set-card" aria-labelledby="set-h-pub">
+          <h2 class="set-head" id="set-h-pub">your publication</h2>
+          <p class="set-sub">where your drafts go. airdate sends drafts and never publishes.</p>
+          <label class="set-field">
+            <span>substack address</span>
+            <small>for example yourname.substack.com or your custom domain.</small>
+            <input id="set-publication" autocomplete="off" spellcheck="false" placeholder="yourname.substack.com">
+          </label>
+          <label class="set-field">
+            <span>publication name</span>
+            <small>used in the thumbnail prompt.</small>
+            <input id="set-publication-name" autocomplete="off">
+          </label>
+          <div class="set-connect" id="set-connect-row" data-connected="false">
+            <p class="set-connect-text" id="set-connect-text">substack not connected</p>
+            <p class="set-connect-sub">the obsidian connector holds your substack session. airdate only ever creates drafts.</p>
+            <button type="button" class="set-btn" id="set-connect">connect</button>
+          </div>
+        </section>
+
+        <section class="set-card" aria-labelledby="set-h-organize">
+          <h2 class="set-head" id="set-h-organize">how you organize</h2>
+          <label class="set-field">
+            <span>topic folders</span>
+            <small>with folders on, each folder inside your essays folder is a topic.</small>
+            <select id="set-category-mode">
+              <option value="folders">essays live in topic folders</option>
+              <option value="off">no folders</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="set-card set-card--wide" aria-labelledby="set-h-board">
+          <h2 class="set-head" id="set-h-board">the board</h2>
+          <p class="set-sub">what a new essay's note looks like until you give it its own in the editor.</p>
+          <div class="set-row2">
+            <fieldset class="set-fieldset">
+              <legend>default note pad</legend>
+              <div class="set-pads" role="radiogroup" aria-label="default note pad">
+                <label class="set-pad"><input type="radio" name="set-board-pad" value="sticky">sticky</label>
+                <label class="set-pad"><input type="radio" name="set-board-pad" value="paper">paper</label>
+                <label class="set-pad"><input type="radio" name="set-board-pad" value="index">index card</label>
+              </div>
+            </fieldset>
+            <fieldset class="set-fieldset">
+              <legend>default color</legend>
+              <div class="set-colors" role="radiogroup" aria-label="default note color" id="set-board-colors"></div>
+            </fieldset>
+          </div>
+          <div class="set-row2">
+            <label class="set-field">
+              <span>publish day</span>
+              <small>one board slot per week on this day. none hides the board.</small>
+              <select id="set-publish-day">
+                <option value="">none</option>
+                <option value="monday">monday</option>
+                <option value="tuesday">tuesday</option>
+                <option value="wednesday">wednesday</option>
+                <option value="thursday">thursday</option>
+                <option value="friday">friday</option>
+                <option value="saturday">saturday</option>
+                <option value="sunday">sunday</option>
+              </select>
+            </label>
+            <label class="set-field">
+              <span>weeks shown on the board</span>
+              <small>how many upcoming weeks the board keeps in view.</small>
+              <input id="set-weeks-shown" type="number" inputmode="numeric" min="1" max="12" step="1">
+            </label>
+          </div>
+
+          <h3 class="set-subhead">red pen and paper</h3>
+          <div class="set-row2">
+            <label class="set-toggle"><input type="checkbox" id="set-red-pen-enabled"><span>show the red-pen jabs on old script pages</span></label>
+            <label class="set-toggle"><input type="checkbox" id="set-paper-fresh"><span>fresh paper when an essay moves up a phase</span></label>
+          </div>
+          <label class="set-field">
+            <span>your own red-pen lines</span>
+            <small>one per line. these join the twenty airdate ships.</small>
+            <textarea id="set-red-pen-lines" rows="3" placeholder="one jab per line"></textarea>
+          </label>
+          <div class="set-reset">
+            <button type="button" class="set-btn set-btn--danger" id="set-reset-room">reset the writers room</button>
+            <p class="set-note">restarts every essay's paper age at once. it cannot be undone.</p>
+            <div class="set-reset-confirm" id="set-reset-confirm" role="alertdialog" aria-labelledby="set-reset-confirm-title" hidden>
+              <p id="set-reset-confirm-title">reset every essay's paper age?</p>
+              <p>every essay goes back to a fresh fountain pen, as if it just arrived. this cannot be undone.</p>
+              <div class="set-reset-actions">
+                <button type="button" class="set-btn set-btn--danger" id="set-reset-confirm-yes">yes, reset it</button>
+                <button type="button" class="set-btn" id="set-reset-confirm-no">never mind</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="set-card set-card--wide" aria-labelledby="set-h-totems">
+          <h2 class="set-head" id="set-h-totems">your totems</h2>
+          <p class="set-sub">five marks for telling your kinds of work apart. the art sits behind each script on the desk.</p>
+          <label class="set-toggle"><input type="checkbox" id="set-totems-enabled"><span>use totems to mark essays</span></label>
+          <div class="set-totem-list" id="set-totem-list"></div>
+        </section>
+
+        <section class="set-card set-card--wide" aria-labelledby="set-h-tags">
+          <h2 class="set-head" id="set-h-tags">your tags</h2>
+          <p class="set-sub">a preset is a name, a color and up to five tags the editor adds in one click.</p>
+          <div class="preset-editor" id="set-tag-presets"></div>
+        </section>
+      </div>
+
+      <p class="set-crosslink">looking for which sections the essay page shows? that lives on the essay page itself, behind the gear in its header.</p>
+
+      <section class="set-card set-card--wide" aria-labelledby="set-h-hood">
+        <h2 class="set-head" id="set-h-hood">under the hood</h2>
+        <p class="set-sub">read only. where airdate runs and what it reads. nothing here needs touching day to day.</p>
+        <div class="set-rows">
+          <div class="set-row"><span>app url</span><strong id="set-uh-url">&hellip;</strong></div>
+          <div class="set-row"><span>port</span><strong id="set-uh-port">&hellip;</strong></div>
+          <div class="set-row"><span>auth</span><strong id="set-uh-auth">&hellip;</strong></div>
+          <div class="set-row"><span>local paths</span><strong id="set-uh-paths">&hellip;</strong></div>
+          <div class="set-row set-row--path"><span>vault</span><strong id="set-uh-vault">&hellip;</strong></div>
+          <div class="set-row set-row--path"><span>runtime data</span><strong id="set-uh-data">&hellip;</strong></div>
+          <div class="set-row set-row--path"><span>drafts</span><strong id="set-uh-drafts">&hellip;</strong></div>
+          <div class="set-row"><span>essay index</span><strong id="set-uh-index">&hellip;</strong></div>
+        </div>
+        <div class="set-actions">
+          <button type="button" class="set-btn" id="set-uh-reload">reload essay index</button>
+        </div>
+      </section>
     </section>
   </main>
 
@@ -519,6 +689,141 @@
       <div class="gs-replay-row"><button type="button" class="ed-btn" id="gs-replay">replay the editor tour</button></div>
       <p class="gs-foot">your vault, substack address, totems, tag presets and default note pad are app settings. they live under settings in the sidebar.</p>
     </section>
+  </div>
+
+  <!-- The first-run wizard (slice 5), reusing static/airdate-wizard.js as is:
+       nine steps carried from the old page, plus one new "metadata" step.
+       Opened by settings.js when /api/app/status says setup.wizard is true. -->
+  <div class="wizard hidden" id="wizard" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
+    <form class="wizard-shell" id="wizard-form" novalidate>
+      <header class="wizard-head">
+        <div class="wizard-brand" id="wizard-title">air<span class="accent">date</span></div>
+        <ol class="wizard-steps" id="wizard-steps" aria-label="setup steps"></ol>
+      </header>
+
+      <section class="wizard-step" data-step="welcome" data-label="welcome">
+        <h2 class="wizard-title">welcome to airdate</h2>
+        <p>airdate is a catalog for the essays in your obsidian vault.</p>
+        <p>it walks each one from first draft to ready, and gives it a day on your board.</p>
+        <p>it creates substack drafts. it never publishes, schedules or emails.</p>
+        <details class="wizard-disclosure">
+          <summary>how airdate talks to substack</summary>
+          <p>substack has no official api for drafts, so airdate uses an unofficial client. your substack session stays inside obsidian, in the airdate connector; airdate never sees your password. <a href="https://github.com/seanjosephs/airdate-public/blob/main/SETUP.md" target="_blank" rel="noopener">SETUP.md</a> has the details.</p>
+        </details>
+      </section>
+
+      <section class="wizard-step" data-step="vault" data-label="vault">
+        <h2 class="wizard-title">your vault</h2>
+        <p>airdate reads essays from a folder in your obsidian vault.</p>
+        <label class="setup-field" id="wizard-vault-path-field">
+          <span>obsidian vault folder</span>
+          <small>the full path to the folder that contains <code>.obsidian</code></small>
+          <input name="vault_path" autocomplete="off" spellcheck="false" placeholder="/Users/you/Documents/My Vault">
+        </label>
+        <p class="setup-note hidden" id="wizard-vault-path-note">the vault folder is set in config.json on the machine running airdate.</p>
+        <label class="setup-field">
+          <span>essays folder</span>
+          <small>inside the vault; every note under it is an essay</small>
+          <input name="essays_folder" autocomplete="off" spellcheck="false" placeholder="Essays">
+        </label>
+        <label class="setup-toggle"><input type="checkbox" name="essays_at_root"> <span>my essays are at the vault root</span></label>
+        <label class="setup-field">
+          <span>vault name</span>
+          <small>as obsidian shows it; used for "open in obsidian" links. blank uses the folder's name</small>
+          <input name="vault_name" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="settings-actions">
+          <button class="settings-button hidden" id="wizard-create-essays" type="button">create the essays folder</button>
+        </div>
+      </section>
+
+      <section class="wizard-step" data-step="publication" data-label="publication">
+        <h2 class="wizard-title">your publication</h2>
+        <p>where your drafts go. you can fill this in later; sending stays blocked until it is set.</p>
+        <label class="setup-field">
+          <span>substack publication</span>
+          <small>for example yourname.substack.com or your custom domain</small>
+          <input name="publication" autocomplete="off" spellcheck="false" placeholder="yourname.substack.com">
+        </label>
+        <label class="setup-field">
+          <span>publication name</span>
+          <small>used in the thumbnail prompt</small>
+          <input name="publication_name" autocomplete="off">
+        </label>
+      </section>
+
+      <section class="wizard-step" data-step="organize" data-label="organize">
+        <h2 class="wizard-title">how you organize</h2>
+        <p>do you keep essays in topic folders?</p>
+        <label class="wizard-choice"><input type="radio" name="category_mode" value="folders" checked>
+          <span><strong>yes, in folders</strong><small>each folder inside your essays folder is a topic. an essay sitting outside any folder shows up as needing filing, and airdate can move it for you.</small></span></label>
+        <label class="wizard-choice"><input type="radio" name="category_mode" value="off">
+          <span><strong>no folders</strong><small>topics are off. nothing asks to be filed.</small></span></label>
+      </section>
+
+      <section class="wizard-step" data-step="totems" data-label="totems">
+        <h2 class="wizard-title">your totems</h2>
+        <p>five marks for telling your kinds of work apart at a glance. rename them, pick a color, and swap the icon for any image in your vault.</p>
+        <label class="setup-toggle"><input type="checkbox" name="totems_enabled" checked> <span>use totems to mark essays</span></label>
+        <div class="setup-totem-list" id="wizard-totem-list"></div>
+      </section>
+
+      <section class="wizard-step" data-step="tags" data-label="tags">
+        <h2 class="wizard-title">your tags</h2>
+        <p>a tag preset is a name, a color and up to five tags you reach for often. the editor adds them in one click. three generic examples are here to start; edit or delete them, or add your own.</p>
+        <div class="preset-editor" id="wizard-presets"></div>
+      </section>
+
+      <section class="wizard-step" data-step="metadata" data-label="metadata">
+        <h2 class="wizard-title">how much metadata</h2>
+        <p>the essay editor can show every substack field, or just the ones most essays need. change this later behind the gear in the editor.</p>
+        <label class="wizard-choice"><input type="radio" name="editor_mode" value="simplified" checked>
+          <span><strong>simplified</strong><small>title, subtitle, summary, the script, post settings. SETUP.md calls this "the short version (simplified metadata)".</small></span></label>
+        <label class="wizard-choice"><input type="radio" name="editor_mode" value="complete">
+          <span><strong>complete</strong><small>everything simplified has, plus advanced, email and comments, seo and social, thumbnail and internal notes. SETUP.md calls this "the full version (complete metadata)".</small></span></label>
+      </section>
+
+      <section class="wizard-step" data-step="calendar" data-label="calendar">
+        <h2 class="wizard-title">your board</h2>
+        <p>pick the day you publish. the board gives you one slot per week on that day.</p>
+        <label class="setup-field">
+          <span>publish day</span>
+          <small>none hides the board</small>
+          <select name="publish_day">
+            <option value="monday">monday</option>
+            <option value="tuesday">tuesday</option>
+            <option value="wednesday">wednesday</option>
+            <option value="thursday">thursday</option>
+            <option value="friday">friday</option>
+            <option value="saturday">saturday</option>
+            <option value="sunday">sunday</option>
+            <option value="">none</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="wizard-step" data-step="connect" data-label="connect">
+        <h2 class="wizard-title">connect substack</h2>
+        <p>three steps in obsidian. you can do this later; sending stays blocked until it is done.</p>
+        <ol class="wizard-checks" id="wizard-checks"></ol>
+        <p class="setup-note" id="wizard-connector-folder"></p>
+        <div class="settings-actions">
+          <button class="settings-button" id="wizard-recheck" type="button">check again</button>
+        </div>
+      </section>
+
+      <section class="wizard-step" data-step="finish" data-label="finish">
+        <h2 class="wizard-title">ready</h2>
+        <p>finish saves these choices to config.json. everything here can be changed in settings.</p>
+        <dl class="wizard-summary" id="wizard-summary"></dl>
+      </section>
+
+      <p class="setup-messages" id="wizard-messages" role="status" aria-live="polite"></p>
+      <footer class="wizard-foot">
+        <button class="settings-button" id="wizard-back" type="button">back</button>
+        <button class="settings-button wizard-next" id="wizard-next" type="submit">next</button>
+      </footer>
+    </form>
   </div>
 </body>
 </html>

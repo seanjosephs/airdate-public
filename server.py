@@ -2321,6 +2321,15 @@ def setup_payload() -> dict[str, Any]:
             "publication_name": PUBLICATION_NAME,
             "publish_day": PUBLISH_DAY or "",
             "category_mode": CATEGORY_MODE,
+            "editor_mode": editor_settings()["mode"],
+            "board_default_pad": BOARD_DEFAULT_PAD,
+            "board_default_color": BOARD_DEFAULT_COLOR,
+            "board_weeks_shown": BOARD_WEEKS_SHOWN,
+            "red_pen_enabled": RED_PEN_ENABLED,
+            # The writer's own lines only, newline-joined for a textarea; the
+            # twenty airdate ships are never editable here.
+            "red_pen_lines": "\n".join(RED_PEN_LINES),
+            "paper_fresh_on_promotion": PAPER_FRESH_ON_PROMOTION,
         },
         "paths_editable": EXPOSE_LOCAL_PATHS,
         # The wizard is for a fresh install. A config.json that exists but

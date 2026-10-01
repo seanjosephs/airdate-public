@@ -56,9 +56,9 @@
       return true;
     }
     if (current) finish();
-    const candidate = Board.firstOpen(board.today(), board.index());
+    const candidate = Board.firstOpen(board.today(), board.index(), board.anchor());
     if (!candidate) {
-      cardSay(id, 'amber', Board.say.noOpen());
+      cardSay(id, 'amber', Board.say.noOpen(board.weekdayName()));
       return true;
     }
     // Where the board was paged, so putting the note back puts the board back.
@@ -108,7 +108,7 @@
     const board = view();
     const next = Board.stepOpen(current.candidate, direction, board.today(), board.index());
     if (!next) {
-      board.announce(direction < 0 ? Board.say.noEarlier(current.candidate) : Board.say.noOpen());
+      board.announce(direction < 0 ? Board.say.noEarlier(current.candidate, board.weekdayName()) : Board.say.noOpen(board.weekdayName()));
       return;
     }
     moveTo(next, Board.say.moved(next));
@@ -125,7 +125,7 @@
       return;
     }
     const taken = (index.get(monday) || [])[0];
-    board.report(monday, 'amber', taken ? Board.say.taken(monday, taken.essay.title) : Board.say.past(monday));
+    board.report(monday, 'amber', taken ? Board.say.taken(monday, taken.essay.title) : Board.say.past(monday, board.weekdayName()));
     board.zone(current.candidate)?.focus();
   }
 

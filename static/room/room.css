@@ -23,6 +23,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The native hidden attribute must always win. A class that sets display
+   (flex, grid) otherwise beats the browser's own [hidden]{display:none}, and a
+   confirmation box styled that way rendered open on first load. This governs
+   the whole room, so it lives here rather than in one feature's stylesheet. */
+[hidden] { display: none !important; }
+
 /* Every control shows where the keyboard is. The baseline audit's first
    blocker was that you could not reach an essay without a mouse.
    Amber on dark, ink on paper: in placing mode this same ring is what marks

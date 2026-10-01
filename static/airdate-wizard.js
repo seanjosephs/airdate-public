@@ -40,6 +40,9 @@
         })),
       };
       if (pathsEditable) out.vault_path = f.vault_path.value.trim();
+      // The room adds a "metadata" step (editor.mode); the old page has none,
+      // so f.editor_mode is undefined there and this stays a no-op.
+      if (f.editor_mode) out.editor_mode = f.editor_mode.value;
       return out;
     }
 
@@ -58,6 +61,7 @@
         ['organize', p.category_mode === 'folders' ? 'topic folders' : 'no folders'],
         ['totems', p.totems_enabled ? p.totems.map((t) => t.label).join(', ') : 'off'],
         ['tags', p.tag_presets.length ? p.tag_presets.map((t) => t.name).join(', ') : 'no presets yet'],
+        ...(form.elements.editor_mode ? [['metadata', p.editor_mode === 'complete' ? 'complete' : 'simplified']] : []),
         ['calendar', p.publish_day ? `${p.publish_day}s` : 'off'],
       ];
       el('wizard-summary').innerHTML = rows
@@ -173,6 +177,7 @@
     form.elements.publication.value = values.publication || '';
     form.elements.publication_name.value = values.publication_name || '';
     form.elements.publish_day.value = values.publish_day || 'monday';
+    if (form.elements.editor_mode) form.elements.editor_mode.value = values.editor_mode || 'simplified';
     el('wizard-vault-path-field').classList.toggle('hidden', !pathsEditable);
     el('wizard-vault-path-note').classList.toggle('hidden', pathsEditable);
     el('wizard-totem-list').innerHTML = (status.config?.totems?.slots || []).map((slot) => `<div class="setup-totem-row" data-totem-key="${escapeHtml(slot.key)}">
