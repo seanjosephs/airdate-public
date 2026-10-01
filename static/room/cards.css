@@ -167,6 +167,14 @@
 .pool-star svg { stroke-width: 3.6; }
 .pool-star[aria-pressed="true"] svg { fill: currentColor; }
 
+/* The needs-filing lane (slice 6): essays with no category yet. */
+.pool-filing {
+  padding: 0 12px 0 8px;
+  border-width: 1px;
+  color: var(--orange-soft);
+  font-size: 12px;
+}
+
 .pool-sort {
   display: flex;
   align-items: center;
@@ -869,3 +877,92 @@
 @media (prefers-reduced-motion: reduce) {
   .card.is-pulsing { animation: none; }
 }
+
+/* ---- the umbrella: save for a rainy day (slice 6) ---- */
+
+.card-umbrella {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--b2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.card-umbrella:hover { border-color: var(--muted); color: var(--orange-soft); }
+
+/* ---- a parked card's footer: no handle, "in the rain since", and the way
+   back (rainy day, slice 6) ---- */
+
+.card-rain-since {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.card-unpark {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--orange-soft);
+  background: rgba(255, 178, 77, 0.12);
+  color: var(--orange-soft);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.card-unpark svg { flex-shrink: 0; }
+.card-unpark:hover { background: rgba(255, 178, 77, 0.20); }
+
+/* ---- the needs-filing lane (slice 6) ---- */
+
+.card-filing {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.card-file-select {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--b2);
+  background: var(--s2);
+  color: var(--text);
+  font: 600 12px var(--font-ui);
+}
+.card-file-btn {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--orange-soft);
+  background: rgba(255, 178, 77, 0.12);
+  color: var(--orange-soft);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.card-file-btn:hover { background: rgba(255, 178, 77, 0.20); }
+.card-file-btn[disabled] { opacity: 0.5; cursor: not-allowed; }

@@ -246,7 +246,11 @@
 
   function drawHeader() {
     const phase = phaseEssay();
-    const stamp = Cards.stampFor(phase);
+    const isParked = phase.status === 'Archived';
+    // A parked essay keeps the stamp of the phase it had before (cards.js's
+    // displayEssay does the same for the card).
+    const stampPhase = isParked ? { ...phase, status: Cards.displayStatusOf(phase) } : phase;
+    const stamp = Cards.stampFor(stampPhase);
     els.scrap.innerHTML = Cards.stampMarkup(stamp);
     els.scrap.setAttribute('aria-label', `status: ${stamp.label}`);
     els.scrap.hidden = false;
@@ -255,6 +259,15 @@
     const url = String((essay && essay.obsidian_url) || '');
     els.obsidian.hidden = !url;
     if (url) els.obsidian.href = url;
+    if (els.umbrella) {
+      const shownPhase = Cards.phaseOf(stampPhase);
+      els.umbrella.hidden = !(isParked || shownPhase === 'room' || shownPhase === 'likey');
+      els.umbrella.dataset.parked = isParked ? 'true' : 'false';
+      const label = isParked ? 'back to the room' : 'save for a rainy day';
+      els.umbrella.setAttribute('aria-label', label);
+      els.umbrella.title = label;
+      els.umbrella.disabled = false;
+    }
   }
 
   function drawTitle() {
@@ -578,6 +591,69 @@
     document.dispatchEvent(new CustomEvent('room:essay', {
       detail: { oldId: String(oldId), essay: row, source: 'editor' },
     }));
+  }
+
+  // ---- the umbrella: save for a rainy day, from the editor header (slice 6) -
+
+  function parkFailure(error) {
+    if (error && error.kind === 'refused') return error.message;
+    if (error && error.kind === 'not-found') return 'the note is no longer in your essays folder, so nothing was parked.';
+    if (error && error.kind === 'network') return 'airdate is not answering, so nothing was parked. try again.';
+    return 'nothing was parked. try again.';
+  }
+
+  function backFailure(error) {
+    if (error && error.kind === 'refused') return error.message;
+    return `could not bring it back. ${(error && error.message) || 'try again.'}`;
+  }
+
+  function phaseWord(status) {
+    return status === 'Writers Likey' ? 'writers likey' : 'writers room';
+  }
+
+  async function bringBack(id, fallbackTitle, slipTone) {
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/back-to-room`, {});
+      const row = result && result.row;
+      if (row) document.dispatchEvent(new CustomEvent('room:essay', { detail: { oldId: String(id), essay: row, source: 'editor' } }));
+      Feedback.slip({ tone: slipTone || 'green', text: `${String((row && row.title) || fallbackTitle).toLowerCase()} is back in the room as ${phaseWord(row && row.status)}.` });
+      return true;
+    } catch (error) {
+      Feedback.slip({ tone: 'red', text: backFailure(error) });
+      return false;
+    }
+  }
+
+  // The essay leaves the editor once this succeeds (there is nothing left in
+  // the editor to show it parked), so the sentence and its undo go on the
+  // slip, same as the card's umbrella.
+  async function parkFromEditor() {
+    if (!state || saving || sending || !els.umbrella || els.umbrella.hidden) return;
+    const id = state.id;
+    const title = String(state.values.title || '').trim() || (essay && essay.title) || 'the essay';
+    if (els.umbrella.dataset.parked === 'true') {
+      els.umbrella.disabled = true;
+      const ok = await bringBack(id, title);
+      if (ok) close();
+      else els.umbrella.disabled = false;
+      return;
+    }
+    els.umbrella.disabled = true;
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/archive`, {});
+      const fresh = result && result.row;
+      announceRow(id, fresh);
+      close();
+      Feedback.slip({
+        tone: 'green',
+        text: `${String((fresh && fresh.title) || title).toLowerCase()} saved for a rainy day.`,
+        // The id parking returns: a uid may have been minted and the file moved.
+        undo: () => bringBack((result && result.new_id) || (fresh && fresh.id) || id, title),
+      });
+    } catch (error) {
+      els.umbrella.disabled = false;
+      Feedback.plaque(els.feedback, { tone: error && error.kind === 'refused' ? 'amber' : 'red', text: parkFailure(error) });
+    }
   }
 
   function followId(oldId) {
@@ -1602,6 +1678,7 @@
     });
     els.reload.addEventListener('click', reloadFromObsidian);
     els.copy.addEventListener('click', copyScript);
+    if (els.umbrella) els.umbrella.addEventListener('click', parkFromEditor);
 
     // On document, not the dialog: a click on a bare part of the page puts
     // focus on <body>, and Escape and save must still reach the editor.
@@ -1747,6 +1824,7 @@
     els.status = $('ed-status');
     els.state = $('ed-state');
     els.obsidian = $('ed-obsidian');
+    els.umbrella = $('ed-umbrella');
     els.save = $('ed-save');
     els.feedback = $('ed-feedback');
     els.conflict = $('ed-conflict');

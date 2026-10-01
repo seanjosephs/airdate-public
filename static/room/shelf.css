@@ -1,0 +1,292 @@
+/* The shelf (slice 6): a table, not a room. "On the shelf" is the current
+ * month; "the archive" is every earlier month, grouped, newest first - a
+ * view only, never the Archive/ folder (rainy day owns that word; see
+ * rainy-day.css). Route visibility lives in settings.css (body.route-shelf).
+ */
+
+.shelf-view {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.shelf-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.shelf-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.shelf-title-row h1 {
+  margin: 0;
+  font: 700 28px/1.2 var(--font-ui);
+  letter-spacing: -0.5px;
+}
+.shelf-count-pill {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: var(--s3);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.shelf-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.shelf-search {
+  position: relative;
+  flex-grow: 1;
+  min-width: 220px;
+  max-width: 520px;
+}
+.shelf-search svg {
+  position: absolute;
+  left: 14px;
+  top: 13px;
+  stroke: var(--muted);
+  pointer-events: none;
+}
+.shelf-search input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px 0 44px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--b2);
+  background: var(--s2);
+  color: var(--text);
+  font: 500 15px/1 var(--font-ui);
+}
+.shelf-search input::placeholder { color: var(--muted); }
+
+.shelf-totems {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shelf-totems[hidden] { display: none; }
+.shelf-totem {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--b2);
+  background: var(--s1);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.shelf-totem img { width: 28px; height: 28px; object-fit: contain; }
+.shelf-totem:hover { border-color: var(--muted); }
+.shelf-totem[aria-pressed="true"] { border-color: var(--orange-soft); background: rgba(255, 106, 0, 0.14); }
+
+.shelf-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.shelf-select label { color: var(--muted); font-size: 12px; font-weight: 600; }
+.shelf-select select {
+  height: 40px;
+  padding: 0 10px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--b2);
+  background: var(--s2);
+  color: var(--text);
+  font: 600 13px/1 var(--font-ui);
+}
+
+.shelf-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.shelf-empty {
+  margin: 0;
+  padding: 28px;
+  border: 1px dashed var(--b2);
+  border-radius: var(--r-lg);
+  background: var(--s1);
+  color: var(--muted);
+  font-size: 14px;
+}
+.shelf-empty-inline { padding: 16px; }
+
+.shelf-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.shelf-month-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 10px 4px;
+}
+.shelf-month-tag {
+  padding: 3px 12px 4px;
+  background: var(--cream);
+  color: var(--ink);
+  font: 400 15px var(--font-marker);
+  transform: rotate(-1.2deg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+.shelf-month-sub {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.shelf-archive-heading {
+  margin: 6px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font: 700 22px/1.2 var(--font-ui);
+}
+.shelf-archive-heading span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* The grid's fixed columns plus the title's floor add up to more than fits
+   a narrow window, so the table scrolls on its own X axis instead of
+   crushing the title column to a sliver - the title is the one thing on
+   this row that must stay readable. */
+.shelf-table {
+  background: var(--s1);
+  border: 1px solid var(--b1);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+}
+
+.shelf-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(200px, 1fr) 170px 84px 110px 140px 44px;
+  align-items: center;
+  gap: 14px;
+  min-width: 920px;
+  min-height: 68px;
+  padding: 0 16px;
+}
+.shelf-row + .shelf-row { border-top: 1px solid var(--b1); }
+
+.shelf-cell { min-width: 0; }
+
+.shelf-cell-totem {
+  width: 40px;
+  height: 52px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--desk);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.shelf-cell-totem img { height: 60px; max-width: none; }
+.shelf-no-totem { display: block; width: 100%; height: 100%; }
+
+.shelf-cell-title { display: flex; flex-direction: column; gap: 2px; }
+.shelf-title-link {
+  position: relative;
+  z-index: 1;
+  color: var(--text);
+  font: 700 16px/1.3 var(--font-ui);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shelf-title-link:hover { text-decoration: underline; }
+.shelf-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shelf-cell-topic {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.shelf-topic-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: var(--r-pill);
+  background: var(--topic, var(--muted));
+}
+.shelf-topic-name { overflow: hidden; text-overflow: ellipsis; }
+.shelf-muted { color: var(--muted); }
+
+.shelf-cell-length {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.shelf-cell-went {
+  font-family: var(--font-stamp);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #E58C9F;
+  white-space: nowrap;
+}
+
+.shelf-read {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--orange-soft);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.shelf-read:hover { text-decoration: underline; }
+
+.shelf-obsidian {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--b2);
+  color: #C9A8FF;
+}
+.shelf-obsidian:hover { border-color: #C9A8FF; }
