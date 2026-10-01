@@ -254,7 +254,7 @@ class EditorSettingsRouteTests(EditorCase):
 
     def test_the_browser_gets_the_editor_settings(self):
         editor = self.server.ui_config_payload()["editor"]
-        self.assertEqual(editor, {"mode": "simplified", "sections": {}, "script_height": None})
+        self.assertEqual(editor, {"mode": "simplified", "sections": {}, "script_height": None, "tour_done": False})
 
     def test_the_script_height_is_remembered(self):
         before = self.on_disk()

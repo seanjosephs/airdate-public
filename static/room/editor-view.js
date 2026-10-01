@@ -1,5 +1,6 @@
 // The essay editor page: drawing it, reading what the writer does, and the
-// round trips (build spec §8; slice 4a the page and save, 4b send).
+// round trips (build spec §8; slice 4a the page and save, 4b send, 4c the
+// gear sheet and the editor tour).
 //
 // The rules live in editor.js and are tested there. This file only moves
 // values between the page and that state object, which is the single source
@@ -40,6 +41,12 @@
   let sending = false;
   let refused = false;
   let madeDraft = null;
+  // The gear sheet and the tour (slice 4c). Editor settings changes go to
+  // the server one at a time, in order; `confirmedEditor` is what config.json
+  // last said, which a failed change falls back to.
+  let gearChain = Promise.resolve();
+  let gearPending = 0;
+  let confirmedEditor = null;
 
   const CHIP_X = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const DOT = '<span class="ed-state-dot" aria-hidden="true"></span>';
@@ -116,6 +123,8 @@
 
   function close() {
     const id = state ? state.id : '';
+    closeGear(false);
+    endTour();
     hideGuard();
     hideConflict();
     Feedback.clear(els.feedback);
@@ -150,6 +159,9 @@
   }
 
   function showGuard() {
+    // The guard sits in the part of the page the sheet and the tour cover.
+    closeGear(false);
+    endTour();
     if (!els.guard.hidden) {
       els.guardKeep.focus();
       return;
@@ -206,6 +218,7 @@
       }
       els.title.focus();
       runChecks();
+      maybeFirstTour(token);
     } catch (error) {
       if (token !== opening) return;
       hide();
@@ -492,7 +505,11 @@
       if (!Number.isFinite(height)) return;
       try {
         const result = await Api.postJson('/api/settings/editor', { script_height: height });
-        if (config && result && result.editor) config.editor = result.editor;
+        if (config && result && result.editor) {
+          // Only the height: a gear change still on its way keeps its place.
+          config.editor = { ...(config.editor || {}), script_height: result.editor.script_height };
+          confirmedEditor = result.editor;
+        }
         Feedback.clear(els.resizeFeedback);
       } catch (error) {
         const text = error && error.kind === 'network'
@@ -1372,6 +1389,195 @@
     });
   }
 
+  // ---- the gear sheet (slice 4c) ---------------------------------------------
+
+  // The parts of the editor behind the sheet. Inert while it is open, so the
+  // sheet is the only thing focus and the pointer can reach.
+  function editorParts() {
+    return [els.root.querySelector('.ed-head'), $('ed-notices'), els.body].filter(Boolean);
+  }
+
+  function gearOpen() {
+    return Boolean(els.gs && !els.gs.hidden);
+  }
+
+  function drawGear() {
+    const totemsOn = totemItems().length > 0;
+    const gear = Editor.gearState(config && config.editor, { totemsEnabled: totemsOn });
+    for (const radio of els.gsModes) radio.checked = radio.value === gear.mode;
+    els.gsCustom.hidden = gear.mode !== 'custom';
+    for (const button of els.gsSwitches) {
+      button.setAttribute('aria-checked', String(Boolean(gear.switches[button.dataset.switch])));
+    }
+    // With totems off in app settings the totem field cannot show, whatever
+    // its switch says, so the row says so instead of offering a switch.
+    const totem = els.gsSwitches.find((button) => button.dataset.switch === 'totem');
+    if (totem) totem.hidden = !gear.totemsEnabled;
+    els.gsTotemOff.hidden = gear.totemsEnabled;
+    els.gsTotemDesc.textContent = gear.totemsEnabled
+      ? 'shows because you have totems set up.'
+      : 'totems are turned off, so there is no totem to pick.';
+  }
+
+  function openGear() {
+    if (!isOpen() || !state || !config || gearOpen()) return;
+    if (window.AirdateTour && typeof window.AirdateTour.isActive === 'function' && window.AirdateTour.isActive()) return;
+    drawGear();
+    els.gsSaved.textContent = '';
+    Feedback.clear(els.gsFeedback);
+    els.gsScrim.hidden = false;
+    els.gs.hidden = false;
+    for (const el of editorParts()) el.inert = true;
+    els.gear.setAttribute('aria-expanded', 'true');
+    els.gsTitle.focus();
+  }
+
+  function closeGear(restoreFocus) {
+    if (!gearOpen()) return;
+    els.gs.hidden = true;
+    els.gsScrim.hidden = true;
+    for (const el of editorParts()) el.inert = false;
+    els.gear.setAttribute('aria-expanded', 'false');
+    if (restoreFocus !== false) els.gear.focus();
+  }
+
+  function gearFailure(error) {
+    if (error && error.kind === 'network') return 'airdate is not answering, so that was not saved. the switches are back as they were.';
+    const message = String((error && error.message) || '').trim().toLowerCase();
+    return `that was not saved${message ? `: ${message}` : ''}. the switches are back as they were.`;
+  }
+
+  // Takes effect at once and is saved to config.json at once: this is a
+  // setting, not the essay, and the essay's own save button does not cover
+  // it. Changes go in order; the last answer is what the page shows.
+  function changeEditor(next) {
+    if (!next || !config) return;
+    if (!confirmedEditor) confirmedEditor = { ...(config.editor || {}) };
+    config.editor = { ...(config.editor || {}), ...next };
+    drawGear();
+    drawSections();
+    els.gsSaved.textContent = 'saving…';
+    Feedback.clear(els.gsFeedback);
+    gearPending += 1;
+    gearChain = gearChain.then(async () => {
+      try {
+        const result = await Api.postJson('/api/settings/editor', next);
+        if (result && result.editor) confirmedEditor = result.editor;
+        gearPending -= 1;
+        if (gearPending) return;
+        config.editor = { ...confirmedEditor };
+        drawGear();
+        drawSections();
+        say(els.gsSaved, 'saved for every essay.');
+      } catch (error) {
+        gearPending -= 1;
+        config.editor = { ...confirmedEditor };
+        drawGear();
+        drawSections();
+        els.gsSaved.textContent = '';
+        Feedback.plaque(els.gsFeedback, { tone: 'red', text: gearFailure(error) });
+      }
+      // Readiness says where a missing detail lives, which can just have
+      // been switched off or on.
+      if (state && !gearPending) runReadiness();
+    });
+  }
+
+  // ---- the editor tour (slice 4c) -------------------------------------------
+
+  function tourModule() {
+    const Tour = window.AirdateTour;
+    return Tour && typeof Tour.isActive === 'function' && Array.isArray(Tour.EDITOR_STOPS) ? Tour : null;
+  }
+
+  function endTour() {
+    const Tour = tourModule();
+    if (Tour && Tour.isActive()) Tour.end('dismissed');
+  }
+
+  function runTour(first) {
+    const Tour = tourModule();
+    if (!Tour || !isOpen() || !state || Tour.isActive() || gearOpen()) return false;
+    // The sticky lives on document.body, outside this dialog. While it runs
+    // the editor stops claiming to be the only dialog on the page, so a
+    // screen reader can reach the sticky. The page behind stays inert.
+    els.root.removeAttribute('aria-modal');
+    const started = Tour.start({
+      stops: Tour.EDITOR_STOPS,
+      key: null,
+      pad: 12,
+      place: Tour.placeBeside,
+      returnToAnchor: true,
+      arrows: true,
+      className: 'ed-tour',
+      buttonClass: 'ed-tour-button',
+      skipLabel: 'skip the tour',
+      countLabel: (n, total) => `step ${n} of ${total}`,
+      textFor: (stop) => (stop.key === 'stamp' ? Editor.stampTourText(phaseEssay().status) : undefined),
+      onEnd: () => {
+        els.root.setAttribute('aria-modal', 'true');
+        if (first) rememberTour();
+      },
+    });
+    if (!started) els.root.setAttribute('aria-modal', 'true');
+    return started;
+  }
+
+  // Once per vault: config.json records it, whether the writer finished the
+  // tour or skipped it.
+  function rememberTour() {
+    gearChain = gearChain.then(async () => {
+      try {
+        const result = await Api.postJson('/api/settings/editor', { tour_done: true });
+        if (result && result.editor) {
+          confirmedEditor = result.editor;
+          if (config) config.editor = { ...(config.editor || {}), tour_done: result.editor.tour_done };
+        }
+      } catch (error) {
+        if (isOpen()) {
+          Feedback.plaque(els.feedback, {
+            tone: 'amber',
+            text: 'airdate could not remember that the tour has run, so it may show again next time.',
+          });
+        }
+      }
+    });
+  }
+
+  // The first time the editor opens on this vault.
+  function maybeFirstTour(token) {
+    if (!config || !config.editor || config.editor.tour_done === true) return;
+    window.requestAnimationFrame(() => {
+      if (token !== opening || !isOpen() || !state || !config.editor || config.editor.tour_done === true) return;
+      // Once per page load too, even if recording it fails.
+      config.editor = { ...config.editor, tour_done: true };
+      runTour(true);
+    });
+  }
+
+  function bindGear() {
+    els.gear.addEventListener('click', openGear);
+    els.gsDone.addEventListener('click', () => closeGear());
+    els.gsScrim.addEventListener('click', () => closeGear());
+    for (const radio of els.gsModes) {
+      radio.addEventListener('change', () => {
+        if (radio.checked) changeEditor(Editor.presetSettings(radio.value));
+      });
+    }
+    for (const button of els.gsSwitches) {
+      button.addEventListener('click', () => {
+        if (!config) return;
+        changeEditor(Editor.flipSection(config.editor, button.dataset.switch));
+      });
+    }
+    els.gsReplay.addEventListener('click', () => {
+      closeGear(false);
+      window.requestAnimationFrame(() => {
+        if (!runTour(false)) els.gear.focus();
+      });
+    });
+  }
+
   // ---- wiring ---------------------------------------------------------------
 
   function bind() {
@@ -1408,6 +1614,10 @@
       }
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       event.preventDefault();
+      if (gearOpen()) {
+        closeGear();
+        return;
+      }
       if (!els.guard.hidden) {
         els.guardKeep.click();
         return;
@@ -1474,6 +1684,7 @@
     bindHero();
     bindResize();
     bindSend();
+    bindGear();
 
     // A plain click on a card title opens the editor in place. A modified
     // click or a middle click is the browser's: a new tab loads the room with
@@ -1600,6 +1811,19 @@
     els.previewHide = $('ed-preview-hide');
     els.pads = Array.from(els.root.querySelectorAll('.ed-pad'));
     els.colors = Array.from(els.root.querySelectorAll('.ed-color'));
+    els.gear = $('ed-gear');
+    els.gs = $('gs');
+    els.gsScrim = $('gs-scrim');
+    els.gsTitle = $('gs-title');
+    els.gsDone = $('gs-done');
+    els.gsModes = Array.from(els.root.querySelectorAll('input[name="gs-mode"]'));
+    els.gsCustom = $('gs-custom');
+    els.gsSwitches = Array.from(els.root.querySelectorAll('.gs-switch'));
+    els.gsTotemOff = $('gs-totem-off');
+    els.gsTotemDesc = $('gs-d-totem');
+    els.gsSaved = $('gs-saved');
+    els.gsFeedback = $('gs-feedback');
+    els.gsReplay = $('gs-replay');
     bind();
     window.RoomEditorView = { open, requestClose, isOpen };
     const id = Editor.essayFromSearch(window.location.search);

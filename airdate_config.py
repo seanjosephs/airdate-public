@@ -103,6 +103,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         # The script area's height once the writer has dragged it; null means
         # airdate's own default.
         "script_height": None,
+        # The editor tour runs the first time the editor opens on this vault,
+        # then this is true. The home tour's state stays in the browser.
+        "tour_done": False,
     },
     # The red-pen jabs on old script pages. Twenty ship; a writer can add
     # their own lines or turn the whole thing off.
@@ -227,7 +230,7 @@ def _check_keywords(value: Any, where: str, errors: list[str]) -> None:
 
 
 def validate_editor(editor: Any, known_sections_only: bool = False) -> list[str]:
-    """editor.mode, editor.sections and editor.script_height.
+    """editor.mode, editor.sections, editor.script_height and editor.tour_done.
 
     config.json is checked loosely on sections (any switch name), so a file
     written by a later airdate still loads; a change arriving from the browser
@@ -254,6 +257,8 @@ def validate_editor(editor: Any, known_sections_only: bool = False) -> list[str]
         errors.append(
             f"editor.script_height must be a whole number from {SCRIPT_HEIGHT_MIN} to {SCRIPT_HEIGHT_MAX}, or null."
         )
+    if "tour_done" in editor and not isinstance(editor["tour_done"], bool):
+        errors.append("editor.tour_done must be true or false.")
     return errors
 
 
