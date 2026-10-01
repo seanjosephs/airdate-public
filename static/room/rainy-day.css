@@ -1,0 +1,147 @@
+/* Rainy day (slice 6): cards, not a table - the script face (paper age, jab,
+ * tool) is the information, so this reuses the room's own card at room size,
+ * three across. Route visibility lives in settings.css (body.route-rainy-day).
+ */
+
+.rainy-view {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.rainy-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rainy-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.rainy-title-row h1 {
+  margin: 0;
+  font: 700 26px/1.2 var(--font-ui);
+  letter-spacing: -0.5px;
+}
+.rainy-count-pill {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--orange-soft);
+  font-variant-numeric: tabular-nums;
+}
+.rainy-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.rainy-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rainy-search {
+  position: relative;
+  width: 340px;
+  max-width: 100%;
+}
+.rainy-search svg {
+  position: absolute;
+  left: 12px;
+  top: 11px;
+  stroke: var(--muted);
+  pointer-events: none;
+}
+.rainy-search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 38px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--b2);
+  background: var(--s2);
+  color: var(--text);
+  font: 600 14px/1 var(--font-ui);
+}
+.rainy-search input::placeholder { color: var(--muted); }
+
+.rainy-grow { flex-grow: 1; }
+
+.rainy-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rainy-sort label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.rainy-sort select {
+  height: 40px;
+  padding: 0 10px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--b2);
+  background: var(--s2);
+  color: var(--text);
+  font: 600 14px/1 var(--font-ui);
+}
+
+.rainy-columns {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.rainy-column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.rainy-empty-wrap {
+  flex: 1 1 auto;
+  min-height: 220px;
+  padding: 24px;
+  border: 1px dashed var(--b2);
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rainy-loading { margin: 0; color: var(--muted); font-size: 14px; }
+
+/* The empty-state slip: a cream paper strip, like the feedback slip. */
+.rainy-empty {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 340px;
+  padding: 22px 28px;
+  border-radius: 3px;
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.60);
+  transform: rotate(-1deg);
+  text-align: center;
+}
+.rainy-empty-title {
+  margin: 0;
+  font: 400 22px var(--font-marker);
+}
+.rainy-empty-sub {
+  margin: 0;
+  font: 600 13px/1.45 var(--font-ui);
+  text-wrap: pretty;
+}
+
+@media (max-width: 900px) {
+  .rainy-columns { flex-wrap: wrap; }
+  .rainy-column { flex-basis: 100%; }
+}

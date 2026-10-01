@@ -257,6 +257,55 @@ class SortTests(unittest.TestCase):
                          ["b", "a"])
 
 
+class RainyDaySortTests(unittest.TestCase):
+    def test_default_is_longest_in_the_rain(self):
+        rows = [
+            essay(id="new", status="Archived", archived_at="2026-09-01T12:00:00Z"),
+            essay(id="old", status="Archived", archived_at="2026-02-01T12:00:00Z"),
+            essay(id="mid", status="Archived", archived_at="2026-06-01T12:00:00Z"),
+        ]
+        order = run(f"cards.rainyDaySort({js(rows)}).map((e) => e.id)")
+        self.assertEqual(order, ["old", "mid", "new"])
+
+    def test_newest_parked(self):
+        rows = [
+            essay(id="new", status="Archived", archived_at="2026-09-01T12:00:00Z"),
+            essay(id="old", status="Archived", archived_at="2026-02-01T12:00:00Z"),
+        ]
+        order = run(f"cards.rainyDaySort({js(rows)}, 'newest-parked').map((e) => e.id)")
+        self.assertEqual(order, ["new", "old"])
+
+    def test_title(self):
+        rows = [essay(id="b", title="Bravo", status="Archived"), essay(id="a", title="Alpha", status="Archived")]
+        order = run(f"cards.rainyDaySort({js(rows)}, 'title').map((e) => e.id)")
+        self.assertEqual(order, ["a", "b"])
+
+    def test_sorting_does_not_mutate_the_input(self):
+        rows = [essay(id="b", status="Archived", archived_at="2026-09-01T12:00:00Z"),
+                essay(id="a", status="Archived", archived_at="2026-02-01T12:00:00Z")]
+        self.assertEqual(
+            run(f"(() => {{ const rows = {js(rows)}; cards.rainyDaySort(rows); return rows.map((e) => e.id); }})()"),
+            ["b", "a"])
+
+
+class DisplayStatusTests(unittest.TestCase):
+    def test_a_non_parked_essay_keeps_its_own_status(self):
+        self.assertEqual(run(f"cards.displayStatusOf({js(essay(status='Writers Likey'))})"), "Writers Likey")
+
+    def test_a_parked_essay_shows_its_previous_status(self):
+        self.assertEqual(
+            run(f"cards.displayStatusOf({js(essay(status='Archived', previous_status='Writers Likey'))})"),
+            "Writers Likey")
+
+    def test_a_parked_essay_with_no_previous_status_falls_back_to_the_room(self):
+        self.assertEqual(run(f"cards.displayStatusOf({js(essay(status='Archived'))})"), "Writers Room")
+
+    def test_an_invalid_previous_status_also_falls_back(self):
+        self.assertEqual(
+            run(f"cards.displayStatusOf({js(essay(status='Archived', previous_status='Ready for Air'))})"),
+            "Writers Room")
+
+
 class DistributeTests(unittest.TestCase):
     def test_shortest_column_first_leftmost_on_a_tie(self):
         columns = run("cards.distribute([100, 100, 100, 50, 10], 3, (h) => h)")
@@ -301,14 +350,47 @@ class CardMarkupTests(unittest.TestCase):
         self.assertNotIn("card-postit", html)
         self.assertIn("airs mon oct 5", html)
 
-    def test_a_room_card_has_no_handle_and_no_umbrella(self):
+    def test_a_room_card_has_no_handle_but_has_the_umbrella(self):
         # A writers room essay cannot go on the board, so it has no handle
         # (tests/test_room_board_js.py covers the likey card's). The umbrella
-        # arrives with rainy day.
+        # (slice 6) is on both room and likey cards.
         html = self.markup()
         self.assertNotIn("drag", html)
-        self.assertNotIn("rainy", html)
-        self.assertEqual(html.count("<button"), 1, "the post-it is the only button on a room card")
+        self.assertIn('data-action="park"', html)
+        self.assertIn("rainy", html)
+        self.assertEqual(html.count("<button"), 2, "the post-it and the umbrella")
+
+    def test_the_umbrella_is_on_likey_too_but_not_on_scheduled_or_live(self):
+        self.assertIn('data-action="park"', self.markup(status="Writers Likey"))
+        self.assertNotIn('data-action="park"', self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
+        self.assertNotIn('data-action="park"', self.markup(status="Live", published_date="2026-09-21"))
+
+    def test_a_parked_card_shows_its_previous_phase(self):
+        html = self.markup(status="Archived", previous_status="Writers Likey", archived_at="2026-05-12T18:00:00Z",
+                            starred_at="2026-02-02T18:00:00Z")
+        self.assertIn("phase-likey", html)
+        self.assertIn('role="img" aria-label="writers likey, feb 2 2026"', html)
+        self.assertIn("is-parked", html)
+        self.assertIn("in the rain since may 12", html)
+        self.assertIn('data-action="unpark"', html)
+        self.assertNotIn('data-action="park"', html)
+        self.assertNotIn('data-action="place"', html)
+
+    def test_a_card_parked_before_archived_at_existed_says_in_the_rain_without_a_date(self):
+        # Essays parked by an older airdate carry no archived_at; the line must
+        # not trail off into "in the rain since" with nothing after it.
+        html = self.markup(status="Archived")
+        self.assertIn(">in the rain</span>", html)
+        self.assertNotIn("in the rain since", html)
+
+    def test_a_parked_card_with_no_previous_status_falls_back_to_the_room(self):
+        html = self.markup(status="Archived", archived_at="2026-05-12T18:00:00Z")
+        self.assertIn("phase-room", html)
+        self.assertIn("size-room", html)
+
+    def test_a_parked_cards_star_still_shows(self):
+        html = self.markup(status="Archived", previous_status="Writers Likey", archived_at="2026-05-12T18:00:00Z")
+        self.assertIn("is-drawn", html)
 
     def test_the_obsidian_link(self):
         html = self.markup()

@@ -56,6 +56,11 @@
   const AIR_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.5 6.5 0 0 0 0 9M16.5 7.5a6.5 6.5 0 0 1 0 9M4.5 4.5a10.5 10.5 0 0 0 0 15M19.5 4.5a10.5 10.5 0 0 1 0 15"/></svg>';
   const HANDLE_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M5 7h14M5 12h14M5 17h14"/></svg>';
   const LIVE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>';
+  // The umbrella: save for a rainy day. On writers room and writers likey
+  // cards (and the editor header) only - §15.2, slice 6.
+  const UMBRELLA_ICON = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9z"/><path d="M12 12v6a2 2 0 0 0 4 0"/><path d="M12 2v1"/></svg>';
+  // Back to the room: a parked card's umbrella becomes this.
+  const BACK_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>';
 
   // How many stacked parts each writing tool is drawn from (cards.css styles
   // them by position).
@@ -127,6 +132,25 @@
 
   function phaseOf(essay) {
     return PHASES[essay?.status] || 'room';
+  }
+
+  // A parked essay (rainy day) keeps the stamp, star and size of the phase it
+  // had just before parking - "stamp, star and paper age stay" (§15.2). Only
+  // room and likey ever reach Archived (the server refuses parking a
+  // scheduled or live essay), so this always resolves to one of those two.
+  const RESTORABLE_STATUSES = new Set(['Writers Room', 'Writers Likey']);
+  function displayStatusOf(essay) {
+    if (essay?.status !== 'Archived') return essay?.status;
+    const previous = String(essay?.previous_status || '').trim();
+    return RESTORABLE_STATUSES.has(previous) ? previous : 'Writers Room';
+  }
+
+  // The essay a card actually draws itself as: the real essay, or - when
+  // parked - a shadow copy wearing its previous phase, so every phase-driven
+  // function (sizeTier, stampFor, the post-it) reads it without knowing
+  // rainy day exists.
+  function displayEssay(essay) {
+    return essay?.status === 'Archived' ? { ...essay, status: displayStatusOf(essay) } : essay;
   }
 
   function isComplete(essay) {
@@ -258,6 +282,24 @@
     });
   }
 
+  function archivedTime(essay) {
+    const date = toDate(essay?.archived_at);
+    return date ? date.getTime() : 0;
+  }
+
+  // Rainy day's three sorts. Default is "longest in the rain": oldest parked
+  // first, because the point of the screen is to see what has been waiting.
+  function rainyDaySort(essays, mode) {
+    const list = [...(Array.isArray(essays) ? essays : [])];
+    if (mode === 'newest-parked') {
+      return list.sort((a, b) => archivedTime(b) - archivedTime(a));
+    }
+    if (mode === 'title') {
+      return list.sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+    }
+    return list.sort((a, b) => archivedTime(a) - archivedTime(b));
+  }
+
   function estimatedHeight(essay) {
     // Cover plus a footer of about two title lines. Only used to balance the
     // columns, so close is good enough.
@@ -363,6 +405,27 @@
       + `<span class="stamp-room-box">writers room</span>${dateSpan('stamp-room-date')}</div>`;
   }
 
+  // The needs-filing lane (slice 6): a one-click route for an essay with no
+  // category, through the existing intake-suggest/intake-apply routes.
+  // `intake` is the last suggestion pool.js has for this essay, or undefined
+  // before the writer has asked for one.
+  function filingMarkup(essay, intake) {
+    if (!essay?.needs_intake) return '';
+    if (!intake) {
+      return '<div class="card-filing"><button type="button" class="card-file-btn" data-action="intake-suggest">file it</button></div>';
+    }
+    const categories = Array.isArray(intake.categories) ? intake.categories : [];
+    const categoriesOff = intake.category_mode === 'off';
+    const picker = (categoriesOff || !categories.length) ? '' : (
+      '<select class="card-file-select" data-role="file-category" aria-label="topic for this essay">'
+      + categories.map((cat) => `<option value="${escapeHtml(cat)}"${cat === intake.category ? ' selected' : ''}>${escapeHtml(String(cat).toLowerCase())}</option>`).join('')
+      + '</select>'
+    );
+    const label = intake.category ? `file it into ${escapeHtml(String(intake.category).toLowerCase())}` : 'file it';
+    const stuck = !categoriesOff && !categories.length;
+    return `<div class="card-filing">${picker}<button type="button" class="card-file-btn" data-action="intake-apply"${stuck ? ' disabled' : ''}>${label}</button></div>`;
+  }
+
   function toolMarkup(tierKey) {
     const tool = toolFor(tierKey);
     const parts = '<span class="tool-part"></span>'.repeat(tool.parts);
@@ -393,6 +456,18 @@
   // The three-bar handle: drag it to the board, or press it (or A) for
   // placing mode. Only a writers likey card has one - a writers room essay
   // cannot be scheduled, and a scheduled card's note is already up.
+  // Save for a rainy day. Writers room and writers likey cards only (slice
+  // 2 deliberately left it out until slice 6 wired it).
+  function umbrellaMarkup() {
+    return `<button type="button" class="card-umbrella" data-action="park" aria-label="save for a rainy day" title="save for a rainy day">${UMBRELLA_ICON}</button>`;
+  }
+
+  // A parked card's handle slot: when it was parked, and the way back.
+  function unparkMarkup(sinceLabel) {
+    return `<span class="card-rain-since">${escapeHtml(sinceLabel)}</span>`
+      + `<button type="button" class="card-unpark" data-action="unpark">${BACK_ICON}back to the room</button>`;
+  }
+
   function handleMarkup(placing) {
     return `<button type="button" class="card-handle" data-action="place" draggable="true" aria-pressed="${placing ? 'true' : 'false'}" aria-label="place on the board" title="drag to the board, or press to place it with the keyboard">${HANDLE_ICON}</button>`;
   }
@@ -402,12 +477,14 @@
   function cardMarkup(essay, ctx) {
     const context = ctx || {};
     const id = String(essay?.id || '');
-    const phase = phaseOf(essay);
-    const size = sizeTier(essay);
+    const isParked = essay?.status === 'Archived';
+    const shown = displayEssay(essay);
+    const phase = phaseOf(shown);
+    const size = sizeTier(shown);
     const tier = ageTier(essay?.arrived_at, context.now);
     const bars = barCount(essay?.word_count);
     const title = String(essay?.title || 'untitled');
-    const stamp = stampFor(essay);
+    const stamp = stampFor(shown);
     const line = pageLine(essay, tier, context.redPen);
     const totem = totemFor(essay, context.totems);
     const topic = topicFor(essay, context.presets);
@@ -417,10 +494,11 @@
     const showTool = phase === 'room' || phase === 'likey';
     const titleId = `card-title-${escapeHtml(id)}`;
     // Placing mode: the note is up on the board, and a dashed spot marks where
-    // it was. Only a likey card can be placing.
-    const placing = Boolean(context.placing) && phase === 'likey';
+    // it was. Only a likey card can be placing - never a parked one.
+    const placing = !isParked && Boolean(context.placing) && phase === 'likey';
 
     const classes = ['card', `size-${size.key}`, `phase-${phase}`, `age-${tier}`];
+    if (isParked) classes.push('is-parked');
     if (placing) classes.push('is-placing');
     let cover = '';
     if (totem) {
@@ -444,7 +522,7 @@
       + stampMarkup(stamp)
       + '</div>';
     if (placing) cover += '<div class="card-postit-spot" aria-hidden="true">note is<br>up</div>';
-    else if (showPostit) cover += postitMarkup(essay);
+    else if (showPostit) cover += postitMarkup(shown);
 
     let meta = '';
     if (topic) {
@@ -458,7 +536,13 @@
       + `<span class="card-length" title="${escapeHtml(words.toLocaleString('en-US'))} words">${barsMarkup(words)}${escapeHtml(formatWords(words))}<span class="visually-hidden"> words</span></span>`;
 
     let actions = '';
-    if (phase === 'likey') {
+    if (isParked) {
+      // No drag handle (it cannot go on the board from here); in its place,
+      // when it was parked. The umbrella becomes "back to the room". An essay
+      // parked by an older airdate has no archived_at, so no date to give.
+      const since = formatStampDate(essay?.archived_at, 'instant');
+      actions += unparkMarkup(since ? `in the rain since ${since}` : 'in the rain');
+    } else if (phase === 'likey') {
       actions += handleMarkup(placing);
     } else if (phase === 'ready' && essay?.scheduled_at) {
       actions += `<span class="card-air">${AIR_ICON}airs ${escapeHtml(formatAirDay(essay.scheduled_at))}</span>`;
@@ -466,6 +550,9 @@
       actions += `<a class="card-live" href="${escapeHtml(essay.substack_url)}" rel="noopener">${LIVE_ICON}live on substack</a>`;
     }
     actions += '<span class="card-spacer"></span>';
+    if (!isParked && (phase === 'room' || phase === 'likey')) {
+      actions += umbrellaMarkup();
+    }
     if (essay?.obsidian_url) {
       actions += `<a class="card-obsidian" href="${escapeHtml(essay.obsidian_url)}" aria-label="open in obsidian" title="open in obsidian">${OBSIDIAN_GEM}</a>`;
     }
@@ -479,6 +566,7 @@
       + '<div class="card-foot">'
       + `<div class="card-meta">${meta}</div>`
       + `<h3 class="card-title"><a class="card-link" id="${titleId}" href="${escapeHtml(editorHref(essay))}">${escapeHtml(title)}</a></h3>`
+      + filingMarkup(essay, context.intake && context.intake[id])
       + error
       + '<div class="card-feedback"></div>'
       + `<div class="card-actions">${actions}</div>`
@@ -492,6 +580,7 @@
     ageTier,
     toolFor,
     barCount,
+    barsMarkup,
     formatWords,
     phaseOf,
     isComplete,
@@ -503,6 +592,9 @@
     jabFor,
     pageLine,
     closestToAirSort,
+    rainyDaySort,
+    displayStatusOf,
+    displayEssay,
     distribute,
     estimatedHeight,
     topicFor,
@@ -511,6 +603,7 @@
     editorHref,
     escapeHtml,
     stampMarkup,
+    filingMarkup,
     cardMarkup,
   };
 });

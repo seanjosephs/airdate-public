@@ -38,19 +38,31 @@
   const els = {};
   function $(id) { return document.getElementById(id); }
 
-  // ---- the route: #settings shows this view, hides the board and the pool --
+  // ---- the route: the hash picks one of four views, hides the board and the
+  // pool for all but "essays", and owns aria-current on the sidebar nav for
+  // every route (shelf.js and rainy-day.js each still own their own view's
+  // hidden state and lazy load, the same way this module already did). --
+
+  const ROUTE_HASHES = { '#settings': 'settings', '#shelf': 'shelf', '#rainy-day': 'rainy-day' };
+
+  function currentRoute() {
+    return ROUTE_HASHES[window.location.hash] || 'essays';
+  }
 
   function isSettingsRoute() {
-    return window.location.hash === '#settings';
+    return currentRoute() === 'settings';
   }
 
   function applyRoute() {
-    const settings = isSettingsRoute();
+    const route = currentRoute();
+    const settings = route === 'settings';
     document.body.classList.toggle('route-settings', settings);
+    document.body.classList.toggle('route-shelf', route === 'shelf');
+    document.body.classList.toggle('route-rainy-day', route === 'rainy-day');
     if (els.view) els.view.hidden = !settings;
     for (const link of document.querySelectorAll('.room-nav a')) {
-      const current = link.getAttribute('href') === '/airdate/room#settings' ? settings : (!settings && link.getAttribute('href') === '/airdate/room');
-      if (current) link.setAttribute('aria-current', 'page');
+      const linkRoute = ROUTE_HASHES[link.getAttribute('href').replace('/airdate/room', '')] || 'essays';
+      if (linkRoute === route) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     }
     if (settings && !els.loaded) load();

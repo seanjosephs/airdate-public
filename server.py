@@ -482,6 +482,12 @@ EDITOR_ALLOWED_FIELDS = {
     # right rail. Validated in sanitize_updates: only what the board draws.
     "note_pad",
     "note_color",
+    # Rainy day (slice 6): stamped by park_essay, read back by back_to_room.
+    # Not editor-settable through the form, but written through the same
+    # save_essay_updates path set_essay_status already uses for every other
+    # machine-stamped field (published_date, substack_url, ...).
+    "previous_status",
+    "archived_at",
 }
 
 NOTE_PADS = ("sticky", "paper", "index")
@@ -529,6 +535,8 @@ ORDERED_FRONTMATTER_KEYS = [
     "notes",
     "note_pad",
     "note_color",
+    "previous_status",
+    "archived_at",
     # Machine-only durable identity — stamped once, never client-settable
     # (deliberately absent from EDITOR_ALLOWED_FIELDS). Last so it stays out of
     # the human-facing top of the Properties editor. Namespaced to avoid
@@ -2055,6 +2063,12 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
                     # stamp. "" when never starred, or starred before airdate
                     # kept the date.
                     "starred_at": load_starred().get(essay_id, ""),
+                    # Rainy day (slice 6): the phase an essay had just before it
+                    # was parked, and when. Both live in frontmatter (they move
+                    # with the file), unlike arrived_at/starred_at, which never
+                    # touch the vault. "" off the Archive folder.
+                    "previous_status": str(frontmatter.get("previous_status") or "").strip(),
+                    "archived_at": str(frontmatter.get("archived_at") or "").strip(),
                     "excerpt": first_line_excerpt(body),
                     "substack_draft_url": str(frontmatter.get("substack_draft_url") or "").strip(),
                     "hero_url": hero_asset_url(frontmatter.get("hero_image") or frontmatter.get("hero")),
@@ -3206,6 +3220,68 @@ def did_not_air(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     return unschedule_essay(essay_id, payload)
 
 
+# Why the umbrella cannot park an essay in these phases. The umbrella is only
+# drawn on writers room and writers likey cards (and the editor header), but
+# the server is the rule: a direct POST cannot park a scheduled or live essay
+# either. Unschedule first.
+PARK_REFUSALS = {
+    "Ready for Air": "it is on the board, so it can't be parked. unschedule it first.",
+    "Live": "it is live, so it stays on the shelf.",
+}
+
+
+def park_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Save an essay for a rainy day: Archived, with the phase it had and the
+    moment it was parked stamped into frontmatter so "back to the room" can
+    restore it exactly, even if the runtime sidecars were ever lost.
+
+    Idempotent: parking an already-parked essay is a no-op success, like the
+    star's double-press, and the stamps are left untouched so a second park
+    does not overwrite the phase the writer actually came from."""
+    path = resolve_essay_path(essay_id)
+    frontmatter, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+    if current in PARK_REFUSALS:
+        raise RefusedError(PARK_REFUSALS[current], current.lower().replace(" ", "-"))
+    if current == "Archived":
+        row = index_row_for(essay_id)
+        new_id = (row or {}).get("id") or essay_id
+        return {"ok": True, "changed": False, "status": "Archived",
+                "old_id": essay_id, "new_id": new_id, "row": row}
+    archived_at = datetime.now(timezone.utc).isoformat()
+    return with_index_row(set_essay_status(
+        essay_id,
+        "Archived",
+        {"previous_status": current, "archived_at": archived_at},
+        payload.get("expected_mtime"),
+        payload.get("expected_content_hash"),
+    ))
+
+
+def back_to_room(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Undo a parking: restore the phase stamped by park_essay (falling back
+    to Writers Room when it is absent or not a phase a parked essay can come
+    back as — the writer never got to leave the room any other way), and
+    clear both stamps. folder_for_status pulls the file back out of Archive/
+    on the same write; the client never reconstructs the phase itself."""
+    path = resolve_essay_path(essay_id)
+    frontmatter, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+    if current != "Archived":
+        raise RefusedError("it is not saved for a rainy day, so there is nothing to bring back.", "not-parked")
+    restored_raw = str(frontmatter.get("previous_status") or "").strip()
+    restored = normalize_status(restored_raw) if restored_raw else "Writers Room"
+    if restored not in ("Writers Room", "Writers Likey"):
+        restored = "Writers Room"
+    return with_index_row(set_essay_status(
+        essay_id,
+        restored,
+        {"previous_status": "", "archived_at": ""},
+        payload.get("expected_mtime"),
+        payload.get("expected_content_hash"),
+    ))
+
+
 def category_folders() -> list[str]:
     """Categories are the essays folder's top-level folders plus any named in
     config, minus airdate's reserved folders and `_` folders. Empty when
@@ -4048,13 +4124,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(publish_essay(essay_id, payload))
                 return
             if essay_id and action == "archive":
-                self.send_json(set_essay_status(
-                    essay_id,
-                    "Archived",
-                    None,
-                    payload.get("expected_mtime"),
-                    payload.get("expected_content_hash"),
-                ))
+                # The umbrella: save for a rainy day. Refused for Ready for Air
+                # and Live (409); stamps previous_status + archived_at so
+                # back-to-room can restore the phase this essay actually had.
+                self.send_json(park_essay(essay_id, payload))
+                return
+            if essay_id and action == "back-to-room":
+                # Rainy day's undo: restore the stamped phase and pull the file
+                # back out of Archive/.
+                self.send_json(back_to_room(essay_id, payload))
                 return
             if essay_id and action == "forget-draft-link":
                 # Recovery for a draft deleted in Substack. Deliberately an

@@ -12,6 +12,7 @@
   const Cards = window.AirdateCards;
   const Api = window.RoomApi;
   const Keys = window.RoomKeys;
+  const Feedback = window.RoomFeedback;
 
   const PHASE_STATUS = {
     'writers-room': 'Writers Room',
@@ -31,10 +32,15 @@
     loaded: false,
     // The card whose note is up on the board in placing mode.
     placing: '',
+    // The needs-filing lane (slice 6): the last /intake-suggest answer for an
+    // essay, keyed by id. Undefined until the writer asks ("file it").
+    intake: {},
   };
   // Phases that live in the default, active list. Anything else is the
   // shelf's or rainy day's.
   const ACTIVE = new Set(['Writers Room', 'Writers Likey', 'Ready for Air']);
+  // A phase pill value that is not a status: filters on needs_intake instead.
+  const NEEDS_FILING = 'needs-filing';
 
   const els = {};
   let roving = null;
@@ -55,11 +61,16 @@
       presets: Array.isArray(cfg.tag_presets) ? cfg.tag_presets : [],
       error: essay ? state.errors.get(String(essay.id)) || '' : '',
       placing: Boolean(essay && state.placing && state.placing === String(essay.id)),
+      intake: state.intake,
     };
   }
 
   function matches(essay) {
-    if (state.phase !== 'all' && essay.status !== PHASE_STATUS[state.phase]) return false;
+    if (state.phase === NEEDS_FILING) {
+      if (!essay.needs_intake) return false;
+    } else if (state.phase !== 'all' && essay.status !== PHASE_STATUS[state.phase]) {
+      return false;
+    }
     if (state.totems.size && !state.totems.has(String(essay.totem_raw || '').trim().toLowerCase())) return false;
     const terms = state.query.toLowerCase().split(/\s+/).filter(Boolean);
     if (!terms.length) return true;
@@ -89,6 +100,13 @@
       button.setAttribute('aria-pressed', String(button.dataset.phase === state.phase));
     }
     els.starPill.setAttribute('aria-pressed', String(state.phase === 'writers-likey'));
+    const filing = state.essays.filter((essay) => essay.needs_intake).length;
+    if (els.filingPill) {
+      els.filingPill.hidden = filing === 0;
+      els.filingCount.textContent = String(filing);
+      els.filingPill.setAttribute('aria-label', `needs filing, ${filing}`);
+      els.filingPill.setAttribute('aria-pressed', String(state.phase === NEEDS_FILING));
+    }
     for (const button of els.totemGroup.querySelectorAll('button[data-totem]')) {
       button.setAttribute('aria-pressed', String(state.totems.has(button.dataset.totem)));
     }
@@ -226,6 +244,157 @@
     render(false);
   }
 
+  // ---- the umbrella: save for a rainy day (slice 6) ------------------------
+
+  function parkFailure(error) {
+    if (error && error.kind === 'refused') return error.message;
+    if (error && error.kind === 'file-changed') return 'could not park it. the note changed in obsidian, so reload the room and try again.';
+    if (error && error.kind === 'not-found') return 'could not park it. the note is no longer in your essays folder.';
+    if (error && error.kind === 'network') return 'could not park it. airdate is not answering. try again.';
+    return 'could not park it. the note was not saved. try again.';
+  }
+
+  function phaseWord(status) {
+    return status === 'Writers Likey' ? 'writers likey' : 'writers room';
+  }
+
+  // Back to the room: the slip's undo, and the card's own "back to the room"
+  // button when it is somehow still reachable. The essay is gone from the
+  // pool by the time either fires, so it is re-added rather than replaced.
+  async function backToRoom(id, fallbackTitle) {
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/back-to-room`, {});
+      const fresh = result && result.row;
+      if (fresh) {
+        const at = state.essays.findIndex((row) => String(row.id) === String(fresh.id));
+        if (at >= 0) state.essays[at] = fresh;
+        else state.essays.push(fresh);
+        render(false);
+        document.dispatchEvent(new CustomEvent('room:essay', {
+          detail: { oldId: id, essay: fresh, source: 'pool' },
+        }));
+      }
+      Feedback.slip({
+        tone: 'green',
+        text: `${String((fresh && fresh.title) || fallbackTitle).toLowerCase()} is back in the room as ${phaseWord(fresh && fresh.status)}.`,
+      });
+    } catch (error) {
+      Feedback.slip({ tone: 'red', text: `could not bring it back. ${error && error.message ? error.message : 'try again.'}` });
+    }
+  }
+
+  // The card has left the pool once this succeeds, so the sentence goes on
+  // the slip, with an undo - the umbrella's own promise (§15.2).
+  async function parkEssay(id) {
+    const index = state.essays.findIndex((essay) => String(essay.id) === id);
+    if (index < 0 || state.busy.has(id)) return;
+    const essay = state.essays[index];
+    const card = cardElement(id);
+    state.busy.add(id);
+    if (card) card.setAttribute('aria-busy', 'true');
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/archive`, {});
+      state.busy.delete(id);
+      const fresh = result && result.row;
+      const at = state.essays.findIndex((row) => String(row.id) === id);
+      if (at >= 0) state.essays.splice(at, 1);
+      render(false);
+      document.dispatchEvent(new CustomEvent('room:essay', {
+        detail: { oldId: id, essay: fresh, source: 'pool' },
+      }));
+      const title = (fresh && fresh.title) || essay.title || 'the essay';
+      // Undo with the id parking RETURNS, never the one we held. A note with no
+      // uid gets one minted on this write, and the file moved into Archive/,
+      // so the old path-based id no longer resolves - undo would 404. That is
+      // most real notes, which is how this was found at review.
+      const parkedId = String((result && result.new_id) || (fresh && fresh.id) || id);
+      Feedback.slip({
+        tone: 'green',
+        text: `${String(title).toLowerCase()} saved for a rainy day.`,
+        undo: () => backToRoom(parkedId, title),
+      });
+    } catch (error) {
+      state.busy.delete(id);
+      if (card) card.removeAttribute('aria-busy');
+      const host = cardElement(id)?.querySelector('.card-feedback');
+      if (host) {
+        Feedback.plaque(host, { tone: error && error.kind === 'refused' ? 'amber' : 'red', text: parkFailure(error) });
+      }
+    }
+  }
+
+  // ---- the needs-filing lane (slice 6) --------------------------------------
+
+  async function suggestFiling(id) {
+    if (state.busy.has(id)) return;
+    state.busy.add(id);
+    const card = cardElement(id);
+    if (card) card.setAttribute('aria-busy', 'true');
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/intake-suggest`, {});
+      state.intake[id] = result;
+    } catch (error) {
+      const host = cardElement(id)?.querySelector('.card-feedback');
+      if (host) Feedback.plaque(host, { tone: 'red', text: 'could not suggest a topic. try again.' });
+    } finally {
+      state.busy.delete(id);
+      const essay = state.essays.find((row) => String(row.id) === id);
+      if (essay) replaceCard(id, essay, true);
+      else if (card) card.removeAttribute('aria-busy');
+    }
+  }
+
+  function filingFailure(error) {
+    if (error && error.kind === 'refused') return error.message;
+    if (error && error.kind === 'file-changed') return 'could not file it. the note changed in obsidian, so reload the room and try again.';
+    if (error && error.kind === 'not-found') return 'could not file it. the note is no longer in your essays folder.';
+    if (error && error.kind === 'network') return 'could not file it. airdate is not answering. try again.';
+    return 'could not file it. try again.';
+  }
+
+  // Reuses /intake-suggest then /intake-apply as is; the writer can swap the
+  // suggested topic for another before confirming.
+  async function applyFiling(card) {
+    const id = card.dataset.essayId;
+    if (state.busy.has(id)) return;
+    const suggestion = state.intake[id] || {};
+    const select = card.querySelector('[data-role="file-category"]');
+    const category = select ? select.value : (suggestion.category || '');
+    if (!category && suggestion.category_mode !== 'off') {
+      const host = card.querySelector('.card-feedback');
+      if (host) Feedback.plaque(host, { tone: 'amber', text: 'pick a topic first.' });
+      return;
+    }
+    state.busy.add(id);
+    card.setAttribute('aria-busy', 'true');
+    try {
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/intake-apply`, {
+        category, totem: suggestion.totem || '', status: 'Writers Room',
+      });
+      state.busy.delete(id);
+      delete state.intake[id];
+      const fresh = result && result.essay && result.essay.row;
+      const at = state.essays.findIndex((row) => String(row.id) === id);
+      if (fresh) {
+        if (at >= 0) state.essays[at] = fresh;
+        else state.essays.push(fresh);
+        replaceCard(id, fresh, true);
+        document.dispatchEvent(new CustomEvent('room:essay', {
+          detail: { oldId: id, essay: fresh, source: 'pool' },
+        }));
+      } else {
+        render(false);
+      }
+    } catch (error) {
+      state.busy.delete(id);
+      card.removeAttribute('aria-busy');
+      const host = card.querySelector('.card-feedback');
+      if (host) {
+        Feedback.plaque(host, { tone: error && error.kind === 'refused' ? 'amber' : 'red', text: filingFailure(error) });
+      }
+    }
+  }
+
   function setPlacing(id) {
     const before = state.placing;
     state.placing = id ? String(id) : '';
@@ -237,7 +406,7 @@
   }
 
   function setPhase(phase) {
-    state.phase = phase in PHASE_STATUS ? phase : 'all';
+    state.phase = (phase in PHASE_STATUS || phase === NEEDS_FILING) ? phase : 'all';
     render(true);
   }
 
@@ -248,6 +417,27 @@
         event.preventDefault();
         const card = star.closest('.card');
         if (card) toggleStar(card);
+        return;
+      }
+      const park = event.target.closest('[data-action="park"]');
+      if (park) {
+        event.preventDefault();
+        const card = park.closest('.card');
+        if (card) parkEssay(card.dataset.essayId);
+        return;
+      }
+      const suggest = event.target.closest('[data-action="intake-suggest"]');
+      if (suggest) {
+        event.preventDefault();
+        const card = suggest.closest('.card');
+        if (card) suggestFiling(card.dataset.essayId);
+        return;
+      }
+      const apply = event.target.closest('[data-action="intake-apply"]');
+      if (apply) {
+        event.preventDefault();
+        const card = apply.closest('.card');
+        if (card) applyFiling(card);
         return;
       }
       if (event.target.closest('[data-action="reset"]')) {
@@ -268,6 +458,11 @@
     els.starPill.addEventListener('click', () => {
       setPhase(state.phase === 'writers-likey' ? 'all' : 'writers-likey');
     });
+    if (els.filingPill) {
+      els.filingPill.addEventListener('click', () => {
+        setPhase(state.phase === NEEDS_FILING ? 'all' : NEEDS_FILING);
+      });
+    }
     els.totemGroup.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-totem]');
       if (!button) return;
@@ -325,9 +520,11 @@
     els.phaseButtons = Array.from(document.querySelectorAll('[data-phase]'));
     els.starPill = $('pool-star');
     els.likeyCount = $('pool-likey-count');
+    els.filingPill = $('pool-filing');
+    els.filingCount = $('pool-filing-count');
     els.totemGroup = $('pool-totems');
     els.totemDivider = $('pool-totem-divider');
-    if (!els.pool || !Cards || !Api || !Keys) return;
+    if (!els.pool || !Cards || !Api || !Keys || !Feedback) return;
     roving = Keys.createRoving({
       container: els.pool,
       itemSelector: '.card',
