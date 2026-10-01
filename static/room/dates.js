@@ -66,9 +66,27 @@
     return (((dayNumber(iso) + 4) % 7) + 7) % 7; // day 0 of the epoch was a thursday
   }
 
+  const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+  // A weekday name ("monday", as config.json and the settings form write it)
+  // to weekday()'s convention (0 = sunday), or -1 for anything else.
+  function weekdayNumber(name) {
+    return WEEKDAY_NAMES.indexOf(String(name || '').trim().toLowerCase());
+  }
+
+  // The anchor day of the week `iso` falls in, for a week that starts on
+  // `anchor` (0 = sunday .. 6 = saturday). Defaults to monday, the board's
+  // long-standing week start, so every existing caller is unchanged.
+  function weekAnchorOf(iso, anchor) {
+    const start = typeof anchor === 'number' && anchor >= 0 && anchor <= 6 ? anchor : 1;
+    return addDays(iso, -(((weekday(iso) - start) % 7 + 7) % 7));
+  }
+
   // The monday of the week a day falls in. Weeks run monday to sunday.
+  // A thin, permanent alias of weekAnchorOf(iso, 1): the board's publish day
+  // is now configurable, but "mondayOf" stays as the historical default.
   function mondayOf(iso) {
-    return addDays(iso, -((weekday(iso) + 6) % 7));
+    return weekAnchorOf(iso, 1);
   }
 
   function parts(iso) {
@@ -133,6 +151,8 @@
     addDays,
     daysBetween,
     weekday,
+    weekdayNumber,
+    weekAnchorOf,
     mondayOf,
     formatDay,
     formatShort,
