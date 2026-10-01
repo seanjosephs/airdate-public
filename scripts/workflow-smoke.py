@@ -446,19 +446,25 @@ def main() -> int:
         status, headers, body = request(base, "/airdate")
         assert_true(status == 200 and "text/html" in content_type(headers), "/airdate did not serve HTML")
         assert_true(b"<title>airdate" in body.lower(), "/airdate HTML missing the airdate title")
-        assert_true(b'data-view="settings"' in body and b'id="settings-view"' in body, "/airdate HTML missing settings view")
-        assert_true(b'data-view="all-ideas"' in body and b'id="all-ideas-view"' in body, "/airdate HTML missing essay catalog view")
-        assert_true(b'id="month-grid"' in body and b'id="month-rail"' in body, "/airdate HTML missing the essays-page month rail")
-        assert_true(b'id="calendar-view"' not in body, "/airdate HTML still has the retired standalone calendar view")
-        assert_true(b'id="all-ideas-cards"' in body and b'id="ai-search"' in body, "/airdate HTML missing catalog grid/search")
-        assert_true(b'name="body"' in body and b'id="editor-create-draft"' in body, "/airdate HTML missing Obsidian body/draft editor controls")
+        # /airdate is the writers room (slice 7): the board, the pool, the
+        # editor's script, and the shelf, rainy day and settings views.
+        for room_id in (b'id="board"', b'id="pool"', b'id="pool-search"', b'id="ed-f-body"',
+                        b'id="shelf-view"', b'id="rainy-view"', b'id="settings-view"'):
+            assert_true(room_id in body, f"/airdate HTML missing {room_id.decode()}")
+        for old_id in (b'id="all-ideas-view"', b'id="month-rail"', b'id="editor-shell"'):
+            assert_true(old_id not in body, f"/airdate HTML still has the old page's {old_id.decode()}")
         checks.append("/airdate served")
 
         status, headers, body = request(base, "/", follow_redirects=False)
         assert_true(status == 302 and header_value(headers, "Location") == "/airdate", "/ did not redirect to /airdate")
         status, headers, body = request(base, "/")
-        assert_true(status == 200 and b"<title>airdate" in body.lower(), "/ redirect did not land on the catalog")
+        assert_true(status == 200 and b'id="pool"' in body, "/ redirect did not land on the room")
         checks.append("/ redirects to /airdate")
+
+        status, headers, _ = request(base, "/airdate/room?essay=smoke-id", follow_redirects=False)
+        assert_true(status == 302 and header_value(headers, "Location") == "/airdate?essay=smoke-id",
+                    "/airdate/room did not redirect to /airdate with its query string")
+        checks.append("/airdate/room redirects to /airdate, query string kept")
 
         for retired in ("/calendar", "/hub", "/airdate-styleboard", "/assets/anything.webp"):
             status, _, _ = request(base, retired, follow_redirects=False)
@@ -506,9 +512,16 @@ def main() -> int:
         checks.append("essay index quality + source/draft roles passed")
 
         assets = {
-            "/static/airdate.js": "javascript",
-            "/static/airdate.css": "text/css",
-            "/static/tokens.css": "text/css",
+            # The room's own assets, as room.html names them.
+            "/static/room/tokens.css": "text/css",
+            "/static/room/room.css": "text/css",
+            "/static/room/cards.js": "javascript",
+            "/static/room/editor-view.js": "javascript",
+            "/static/room/settings.js": "javascript",
+            "/static/airdate-tour.js": "javascript",
+            "/static/airdate-wizard.js": "javascript",
+            "/static/airdate-presets.js": "javascript",
+            "/static/brand/airdate-sign-600.webp": "image/webp",
             # Placeholders stay: the last resort for a totem with no shipped art.
             "/static/totems/placeholder-1.svg": "image/svg+xml",
             "/static/totems/placeholder-5.svg": "image/svg+xml",
@@ -522,6 +535,12 @@ def main() -> int:
             assert_true(expected in content_type(headers), f"{path} content-type was {content_type(headers)!r}")
             assert_true(len(body) > 0, f"{path} was empty")
         checks.append("static assets served with expected MIME")
+
+        for deleted in ("/static/airdate.js", "/static/airdate.css", "/static/tokens.css",
+                        "/static/airdate-filters.js", "/static/airdate-deep-link.js"):
+            status, _, _ = request(base, deleted)
+            assert_true(status == 404, f"{deleted} was deleted with the old page but returned {status}")
+        checks.append("the old page's files are gone")
 
         missing_status, _, missing_payload = json_request(base, "/api/essays/not-real")
         assert_true(missing_status == 404 and missing_payload.get("error"), "unknown essay did not return JSON 404")

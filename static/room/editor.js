@@ -23,9 +23,11 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.RoomEditor = api;
 })(typeof globalThis === 'object' ? globalThis : this, function createRoomEditor() {
-  // Every field the editor holds, by kind. The last four are not drawn: they
-  // are draft details the note must carry before a send, so they are held
-  // and saved like the rest (server.py PERSISTED_DRAFT_FIELDS).
+  // Every field the editor holds, by kind. `publication` is not drawn: it is
+  // a draft detail the note must carry before a send, so it is held and
+  // saved like the rest (server.py PERSISTED_DRAFT_FIELDS). The social
+  // fields, alt text and free unlock date are drawn in their sections (slice
+  // 7): the send reads all of them from the note's frontmatter.
   const FIELDS = {
     title: 'text',
     subtitle: 'text',
@@ -55,6 +57,8 @@
     thumbnail_alt: 'text',
     social_title: 'text',
     social_description: 'text',
+    social_image: 'text',
+    free_unlock_at: 'text',
   };
 
   // Keys the editor never sends, whatever the state holds.
@@ -548,11 +552,17 @@
     seo_title: 'ed-f-seo_title',
     seo_description: 'ed-f-seo_description',
     canonical_url: 'ed-f-canonical_url',
+    social_title: 'ed-f-social_title',
+    social_description: 'ed-f-social_description',
+    social_image: 'ed-social-file',
     thumbnail_prompt: 'ed-f-thumbnail_prompt',
+    thumbnail_alt: 'ed-f-thumbnail_alt',
+    free_unlock_at: 'ed-f-free_unlock_at',
   };
 
-  // Details the note must carry that have no control of their own: airdate
-  // fills them in from these fields when the essay opens.
+  // Details the note must carry that airdate fills in from these fields when
+  // the essay opens. Their own controls sit in switchable sections; while a
+  // section is off, the row sends the writer to the field it is filled from.
   const FILLED_FROM = {
     thumbnail_alt: 'title',
     social_title: 'title',
@@ -570,7 +580,12 @@
     seo_title: 'seo_social',
     seo_description: 'seo_social',
     canonical_url: 'seo_social',
+    social_title: 'seo_social',
+    social_description: 'seo_social',
+    social_image: 'seo_social',
     thumbnail_prompt: 'thumbnail',
+    thumbnail_alt: 'thumbnail',
+    free_unlock_at: 'advanced',
   };
 
   const FIELD_NAMES = {
@@ -590,6 +605,8 @@
     thumbnail_alt: 'the thumbnail alt text',
     social_title: 'the social title',
     social_description: 'the social description',
+    social_image: 'the social image',
+    free_unlock_at: 'the free unlock date',
     publication: 'your substack address',
   };
 
@@ -606,8 +623,9 @@
   // Order on the page, top to bottom. Save sits in the header.
   const PAGE_ORDER = [
     'ed-save', 'ed-f-title', 'ed-f-subtitle', 'ed-f-summary', 'ed-f-body', 'ed-hero-file', 'ed-tag-input',
-    'ed-f-slug', 'ed-f-section', 'ed-f-email_subject', 'ed-f-email_preview_text', 'ed-f-audience-everyone',
-    'ed-f-comment_permissions', 'ed-f-seo_title', 'ed-f-canonical_url', 'ed-f-seo_description', 'ed-f-thumbnail_prompt',
+    'ed-f-slug', 'ed-f-section', 'ed-f-free_unlock_at', 'ed-f-email_subject', 'ed-f-email_preview_text',
+    'ed-f-audience-everyone', 'ed-f-comment_permissions', 'ed-f-seo_title', 'ed-f-canonical_url', 'ed-f-seo_description',
+    'ed-f-social_title', 'ed-f-social_description', 'ed-social-file', 'ed-f-thumbnail_prompt', 'ed-f-thumbnail_alt',
   ];
 
   // Rows that are about the connection, not the note. They shut gate 1.
@@ -641,7 +659,9 @@
   // decides it: a value the writer only has to save folds into one row;
   // an empty one sends them to the field.
   function emptyRow(field, visibility) {
-    if (FILLED_FROM[field]) {
+    const own = FIELD_SECTIONS[field];
+    const ownShowing = Boolean(own && visibility && visibility[own] !== false);
+    if (FILLED_FROM[field] && !ownShowing) {
       const from = FILLED_FROM[field];
       return rowFor(`persisted_${field}`, `${FIELD_NAMES[field]} is empty. airdate fills it in from ${FIELD_NAMES[from]}`, FIELD_TARGETS[from], 'write it');
     }
@@ -1055,8 +1075,73 @@
     return String(params.get('essay') || '').trim();
   }
 
+  // ---- the send fields (slice 7) ---------------------------------------------
+
+  // What a blank social title, social description or alt text falls back to,
+  // shown as the field's placeholder. The same fallbacks as the server's
+  // metadata_defaults, read from what the page holds now, so the hint follows
+  // the title and summary as the writer types them.
+  function sendFieldPlaceholders(values) {
+    const v = values || {};
+    const title = String(v.title || '').trim();
+    const summary = String(v.summary || '').trim() || String(v.subtitle || '').trim();
+    return {
+      social_title: title,
+      social_description: summary,
+      thumbnail_alt: title,
+    };
+  }
+
+  // A date field shows a day. A note can hold a full time ("2026-10-05T09:00")
+  // that a date control would read as nothing, so the day is shown; the note
+  // keeps its own value until the writer picks another day.
+  function dayValue(value) {
+    const text = String(value ?? '').trim();
+    return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : '';
+  }
+
+  // The image the social image points at, as the page names it.
+  function imageName(path) {
+    const parts = String(path || '').trim().split('/');
+    return parts[parts.length - 1] || '';
+  }
+
+  // An image /api/upload-image just stored: the note will point at it once
+  // the writer saves, the same as anything else typed on the page.
+  function adoptSocialImage(state, result) {
+    const path = String((result && result.relativePath) || '').trim();
+    if (!path) return state;
+    return { ...state, values: { ...copyValues(state.values), social_image: path } };
+  }
+
+  // The room lives at /airdate; the editor is the room with ?essay=.
+  const ROOM_PATH = '/airdate';
+
   function editorUrl(id) {
-    return `/airdate/room?essay=${encodeURIComponent(String(id || ''))}`;
+    return `${ROOM_PATH}?essay=${encodeURIComponent(String(id || ''))}`;
+  }
+
+  // The room as it is, with the editor closed: the view (the hash) stays.
+  function roomUrl(hash) {
+    return `${ROOM_PATH}${hash || ''}`;
+  }
+
+  // The essay a clicked link opens in place, or '' when the browser should
+  // follow it. Only a link to the room itself, on this origin, with ?essay=,
+  // is the editor's; anything else (another page, another site) is a real
+  // navigation. Getting the path wrong here turns every card click into a
+  // full page load.
+  function essayFromLink(href, here) {
+    let url;
+    let base;
+    try {
+      base = new URL(String(here || ''));
+      url = new URL(String(href || ''), base);
+    } catch (error) {
+      return '';
+    }
+    if (url.origin !== base.origin || url.pathname !== ROOM_PATH) return '';
+    return essayFromSearch(url.search);
   }
 
   return {
@@ -1100,7 +1185,14 @@
     clockTime,
     savedLine,
     essayFromSearch,
+    sendFieldPlaceholders,
+    dayValue,
+    imageName,
+    adoptSocialImage,
+    ROOM_PATH,
     editorUrl,
+    roomUrl,
+    essayFromLink,
     FIELD_TARGETS,
     readinessList,
     readinessHeading,

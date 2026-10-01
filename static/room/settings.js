@@ -43,10 +43,11 @@
   // every route (shelf.js and rainy-day.js each still own their own view's
   // hidden state and lazy load, the same way this module already did). --
 
-  const ROUTE_HASHES = { '#settings': 'settings', '#shelf': 'shelf', '#rainy-day': 'rainy-day' };
+  // The hash names the view; cards.js holds the table so node can test it.
+  const Cards = window.AirdateCards;
 
   function currentRoute() {
-    return ROUTE_HASHES[window.location.hash] || 'essays';
+    return Cards.routeOfHash(window.location.hash);
   }
 
   function isSettingsRoute() {
@@ -61,7 +62,7 @@
     document.body.classList.toggle('route-rainy-day', route === 'rainy-day');
     if (els.view) els.view.hidden = !settings;
     for (const link of document.querySelectorAll('.room-nav a')) {
-      const linkRoute = ROUTE_HASHES[link.getAttribute('href').replace('/airdate/room', '')] || 'essays';
+      const linkRoute = Cards.routeOfHref(link.getAttribute('href'));
       if (linkRoute === route) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     }
@@ -311,6 +312,7 @@
     els.totemList = $('set-totem-list');
     els.tagPresets = $('set-tag-presets');
     els.uhReload = $('set-uh-reload');
+    els.replayTour = $('set-replay-tour');
     if (!els.view) return;
 
     els._bindBoardColors();
@@ -328,8 +330,90 @@
       }
     });
 
+    if (els.replayTour) els.replayTour.addEventListener('click', () => runTour(true));
+
     window.addEventListener('hashchange', applyRoute);
     applyRoute();
+  }
+
+  // ---- the home tour ---------------------------------------------------------
+  //
+  // static/airdate-tour.js's own nine stops on the essays view, seen or
+  // dismissed kept in this browser (its TOUR_KEY). It runs once after
+  // first-run setup, and again whenever the writer presses "replay the tour".
+  // The wizard's finish reloads the page, so the hand-over is a one-shot flag
+  // in this tab's session, read and cleared on the next load.
+
+  const TOUR_AFTER_SETUP = 'airdate.tour.after-setup';
+
+  function session() {
+    try { return window.sessionStorage || null; } catch (error) { return null; }
+  }
+
+  function flagTourAfterSetup() {
+    try { session()?.setItem(TOUR_AFTER_SETUP, '1'); } catch (error) { /* no tour then */ }
+  }
+
+  function takeTourAfterSetup() {
+    try {
+      const store = session();
+      if (!store || store.getItem(TOUR_AFTER_SETUP) !== '1') return false;
+      store.removeItem(TOUR_AFTER_SETUP);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Four stops are on the cards, so the tour waits for the pool to draw them.
+  function whenPoolReady(run) {
+    const pool = window.RoomPool;
+    if (pool && pool.isLoaded && pool.isLoaded()) {
+      run();
+      return;
+    }
+    document.addEventListener('room:pool-ready', () => run(), { once: true });
+  }
+
+  // The stops are on the essays view; from settings, go there first. Clearing
+  // the hash leaves a bare "#" in the address, which is tidied away; every
+  // view reads the hash, so the route has already moved.
+  function showEssaysThen(run) {
+    if (currentRoute() === 'essays') {
+      run();
+      return;
+    }
+    window.addEventListener('hashchange', () => run(), { once: true });
+    window.location.hash = '';
+    window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+  }
+
+  // The sticky is taller than the old page's callout, so it sits beside its
+  // anchor, never over it (the editor tour's own rule). Everything else is
+  // the home tour's default: its nine stops and its key in this browser.
+  function tourOptions(Tour) {
+    return { place: Tour.placeBeside };
+  }
+
+  function runTour(replay) {
+    const Tour = window.AirdateTour;
+    if (!Tour) return;
+    showEssaysThen(() => whenPoolReady(() => window.requestAnimationFrame(() => {
+      if (replay) Tour.replay(tourOptions(Tour));
+      else Tour.start(tourOptions(Tour));
+    })));
+  }
+
+  function maybeTourAfterSetup() {
+    if (!takeTourAfterSetup()) return;
+    const Tour = window.AirdateTour;
+    // The tour's own rule: once seen or skipped in this browser, it waits
+    // for "replay the tour".
+    if (!Tour || Tour.tourState()) return;
+    // An essay link opened the editor over the room; the tour would ring
+    // what the editor covers.
+    if (window.RoomEditorView && window.RoomEditorView.isOpen()) return;
+    runTour(false);
   }
 
   // ---- the first-run wizard --------------------------------------------------
@@ -352,9 +436,11 @@
       escapeHtml: esc,
       onFinish: async () => {
         // The room's board and pool already self-started against the old
-        // (unset-up) status; reloading is the simplest way to hand them the
-        // configuration the wizard just wrote.
-        window.location.reload();
+        // (unset-up) status; loading the page again is the simplest way to
+        // hand them the configuration the wizard just wrote. It loads on the
+        // essays view, where the home tour then runs once.
+        flagTourAfterSetup();
+        window.location.replace(window.location.pathname + window.location.search);
       },
     });
   }
@@ -362,6 +448,7 @@
   function start() {
     bind();
     maybeOpenWizard();
+    maybeTourAfterSetup();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

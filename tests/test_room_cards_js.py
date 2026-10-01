@@ -328,7 +328,7 @@ class CardMarkupTests(unittest.TestCase):
 
     def test_the_title_is_a_link_to_the_editor(self):
         html = self.markup(id="abc123", title="Take <Care>")
-        self.assertIn('class="card-link" id="card-title-abc123" href="/airdate/room?essay=abc123"', html)
+        self.assertIn('class="card-link" id="card-title-abc123" href="/airdate?essay=abc123"', html)
         self.assertIn("Take &lt;Care&gt;", html)
         self.assertNotIn("<Care>", html)
 

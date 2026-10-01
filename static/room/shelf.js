@@ -155,7 +155,7 @@
       : '';
     return `<div role="row" class="shelf-row" data-essay-id="${id}">`
       + `<div role="cell" class="shelf-cell shelf-cell-totem">${totemCell}</div>`
-      + `<div role="cell" class="shelf-cell shelf-cell-title"><a class="shelf-title-link" href="/airdate/room?essay=${id}">${esc(title)}</a>`
+      + `<div role="cell" class="shelf-cell shelf-cell-title"><a class="shelf-title-link" href="/airdate?essay=${id}">${esc(title)}</a>`
       + (subtitle ? `<span class="shelf-subtitle">${esc(subtitle)}</span>` : '')
       + '</div>'
       + `<div role="cell" class="shelf-cell shelf-cell-topic">${topicCell}</div>`

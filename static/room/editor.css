@@ -255,6 +255,7 @@ body.editor-open { overflow: hidden; }
 
 .ed-field input[type="text"],
 .ed-field input[type="url"],
+.ed-field input[type="date"],
 .ed-field select,
 .ed-field textarea,
 .ed-presets select {
@@ -266,7 +267,8 @@ body.editor-open { overflow: hidden; }
   font: 500 15px/1.5 var(--font-ui);
 }
 .ed-field input[type="text"],
-.ed-field input[type="url"] { height: 44px; padding: 0 12px; }
+.ed-field input[type="url"],
+.ed-field input[type="date"] { height: 44px; padding: 0 12px; }
 .ed-field select,
 .ed-presets select { height: 44px; padding: 0 10px; }
 .ed-field textarea { padding: 10px 12px; resize: vertical; min-height: 64px; }
@@ -1060,75 +1062,13 @@ button.ed-ready-row[aria-busy="true"] { cursor: progress; opacity: 0.7; }
 }
 
 /* ---- the editor tour (slice 4c) ------------------------------------------- */
-/* TourSteps: a 3px orange-soft ring with an 18px radius, 12px outside the
-   anchor, over a 70% dim; a canary sticky beside it, ink only (muted on
-   canary measures 2.12). The ring and sticky live on document.body, above
-   the editor (z 40) and the slip (z 50). */
+/* The ring and the sticky are shared with the home tour (room.css, "the
+   tours"). The editor's own: its ring sits 12px out (tour option pad), and
+   two of its stickies lean the other way. */
 
-.tour-ring.ed-tour {
-  position: fixed;
-  z-index: 60;
-  box-sizing: border-box;
-  border: 3px solid var(--orange-soft);
-  border-radius: 18px;
-  box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.70);
-  pointer-events: none;
-  transition: top 0.18s ease, left 0.18s ease, width 0.18s ease, height 0.18s ease;
-}
-.tour-callout.ed-tour {
-  position: fixed;
-  z-index: 61;
-  box-sizing: border-box;
-  width: min(330px, calc(100vw - 16px));
-  min-height: 250px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-radius: 2px 2px 16px 2px;
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.09) 0 26px, transparent 26px),
-    var(--pad-canary);
-  color: var(--ink);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.60);
-  transform: rotate(1.5deg);
-  font-family: var(--font-ui);
-}
 .tour-callout.ed-tour[data-stop="script"],
 .tour-callout.ed-tour[data-stop="send"] { transform: rotate(-1.2deg); }
-.ed-tour .tour-count { margin: 0; padding-top: 14px; font: 700 12px/1.3 var(--font-ui); }
-.ed-tour .tour-title {
-  margin: 0;
-  font: 400 24px/1.15 var(--font-marker);
-  text-wrap: balance;
-}
-.ed-tour .tour-title:focus { outline: none; }
-.ed-tour .tour-text { margin: 0; font: 600 14px/1.5 var(--font-ui); text-wrap: pretty; }
-.ed-tour .tour-actions {
-  margin-top: auto;
-  padding-top: 4px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.ed-tour .tour-nav { margin-left: auto; display: flex; gap: 8px; }
-.ed-tour .hidden { display: none; }
-.ed-tour-button {
-  height: 40px;
-  padding: 0 14px;
-  border-radius: var(--r-md);
-  border: 1.5px solid var(--ink);
-  background: transparent;
-  color: var(--ink);
-  font: 700 13px/1 var(--font-ui);
-  cursor: pointer;
-}
-.ed-tour-button.tour-skip { padding: 0 6px; border: 0; text-decoration: underline; text-underline-offset: 3px; }
-.ed-tour-button.tour-next { padding: 0 18px; border-color: var(--ink); background: var(--ink); color: var(--pad-canary); }
-.tour-callout.ed-tour :focus-visible { outline: var(--focus-paper); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .gs-knob { transition: none; }
-  .tour-ring.ed-tour { transition: none; }
 }

@@ -2,7 +2,7 @@
 
 airdate is a local essay manager for writers who keep their essays in Obsidian
 and publish on Substack. It reads a folder of Markdown notes in your vault,
-tracks each essay from first draft to published, and sends a finished essay to
+tracks each essay from first draft to live, and sends a finished essay to
 Substack as a **draft**.
 
 ## The promise: drafts only
@@ -130,17 +130,20 @@ exception noted in step 2.
    `Essays/_assets/airdate/fox.png`. Or turn them off.
 6. **Your tags**: optional tag presets, each a name, a color and up to five
    tags. The editor adds a preset's tags in one click. It starts empty.
-7. **Your calendar**: your publish day, with Monday preselected. One weekday
-   gives you a calendar with one slot per week on that day. "none" hides the
-   calendar; you still pick a date when an essay is ready for air.
+7. **Your board**: your publish day, with Monday preselected. One weekday
+   gives you a board with one slot per week on that day. "none" hides the
+   board, and with it the way to give an essay an air date.
 8. **Connect Substack**: the three Obsidian steps from the next section, the
    folder the connector is copied to, and a live check of each step. "I'll do
    this later" is fine; sending stays blocked until it is done.
 9. **Finish**: a summary of your choices. Finish writes
    `.airdate-data/config.json` and opens your essays.
 
-A short tour follows: nine stops, each pointing at one part of the screen.
-Skip it whenever you like, and replay it from the top of settings.
+A short tour follows, once, on the essays view: up to nine stops, each
+pointing at one part of the room. A stop with nothing to point at is skipped
+(no publish day, no board stop). Skip it whenever you like, and replay it with
+"replay the tour" under "under the hood" in settings. The essay editor has a
+tour of its own, replayed from the gear in the editor's header.
 
 Everything from the wizard stays editable in settings, under the same
 headings. If `config.json` already exists but needs fixing (a moved vault,
@@ -192,19 +195,21 @@ Reloading the app itself does not reload the plugin.
   `research`. You can hide more by filename prefix or title word in
   `config.json` (`vault.hidden`).
 - **Two folders belong to airdate**, directly inside the essays folder:
-  `Published/` and `Archive/`. airdate moves an essay there when you mark it
-  published or archived, and moves it back out if you change your mind. A
-  file in one of those folders is published or archived, whatever its
-  frontmatter says.
+  `Published/` and `Archive/`. An essay moves into `Published/` when it goes
+  live, and into `Archive/` when you save it for a rainy day; bringing it back
+  to the room moves it out again. A file in `Published/` reads as live and a
+  file in `Archive/` as rainy day, whatever its frontmatter says. The folders
+  keep these names on disk; the app itself only ever says live and rainy day.
 - **Categories are the other top-level folders** inside the essays folder
   (folders starting with `_` are ignored). Filing an essay moves it into one.
   To keep your own folder layout, choose "no folders" under "how you organize"
   in settings. If your essays folder is the vault root, every top-level
   folder in the vault counts as a category, so turning categories off is
   usually the better fit.
-- **Totems.** Every card has a totem slot. Click it to pick one of your five
-  or none; the choice is saved to the note's `totem` key. A value airdate does
-  not recognize shows as "?" and is left alone until you pick.
+- **Totems.** Pick an essay's totem in the editor, under post settings: one
+  of your five, or none. The choice is saved to the note's `totem` key, and
+  the card shows its art. A value airdate does not recognize shows in the
+  picker as "not one of your totems" and is left alone until you pick.
 - **Images you attach** are written to `<essays folder>/_assets/substack/`.
 - **Frontmatter.** airdate reads and writes these keys and keeps every other
   key you have exactly as it was: `title`, `subtitle`, `summary`, `status`,
@@ -227,16 +232,30 @@ Reloading the app itself does not reload the plugin.
 
 ## The lifecycle
 
-Every essay starts in the **Writers Room**. When the writing is done it moves
-to **Writers Likey**. Giving it a date (the ready for air button, or dragging it
-onto the calendar) makes it **Ready for Air**. Sending the draft to Substack
-makes it **Live**. When you have published it in Substack, mark it
-**Published** and paste the post link; it moves to the shelf. **Archived**
-sits outside the flow.
+Four phases:
 
-The catalog's state filter follows the same stages, plus "needs attention":
-essays that need filing, are missing metadata, or are missing only a hero
-image.
+- **writers room**: every essay starts here, just by being in the vault.
+- **writers likey**: you starred it, with the post-it on its card. Press the
+  star again to send it back to the writers room.
+- **ready for air**: it has an air date. Drag a writers likey script onto a
+  week on the board, or use the keys listed under the board. A writers room
+  essay cannot go up; star it first. To move it, unschedule it on the board
+  and put it up again.
+- **live**: it is out. From its air date on, its note on the board asks
+  whether it is live; paste the Substack post link there and it moves to the
+  shelf. airdate checks the link's shape, never fetches it.
+
+Sending a draft to Substack does not change the phase. Rainy day sits outside
+the flow: a writers room or writers likey essay parked there waits, as it
+was, until you bring it back to the room.
+
+Notes written before these four phases keep their words until airdate next
+writes their status: `Published` reads as live, and an old `Live` reads as
+live when it has a post link and as ready for air when it only has a draft.
+
+The essays view filters by phase and by totem, and the star pill shows only
+writers likey. When essays sit outside a topic folder, a "needs filing" pill
+appears and shows only those.
 
 ## Thumbnails
 
@@ -377,7 +396,8 @@ says so there.
   none, for example `{"debate": 3}`. `totems.default`: the totem for essays
   that match nothing.
 - `categories.items`: category folders with keywords for filing suggestions.
-- `links`: extra links in the sidebar.
+- `links`: a list of `{"label", "url"}` pairs. airdate still reads and
+  checks it, but the room does not draw these links anywhere yet.
 - `connector.port`: the port airdate expects before pairing. After
   pairing, airdate uses the port you chose in **Pair with airdate**.
 

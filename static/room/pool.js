@@ -501,9 +501,11 @@
       state.loaded = true;
       renderTotems();
       render(false);
+      // The home tour waits for this: four of its stops are on the cards.
+      document.dispatchEvent(new CustomEvent('room:pool-ready', { detail: { count: state.essays.length } }));
     } catch (error) {
       if (error && error.kind === 'setup') {
-        renderMessage('<p>finish setup first: choose your vault and essays folder in <a href="/airdate">settings</a>.</p>', 'alert');
+        renderMessage('<p>finish setup first: choose your vault and essays folder in <a href="/airdate#settings">settings</a>.</p>', 'alert');
       } else {
         renderMessage(`<p>could not load the essays. ${Cards.escapeHtml(error && error.message ? error.message : '')}</p>`, 'alert');
       }
@@ -543,6 +545,7 @@
       card: (id) => cardElement(id),
       feedbackHost: (id) => cardElement(id)?.querySelector('.card-feedback') || null,
       setPlacing,
+      isLoaded: () => state.loaded,
     };
     load();
   }

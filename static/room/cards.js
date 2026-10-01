@@ -361,11 +361,29 @@
     return item && item.image ? { key: raw, label: String(item.label || raw).toLowerCase(), image: String(item.image) } : null;
   }
 
+  // The room lives at /airdate. Its four views are the hash: none is the
+  // essays, and the sidebar's links name the other three.
+  const ROOM_PATH = '/airdate';
+  const ROUTE_HASHES = { '#settings': 'settings', '#shelf': 'shelf', '#rainy-day': 'rainy-day' };
+
+  function routeOfHash(hash) {
+    return ROUTE_HASHES[String(hash || '')] || 'essays';
+  }
+
+  // The view a room link goes to: "/airdate#shelf" is the shelf, "/airdate"
+  // the essays. Only the hash decides, so the path a link spells is free to
+  // change without moving aria-current off the right sidebar item.
+  function routeOfHref(href) {
+    const text = String(href || '');
+    const at = text.indexOf('#');
+    return routeOfHash(at >= 0 ? text.slice(at) : '');
+  }
+
   // The room's own editor (slice 4). A real link, so it opens with the
   // keyboard and in a new tab; editor-view.js opens it in place on a plain
   // click and reads ?essay= when the room loads.
   function editorHref(essay) {
-    return `/airdate/room?essay=${encodeURIComponent(String(essay?.id || ''))}`;
+    return `${ROOM_PATH}?essay=${encodeURIComponent(String(essay?.id || ''))}`;
   }
 
   function isPostLink(value) {
@@ -600,6 +618,9 @@
     topicFor,
     padFor,
     totemFor,
+    ROOM_PATH,
+    routeOfHash,
+    routeOfHref,
     editorHref,
     escapeHtml,
     stampMarkup,
