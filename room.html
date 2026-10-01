@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/static/room/room.css?v=2">
   <link rel="stylesheet" href="/static/room/cards.css?v=2">
   <link rel="stylesheet" href="/static/room/board.css?v=1">
-  <link rel="stylesheet" href="/static/room/editor.css?v=2">
+  <link rel="stylesheet" href="/static/room/editor.css?v=3">
   <script src="/static/room/api.js?v=1" defer></script>
   <script src="/static/room/cards.js?v=3" defer></script>
   <script src="/static/room/keys.js?v=1" defer></script>
@@ -19,8 +19,9 @@
   <script src="/static/room/feedback.js?v=1" defer></script>
   <script src="/static/room/board-view.js?v=1" defer></script>
   <script src="/static/room/placing.js?v=1" defer></script>
-  <script src="/static/room/editor.js?v=2" defer></script>
-  <script src="/static/room/editor-view.js?v=2" defer></script>
+  <script src="/static/room/editor.js?v=3" defer></script>
+  <script src="/static/airdate-tour.js?v=5" defer></script>
+  <script src="/static/room/editor-view.js?v=3" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#room-main">skip to the essays</a>
@@ -157,9 +158,13 @@
         <p class="ed-status" id="ed-status"></p>
       </div>
       <span class="ed-grow"></span>
-      <p class="ed-state" id="ed-state" role="status"></p>
-      <a class="ed-btn ed-obsidian" id="ed-obsidian" href="#" aria-label="open in obsidian" title="open in obsidian" hidden><svg viewBox="0 0 24 24" width="25" height="25" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 4 9l3 13h10l3-13z"/><path d="M12 2 7 22"/><path d="M12 2 17 22"/><path d="M4 9h16"/></svg></a>
-      <button type="submit" form="ed-form" class="ed-save" id="ed-save">save</button>
+      <!-- One box so the tour's save step can ring the status and save together. -->
+      <div class="ed-head-end" id="ed-head-end">
+        <p class="ed-state" id="ed-state" role="status"></p>
+        <a class="ed-btn ed-obsidian" id="ed-obsidian" href="#" aria-label="open in obsidian" title="open in obsidian" hidden><svg viewBox="0 0 24 24" width="25" height="25" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 4 9l3 13h10l3-13z"/><path d="M12 2 7 22"/><path d="M12 2 17 22"/><path d="M4 9h16"/></svg></a>
+        <button type="button" class="ed-btn ed-gear" id="ed-gear" aria-label="editor settings" title="editor settings" aria-haspopup="dialog" aria-controls="gs" aria-expanded="false"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg></button>
+        <button type="submit" form="ed-form" class="ed-save" id="ed-save">save</button>
+      </div>
     </header>
 
     <div class="ed-notices" id="ed-notices">
@@ -403,20 +408,23 @@
           <p class="ed-air-value" id="ed-air-value"></p>
           <p class="ed-air-hint" id="ed-air-hint" hidden></p>
         </div>
-        <div class="ed-send">
-          <button type="button" class="ed-send-button" id="ed-send" aria-describedby="ed-send-caption" disabled><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg><span id="ed-send-label">send to substack</span></button>
-          <p class="ed-send-why" id="ed-send-why" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></svg><span id="ed-send-why-text"></span></p>
-          <p class="ed-send-caption" id="ed-send-caption">sends a draft. airdate never publishes.</p>
-          <div class="ed-send-result" id="ed-send-result" tabindex="-1" hidden></div>
-          <p class="ed-draft-link" id="ed-draft-link" hidden>sent before as a draft. <a id="ed-draft-link-a" href="#" target="_blank" rel="noopener">open it in substack</a></p>
-        </div>
-        <div class="ed-check">
-          <button type="button" class="ed-action" id="ed-check"><span class="ed-action-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="ed-action-words"><span class="ed-action-name">check readiness</span><span class="ed-action-sub">finds anything substack would reject</span></span></button>
-          <div class="ed-readiness" id="ed-readiness" role="region" aria-label="readiness" aria-live="polite">
-            <p class="ed-readiness-head" id="ed-readiness-head"></p>
-            <ol class="ed-readiness-list" id="ed-readiness-list"></ol>
+        <!-- One box so the tour's send step can ring send and readiness together. -->
+        <div class="ed-go" id="ed-go">
+          <div class="ed-send">
+            <button type="button" class="ed-send-button" id="ed-send" aria-describedby="ed-send-caption" disabled><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg><span id="ed-send-label">send to substack</span></button>
+            <p class="ed-send-why" id="ed-send-why" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></svg><span id="ed-send-why-text"></span></p>
+            <p class="ed-send-caption" id="ed-send-caption">sends a draft. airdate never publishes.</p>
+            <div class="ed-send-result" id="ed-send-result" tabindex="-1" hidden></div>
+            <p class="ed-draft-link" id="ed-draft-link" hidden>sent before as a draft. <a id="ed-draft-link-a" href="#" target="_blank" rel="noopener">open it in substack</a></p>
           </div>
-          <div class="ed-readiness-feedback" id="ed-readiness-feedback"></div>
+          <div class="ed-check">
+            <button type="button" class="ed-action" id="ed-check"><span class="ed-action-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="ed-action-words"><span class="ed-action-name">check readiness</span><span class="ed-action-sub">finds anything substack would reject</span></span></button>
+            <div class="ed-readiness" id="ed-readiness" role="region" aria-label="readiness" aria-live="polite">
+              <p class="ed-readiness-head" id="ed-readiness-head"></p>
+              <ol class="ed-readiness-list" id="ed-readiness-list"></ol>
+            </div>
+            <div class="ed-readiness-feedback" id="ed-readiness-feedback"></div>
+          </div>
         </div>
         <div class="ed-more">
           <button type="button" class="ed-more-button" id="ed-more-button" aria-expanded="false" aria-controls="ed-more-panel"><svg class="ed-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg><span>more</span></button>
@@ -447,6 +455,70 @@
         </section>
       </aside>
     </div>
+    <!-- The gear sheet (slice 4c): which sections the editor shows, for every
+         essay. Each change is saved to config.json as it is made. While it is
+         open the rest of the editor is inert. -->
+    <div class="gs-scrim" id="gs-scrim" hidden></div>
+    <section class="gs" id="gs" role="dialog" aria-modal="true" aria-labelledby="gs-title" aria-describedby="gs-intro" hidden>
+      <div class="gs-head">
+        <span class="gs-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg></span>
+        <h2 class="gs-title" id="gs-title" tabindex="-1">editor settings</h2>
+        <span class="ed-grow"></span>
+        <button type="button" class="ed-btn gs-done" id="gs-done">done</button>
+      </div>
+      <p class="gs-intro" id="gs-intro">what this page shows you. applies to every essay. nothing you typed is lost when a section is off.</p>
+
+      <fieldset class="gs-modes">
+        <legend>simplified metadata or complete metadata?</legend>
+        <div class="gs-mode-row">
+          <label class="gs-mode">
+            <span class="gs-mode-name"><input type="radio" name="gs-mode" value="simplified" id="gs-mode-simplified" aria-labelledby="gs-mode-simplified-name" aria-describedby="gs-mode-simplified-list"><span id="gs-mode-simplified-name">simplified</span></span>
+            <ul class="gs-mode-list" id="gs-mode-simplified-list">
+              <li>title, subtitle, summary</li>
+              <li>the script</li>
+              <li>post type, hero image, tags</li>
+              <li>totem and on the board</li>
+            </ul>
+          </label>
+          <label class="gs-mode">
+            <span class="gs-mode-name"><input type="radio" name="gs-mode" value="complete" id="gs-mode-complete" aria-labelledby="gs-mode-complete-name" aria-describedby="gs-mode-complete-list"><span id="gs-mode-complete-name">complete</span></span>
+            <ul class="gs-mode-list" id="gs-mode-complete-list">
+              <li>everything in simplified</li>
+              <li>advanced: slug, section</li>
+              <li>email and comments</li>
+              <li>seo and social</li>
+              <li>thumbnail</li>
+              <li>internal notes</li>
+            </ul>
+          </label>
+        </div>
+        <p class="gs-custom" id="gs-custom" hidden>custom: your own mix of the switches below. pick one above to go back to a preset.</p>
+        <p class="gs-hint">picking one flips the switches below. flip any switch yourself and this reads custom.</p>
+      </fieldset>
+
+      <section class="gs-sections" aria-labelledby="gs-sections-title">
+        <h3 class="gs-sections-title" id="gs-sections-title">sections</h3>
+        <ul class="gs-rows">
+          <li class="gs-row"><span class="gs-words"><span class="gs-name">title, subtitle, summary</span><span class="gs-desc">the first block.</span></span><span class="gs-fixed">always on</span></li>
+          <li class="gs-row"><span class="gs-words"><span class="gs-name">the script</span><span class="gs-desc">the writing area.</span></span><span class="gs-fixed">always on</span></li>
+          <li class="gs-row"><span class="gs-words"><span class="gs-name">post settings</span><span class="gs-desc">post type, hero image, tags.</span></span><span class="gs-fixed">always on</span></li>
+          <li class="gs-row"><span class="gs-words"><span class="gs-name" id="gs-l-totem">totem</span><span class="gs-desc" id="gs-d-totem">shows because you have totems set up.</span></span><button type="button" class="gs-switch" role="switch" aria-checked="false" data-switch="totem" aria-labelledby="gs-l-totem" aria-describedby="gs-d-totem"><span class="gs-knob"></span></button><span class="gs-fixed" id="gs-totem-off" hidden>off in app settings</span></li>
+          <li class="gs-row"><span class="gs-words"><span class="gs-name" id="gs-l-on_the_board">on the board</span><span class="gs-desc" id="gs-d-on_the_board">note pad and color for this essay.</span></span><button type="button" class="gs-switch" role="switch" aria-checked="false" data-switch="on_the_board" aria-labelledby="gs-l-on_the_board" aria-describedby="gs-d-on_the_board"><span class="gs-knob"></span></button></li>
+          <li class="gs-row"><span class="gs-words"><span class="gs-name" id="gs-l-advanced">advanced</span><span class="gs-desc" id="gs-d-advanced">slug and section, inside post settings.</span></span><button type="button" class="gs-switch" role="switch" aria-checked="false" data-switch="advanced" aria-labelledby="gs-l-advanced" aria-describedby="gs-d-advanced"><span class="gs-knob"></span></button></li>
+          <li class="gs-row"><span class="gs-words"><span class="gs-name" id="gs-l-email_comments">email and comments</span><span class="gs-desc" id="gs-d-email_comments">subject, preview text, audience, comments, test sends.</span></span><button type="button" class="gs-switch" role="switch" aria-checked="false" data-switch="email_comments" aria-labelledby="gs-l-email_comments" aria-describedby="gs-d-email_comments"><span class="gs-knob"></span></button></li>
+          <li class="gs-row"><span class="gs-words"><span class="gs-name" id="gs-l-seo_social">seo and social</span><span class="gs-desc" id="gs-d-seo_social">seo title and description, canonical url.</span></span><button type="button" class="gs-switch" role="switch" aria-checked="false" data-switch="seo_social" aria-labelledby="gs-l-seo_social" aria-describedby="gs-d-seo_social"><span class="gs-knob"></span></button></li>
+          <li class="gs-row"><span class="gs-words"><span class="gs-name" id="gs-l-thumbnail">thumbnail</span><span class="gs-desc" id="gs-d-thumbnail">thumbnail prompt and copy button.</span></span><button type="button" class="gs-switch" role="switch" aria-checked="false" data-switch="thumbnail" aria-labelledby="gs-l-thumbnail" aria-describedby="gs-d-thumbnail"><span class="gs-knob"></span></button></li>
+          <li class="gs-row"><span class="gs-words"><span class="gs-name" id="gs-l-notes">internal notes</span><span class="gs-desc" id="gs-d-notes">notes to yourself. never sent.</span></span><button type="button" class="gs-switch" role="switch" aria-checked="false" data-switch="notes" aria-labelledby="gs-l-notes" aria-describedby="gs-d-notes"><span class="gs-knob"></span></button></li>
+          <!-- Not a switch: there is nothing for it to turn on yet. -->
+          <li class="gs-row"><span class="gs-words"><span class="gs-name">scheduled publish time</span><span class="gs-desc">airdate only sends drafts today, so there is no time to set.</span></span><span class="gs-fixed">not yet</span></li>
+        </ul>
+        <p class="gs-saved" id="gs-saved" role="status"></p>
+        <div class="gs-feedback" id="gs-feedback"></div>
+      </section>
+
+      <div class="gs-replay-row"><button type="button" class="ed-btn" id="gs-replay">replay the editor tour</button></div>
+      <p class="gs-foot">your vault, substack address, totems, tag presets and default note pad are app settings. they live under settings in the sidebar.</p>
+    </section>
   </div>
 </body>
 </html>

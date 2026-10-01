@@ -278,6 +278,71 @@ class SectionTests(unittest.TestCase):
         self.assertEqual(one, "you chose custom metadata. internal notes is switched off.")
 
 
+class GearSheetTests(unittest.TestCase):
+    """The gear sheet (slice 4c): two presets, per-section switches, and any
+    flip reads custom. What it sends is what POST /api/settings/editor takes."""
+
+    SWITCHES = ["totem", "on_the_board", "advanced", "email_comments", "seo_social", "thumbnail", "notes"]
+
+    def test_a_preset_is_just_its_name(self):
+        self.assertEqual(run("return E.presetSettings('complete');"), {"mode": "complete", "sections": {}})
+        self.assertEqual(run("return E.presetSettings('simplified');"), {"mode": "simplified", "sections": {}})
+        self.assertEqual(run("return E.presetSettings('custom');"), {"mode": "simplified", "sections": {}})
+
+    def test_the_switches_follow_the_preset(self):
+        simple = run("return E.gearState({mode: 'simplified'});")
+        self.assertEqual(simple["mode"], "simplified")
+        self.assertEqual([k for k in self.SWITCHES if simple["switches"][k]], ["totem", "on_the_board"])
+        complete = run("return E.gearState({mode: 'complete'});")
+        self.assertTrue(all(complete["switches"][k] for k in self.SWITCHES))
+
+    def test_simplified_does_not_show_advanced_even_with_a_stale_switch(self):
+        state = run("return E.gearState({mode: 'simplified', sections: {advanced: true}});")
+        self.assertFalse(state["switches"]["advanced"])
+
+    def test_flipping_a_switch_reads_custom_and_carries_every_switch(self):
+        flipped = run("return E.flipSection({mode: 'simplified', sections: {}}, 'seo_social');")
+        self.assertEqual(flipped["mode"], "custom")
+        self.assertEqual(sorted(flipped["sections"]), sorted(self.SWITCHES))
+        self.assertTrue(flipped["sections"]["seo_social"])
+        self.assertFalse(flipped["sections"]["advanced"])
+        # And the editor shows exactly that.
+        shown = run("const next = E.flipSection({mode: 'complete'}, 'notes'); return E.sectionVisibility(next);")
+        self.assertFalse(shown["notes"])
+        self.assertTrue(shown["advanced"])
+
+    def test_flipping_back_stays_custom(self):
+        twice = run("const a = E.flipSection({mode: 'simplified'}, 'thumbnail'); return E.flipSection(a, 'thumbnail');")
+        self.assertEqual(twice["mode"], "custom")
+        self.assertFalse(twice["sections"]["thumbnail"])
+
+    def test_scheduled_time_is_not_a_switch(self):
+        self.assertIsNone(run("return E.flipSection({mode: 'simplified'}, 'scheduled_time');"))
+        self.assertNotIn("scheduled_time", run("return E.gearState({mode: 'complete'});")["switches"])
+
+    def test_the_totem_switch_needs_totems(self):
+        self.assertFalse(run("return E.gearState({mode: 'complete'}, {totemsEnabled: false}).totemsEnabled;"))
+        self.assertTrue(run("return E.gearState({mode: 'complete'}).totemsEnabled;"))
+
+
+class EditorTourWordsTests(unittest.TestCase):
+    """Step 1 of the editor tour names the phase this essay is actually in."""
+
+    REST = "airdate stamps it when you star it, when you schedule it, and when it airs. you never set it by hand."
+
+    def test_the_writers_room_reads_as_drawn(self):
+        self.assertEqual(run("return E.stampTourText('Writers Room');"), f"writers room today. {self.REST}")
+
+    def test_every_other_phase_says_where_it_stands(self):
+        for status, name in (("Writers Likey", "writers likey"), ("Ready for Air", "ready for air"),
+                             ("Live", "live"), ("Archived", "saved for a rainy day")):
+            with self.subTest(status=status):
+                self.assertEqual(run(f"return E.stampTourText({js(status)});"), f"{name} today. {self.REST}")
+
+    def test_an_unknown_phase_drops_the_first_sentence(self):
+        self.assertEqual(run("return E.stampTourText('');"), self.REST)
+
+
 class SmallRulesTests(unittest.TestCase):
     def test_the_word_line(self):
         self.assertEqual(run("return E.wordLine('one two three');"), "3 words · about 1 min")

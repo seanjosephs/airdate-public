@@ -101,7 +101,8 @@
   "editor": {
     "mode": "simplified",
     "sections": {},
-    "script_height": null
+    "script_height": null,
+    "tour_done": false
   },
   "red_pen": {
     "enabled": true,

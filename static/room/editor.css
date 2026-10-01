@@ -1,4 +1,5 @@
-/* The writers room: the essay editor (slice 4a).
+/* The writers room: the essay editor (slice 4a; the gear sheet and the
+ * editor tour are slice 4c, at the end).
  *
  * Measured from docs/design-handoff-2026-09-21/measured-specs-editor-settings-shelf.md
  * sections 1 to 3 and transcribed from the EditorSimple, EditorComplete and
@@ -59,6 +60,18 @@ body.editor-open { overflow: hidden; }
 .ed-btn svg { flex-shrink: 0; }
 
 .ed-obsidian { padding: 0 10px; width: 40px; color: #C9A8FF; }
+.ed-gear { padding: 0 10px; color: var(--muted); }
+.ed-gear:hover, .ed-gear[aria-expanded="true"] { color: var(--text); }
+
+/* The status, the obsidian link, the gear and save, in one box the tour can
+   ring. It lays its children out exactly as the header did. */
+.ed-head-end {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  min-width: 0;
+}
 
 /* The phase stamp on a cream scrap of paper. The stamp is the card's own,
    rendered by cards.js, set down smaller and straight in the scrap. */
@@ -568,6 +581,8 @@ body.editor-open { overflow: hidden; }
 
 /* ---- send to substack (slice 4b) ------------------------------------------ */
 
+/* Send and check readiness, in one box the tour can ring. */
+.ed-go { display: flex; flex-direction: column; gap: 16px; }
 .ed-send { display: flex; flex-direction: column; gap: 8px; }
 /* The single primary. White, not --text: #F0F0F0 on #C44A00 measures 4.26
    and fails AA; white is 4.85. */
@@ -880,6 +895,7 @@ button.ed-ready-row[aria-busy="true"] { cursor: progress; opacity: 0.7; }
 
 @media (max-width: 860px) {
   .ed-head { gap: 10px; padding: 0 16px; }
+  .ed-head-end { gap: 10px; }
   .ed-status, .ed-state { display: none; }
   .ed-body { flex-direction: column; overflow-y: auto; }
   .ed-main { overflow: visible; padding: 24px 16px 32px; }
@@ -891,4 +907,222 @@ button.ed-ready-row[aria-busy="true"] { cursor: progress; opacity: 0.7; }
 
 @media (prefers-reduced-motion: reduce) {
   .ed-chevron { transition: none; }
+}
+
+/* ---- the gear sheet (slice 4c) -------------------------------------------- */
+/* EditorSettings artboard: a right-hand sheet, 560 wide, over a dimmed page. */
+
+.gs-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.62);
+}
+.gs {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  width: min(560px, 100%);
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 28px 32px;
+  background: var(--s1);
+  border-left: 1px solid var(--b2);
+  box-shadow: -30px 0 60px rgba(0, 0, 0, 0.60);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.gs-head { display: flex; align-items: center; gap: 12px; }
+.gs-icon { display: flex; color: var(--orange-soft); }
+.gs-title { margin: 0; font: 700 22px/1.2 var(--font-ui); }
+.gs-title:focus { outline: none; }
+.gs-title:focus-visible { outline: var(--focus-dark); outline-offset: 2px; }
+.gs-done { padding: 0 16px; }
+.gs-intro { margin: 0; font: 500 13px/1.45 var(--font-ui); color: var(--muted); }
+
+.gs-modes {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.gs-modes legend { padding: 0 0 10px; font: 700 15px/1.3 var(--font-ui); }
+.gs-mode-row { display: flex; gap: 12px; }
+.gs-mode {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--b2);
+  background: transparent;
+  cursor: pointer;
+}
+.gs-mode:has(input:checked) { border-color: var(--orange-soft); background: rgba(255, 178, 77, 0.10); }
+.gs-mode:has(input:focus-visible) { outline: var(--focus-dark); outline-offset: 2px; }
+.gs-mode-name { display: flex; align-items: center; gap: 10px; font: 700 16px/1.2 var(--font-ui); }
+.gs-mode input { width: 18px; height: 18px; margin: 0; accent-color: var(--orange); }
+.gs-mode input:focus-visible { outline: none; }
+.gs-mode-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font: 500 12px/1.4 var(--font-ui);
+  color: var(--muted);
+}
+.gs-custom {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--orange-soft);
+  font: 700 13px/1.4 var(--font-ui);
+  color: var(--orange-soft);
+}
+.gs-hint { margin: 0; font: 500 12px/1.45 var(--font-ui); color: var(--muted); }
+
+.gs-sections { display: flex; flex-direction: column; }
+.gs-sections-title { margin: 0 0 4px; font: 700 15px/1.3 var(--font-ui); }
+.gs-rows { margin: 0; padding: 0; list-style: none; }
+.gs-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 58px;
+  padding-block: 6px;
+  border-bottom: 1px solid var(--b1);
+}
+.gs-words { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0; }
+.gs-name { font: 700 14px/1.3 var(--font-ui); }
+.gs-desc { font: 500 12px/1.4 var(--font-ui); color: var(--muted); }
+.gs-fixed { font: 700 12px/1.3 var(--font-ui); color: var(--muted); white-space: nowrap; }
+
+/* 52 by 30, green when on. The knob moves; the colour is not the only cue. */
+.gs-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 30px;
+  padding: 0;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--b2);
+  background: var(--s3);
+  cursor: pointer;
+}
+.gs-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: var(--r-pill);
+  background: var(--muted);
+  transition: left 0.15s ease;
+}
+.gs-switch[aria-checked="true"] { border-color: var(--green); background: rgba(59, 255, 122, 0.18); }
+.gs-switch[aria-checked="true"] .gs-knob { left: 25px; background: var(--green); }
+.gs-switch[aria-busy="true"] { cursor: progress; }
+
+.gs-saved { margin: 10px 0 0; font: 600 12px/1.4 var(--font-ui); color: var(--muted); }
+.gs-saved:empty { display: none; }
+.gs-feedback:empty { display: none; }
+.gs-feedback { margin-top: 10px; }
+.gs-replay-row { display: flex; align-items: center; gap: 12px; }
+.gs-replay-row .ed-btn { padding: 0 16px; }
+.gs-foot {
+  margin: auto 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--b1);
+  font: 500 12px/1.45 var(--font-ui);
+  color: var(--muted);
+}
+
+@media (max-width: 600px) {
+  .gs { padding: 20px 16px; }
+  .gs-mode-row { flex-direction: column; }
+}
+
+/* ---- the editor tour (slice 4c) ------------------------------------------- */
+/* TourSteps: a 3px orange-soft ring with an 18px radius, 12px outside the
+   anchor, over a 70% dim; a canary sticky beside it, ink only (muted on
+   canary measures 2.12). The ring and sticky live on document.body, above
+   the editor (z 40) and the slip (z 50). */
+
+.tour-ring.ed-tour {
+  position: fixed;
+  z-index: 60;
+  box-sizing: border-box;
+  border: 3px solid var(--orange-soft);
+  border-radius: 18px;
+  box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.70);
+  pointer-events: none;
+  transition: top 0.18s ease, left 0.18s ease, width 0.18s ease, height 0.18s ease;
+}
+.tour-callout.ed-tour {
+  position: fixed;
+  z-index: 61;
+  box-sizing: border-box;
+  width: min(330px, calc(100vw - 16px));
+  min-height: 250px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 2px 2px 16px 2px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.09) 0 26px, transparent 26px),
+    var(--pad-canary);
+  color: var(--ink);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.60);
+  transform: rotate(1.5deg);
+  font-family: var(--font-ui);
+}
+.tour-callout.ed-tour[data-stop="script"],
+.tour-callout.ed-tour[data-stop="send"] { transform: rotate(-1.2deg); }
+.ed-tour .tour-count { margin: 0; padding-top: 14px; font: 700 12px/1.3 var(--font-ui); }
+.ed-tour .tour-title {
+  margin: 0;
+  font: 400 24px/1.15 var(--font-marker);
+  text-wrap: balance;
+}
+.ed-tour .tour-title:focus { outline: none; }
+.ed-tour .tour-text { margin: 0; font: 600 14px/1.5 var(--font-ui); text-wrap: pretty; }
+.ed-tour .tour-actions {
+  margin-top: auto;
+  padding-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ed-tour .tour-nav { margin-left: auto; display: flex; gap: 8px; }
+.ed-tour .hidden { display: none; }
+.ed-tour-button {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font: 700 13px/1 var(--font-ui);
+  cursor: pointer;
+}
+.ed-tour-button.tour-skip { padding: 0 6px; border: 0; text-decoration: underline; text-underline-offset: 3px; }
+.ed-tour-button.tour-next { padding: 0 18px; border-color: var(--ink); background: var(--ink); color: var(--pad-canary); }
+.tour-callout.ed-tour :focus-visible { outline: var(--focus-paper); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-knob { transition: none; }
+  .tour-ring.ed-tour { transition: none; }
 }

@@ -365,6 +365,53 @@
     return `you chose ${mode} metadata. ${joinWords(off)} ${verb} switched off.`;
   }
 
+  // ---- the gear sheet (slice 4c) ---------------------------------------------
+
+  // What the sheet shows: the mode (custom when the writer flipped a switch)
+  // and where each switch sits. The switches are the setting itself, before
+  // the app-wide "no totems" is applied, so turning totems back on in
+  // settings brings the writer's choice back.
+  function gearState(editorConfig, options) {
+    const opts = options || {};
+    const visible = sectionVisibility(editorConfig);
+    const switches = {};
+    for (const key of SECTION_KEYS) switches[key] = Boolean(visible[key]);
+    return { mode: visible.mode, switches, totemsEnabled: opts.totemsEnabled !== false };
+  }
+
+  // Picking a preset is the whole setting: its sections follow the preset.
+  function presetSettings(mode) {
+    return { mode: mode === 'complete' ? 'complete' : 'simplified', sections: {} };
+  }
+
+  // Flipping one switch makes the mode custom and writes every switch, so
+  // custom shows exactly what the sheet showed plus the one change.
+  function flipSection(editorConfig, key) {
+    if (!SECTION_KEYS.includes(key)) return null;
+    const { switches } = gearState(editorConfig);
+    switches[key] = !switches[key];
+    return { mode: 'custom', sections: switches };
+  }
+
+  // ---- the editor tour (slice 4c) -------------------------------------------
+
+  const TOUR_PHASES = {
+    'writers room': 'writers room',
+    'writers likey': 'writers likey',
+    'ready for air': 'ready for air',
+    live: 'live',
+    archived: 'saved for a rainy day',
+  };
+
+  // Step 1 points at the stamp. The artboard's "writers room today." is only
+  // true of an essay in the writers room, so the first sentence names the
+  // phase this essay is in.
+  function stampTourText(status) {
+    const rest = 'airdate stamps it when you star it, when you schedule it, and when it airs. you never set it by hand.';
+    const name = TOUR_PHASES[String(status || '').trim().toLowerCase()];
+    return name ? `${name} today. ${rest}` : rest;
+  }
+
   // ---- the script -----------------------------------------------------------
 
   function wordCount(text) {
@@ -1037,6 +1084,10 @@
     adoptHero,
     sectionVisibility,
     hiddenSentence,
+    gearState,
+    presetSettings,
+    flipSection,
+    stampTourText,
     wordCount,
     wordLine,
     clampScriptHeight,

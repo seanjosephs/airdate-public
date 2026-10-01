@@ -2401,21 +2401,25 @@ def editor_settings() -> dict[str, Any]:
         "mode": mode,
         "sections": {str(k): v for k, v in sections.items() if isinstance(v, bool)},
         "script_height": height,
+        # Anything but a real true reads as not shown, so a hand-edited value
+        # shows the tour once more rather than never.
+        "tour_done": editor.get("tour_done") is True,
     }
 
 
-EDITOR_SETTING_KEYS = ("mode", "sections", "script_height")
+EDITOR_SETTING_KEYS = ("mode", "sections", "script_height", "tour_done")
 
 
 def save_editor_settings(payload: dict[str, Any]) -> dict[str, Any]:
     """Change only editor.* in config.json: the script height the writer
-    dragged to, and (slice 4c's gear sheet) the mode and its sections. The
+    dragged to, the gear sheet's mode and sections, and that the editor tour
+    has been shown. The
     rest of the file is carried over untouched and is not re-validated, so a
     remembered height never trips over an unrelated setting."""
     global _essay_cache
     unknown = sorted(key for key in payload if key not in EDITOR_SETTING_KEYS)
     if unknown:
-        return {"ok": False, "errors": [f"only the editor's mode, sections and script height change here, not {', '.join(unknown)}."]}
+        return {"ok": False, "errors": [f"only the editor's mode, sections, script height and tour change here, not {', '.join(unknown)}."]}
     if not payload:
         return {"ok": False, "errors": ["nothing to change."]}
     current, _, load_error = airdate_config.load_config(DATA_DIR)
