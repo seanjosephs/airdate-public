@@ -72,7 +72,9 @@ class ConfigFileTests(unittest.TestCase):
         self.assertEqual(config["vault"]["path"], "")
         self.assertEqual(config["substack"]["publication"], "")
         self.assertIsNone(config["calendar"]["publish_day"])
-        self.assertEqual(config["tag_presets"], [])
+        # Three generic examples ship so a fresh install is not an empty page;
+        # a writer edits or deletes them (test_form_saves_tag_presets).
+        self.assertEqual([p["name"] for p in config["tag_presets"]], ["Craft", "Culture", "Ideas"])
         self.assertEqual(config["links"], [])
         self.assertTrue(config["totems"]["enabled"])
         self.assertEqual(len(config["totems"]["items"]), 5)
@@ -191,6 +193,69 @@ class ConfigFileTests(unittest.TestCase):
         self.assertEqual((out["categories"]["mode"], out["totems"]["enabled"], out["calendar"]["publish_day"]),
                          ("off", False, "monday"))
         self.assertIsNone(airdate_config.DEFAULT_CONFIG["calendar"]["publish_day"])
+
+    def test_a_configs_own_presets_survive_the_merge(self):
+        # Lists replace wholesale (_merge): a writer's own two presets are not
+        # topped up to three, and an explicit empty list stays empty.
+        own = [{"name": "Mine", "color": "#112233", "tags": ["a"]}]
+        airdate_config.config_path(self.data).write_text(json.dumps({"tag_presets": own}), encoding="utf-8")
+        config, _, _ = airdate_config.load_config(self.data)
+        self.assertEqual(config["tag_presets"], own)
+
+        airdate_config.config_path(self.data).write_text(json.dumps({"tag_presets": []}), encoding="utf-8")
+        config, _, _ = airdate_config.load_config(self.data)
+        self.assertEqual(config["tag_presets"], [])
+
+    def test_board_red_pen_and_paper_are_settable(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        out = airdate_config.settings_from_form(config, {
+            "board_default_pad": "paper",
+            "board_default_color": "blue",
+            "board_weeks_shown": "6",
+            "red_pen_enabled": False,
+            "red_pen_lines": " be a writer, not a procrastinator. \n\n it is not that bad. \n",
+            "paper_fresh_on_promotion": True,
+        })
+        self.assertEqual(airdate_config.validate_config(out), [])
+        self.assertEqual(out["board"], {"default_pad": "paper", "default_color": "blue", "weeks_shown": 6})
+        self.assertEqual(out["red_pen"], {
+            "enabled": False,
+            "lines": ["be a writer, not a procrastinator.", "it is not that bad."],
+        })
+        self.assertTrue(out["paper"]["fresh_on_promotion"])
+        # A form that leaves these out keeps whatever was already saved.
+        self.assertEqual(airdate_config.settings_from_form(out, {"publish_day": "monday"})["board"], out["board"])
+
+    def test_board_red_pen_and_paper_problems_are_named(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        cases = {
+            "board.default_pad": {"board_default_pad": "velvet"},
+            "board.default_color": {"board_default_color": "chartreuse"},
+            "board.weeks_shown": {"board_weeks_shown": "0"},
+        }
+        for fragment, form in cases.items():
+            out = airdate_config.settings_from_form(config, form)
+            errors = " ".join(airdate_config.validate_config(out))
+            self.assertIn(fragment, errors, errors)
+        # A blank line from the form is dropped before it is saved, so the
+        # form path never produces an empty-line error; set it directly.
+        bad = copy.deepcopy(config)
+        bad["red_pen"]["lines"] = ["", "ok"]
+        bad["red_pen"]["enabled"] = "yes"
+        bad["paper"]["fresh_on_promotion"] = "yes"
+        errors = " ".join(airdate_config.validate_config(bad))
+        self.assertIn("red_pen.lines", errors)
+        self.assertIn("red_pen.enabled", errors)
+        self.assertIn("paper.fresh_on_promotion", errors)
+
+    def test_editor_mode_is_settable_from_the_form(self):
+        config = copy.deepcopy(airdate_config.DEFAULT_CONFIG)
+        out = airdate_config.settings_from_form(config, {"editor_mode": "complete"})
+        self.assertEqual(out["editor"]["mode"], "complete")
+        self.assertEqual(airdate_config.validate_config(out), [])
+        # An unknown mode from a stray request is ignored, not stored broken.
+        ignored = airdate_config.settings_from_form(config, {"editor_mode": "nonsense"})
+        self.assertEqual(ignored["editor"]["mode"], "simplified")
 
 
 class ServerSettingsTests(unittest.TestCase):
@@ -328,6 +393,21 @@ class ServerSettingsTests(unittest.TestCase):
         server.save_essay_updates(essay_id, {"totem": "none"})
         server.save_essay_updates(essay_id, {"totem": "star"})
         self.assertEqual(self.note_totem(server, note), "circle")
+
+    def test_setup_payload_carries_the_room_settings_form_fields(self):
+        self.configure(
+            editor__mode="complete",
+            board__default_pad="paper", board__default_color="green", board__weeks_shown=5,
+            red_pen__enabled=False, red_pen__lines=["mine"],
+            paper__fresh_on_promotion=True,
+        )
+        form = self.server.setup_payload()["form"]
+        self.assertEqual(form["editor_mode"], "complete")
+        self.assertEqual((form["board_default_pad"], form["board_default_color"], form["board_weeks_shown"]),
+                         ("paper", "green", 5))
+        self.assertFalse(form["red_pen_enabled"])
+        self.assertEqual(form["red_pen_lines"], "mine")
+        self.assertTrue(form["paper_fresh_on_promotion"])
 
     def test_configured_vault_is_ready(self):
         server = self.configure()

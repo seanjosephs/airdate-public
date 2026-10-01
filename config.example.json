@@ -129,6 +129,15 @@
         "music",
         "books"
       ]
+    },
+    {
+      "name": "Ideas",
+      "color": "#4caf7d",
+      "tags": [
+        "draft",
+        "brainstorm",
+        "question"
+      ]
     }
   ],
   "links": [
