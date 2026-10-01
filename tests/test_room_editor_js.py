@@ -383,7 +383,7 @@ class SmallRulesTests(unittest.TestCase):
     def test_the_deep_link(self):
         self.assertEqual(run("return E.essayFromSearch('?essay=abc%20d');"), "abc d")
         self.assertEqual(run("return E.essayFromSearch('');"), "")
-        self.assertEqual(run("return E.editorUrl('a b');"), "/airdate/room?essay=a%20b")
+        self.assertEqual(run("return E.editorUrl('a b');"), "/airdate?essay=a%20b")
 
 
 if __name__ == "__main__":

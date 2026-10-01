@@ -49,10 +49,16 @@ class ForgettingTheLinkIsDeliberateTests(unittest.TestCase):
     """The transport refuses to silently create a replacement draft: if the old
     one was published rather than deleted, a new draft would duplicate a live
     post. So recovery is an explicit route the writer chooses, and the UI
-    confirms before calling it."""
+    confirms before calling it.
+
+    Re-pinned to the room in slice 7: the old page asked with window.confirm;
+    the room asks in the page, in the send result under the button
+    (editor-view.js askForget), and only its "forget it and send" calls the
+    route. editor.js offers the row only when there is a dead id."""
 
     SERVER = (ROOT / "server.py").read_text(encoding="utf-8")
-    EDITOR = (ROOT / "static" / "airdate.js").read_text(encoding="utf-8")
+    VIEW = (ROOT / "static" / "room" / "editor-view.js").read_text(encoding="utf-8")
+    RULES = (ROOT / "static" / "room" / "editor.js").read_text(encoding="utf-8")
 
     def test_the_transport_still_refuses_to_auto_replace(self):
         source = (ROOT / "substack_draft.py").read_text(encoding="utf-8")
@@ -72,30 +78,55 @@ class ForgettingTheLinkIsDeliberateTests(unittest.TestCase):
         self.assertIn("get_essay_detail(essay_id).get(\"status\")", route,
                       "recovery must reuse the essay's own effective status")
 
-    def test_the_editor_confirms_before_forgetting(self):
-        self.assertIn("forgetDraftLinkAndResend", self.EDITOR)
-        flow = self.EDITOR.split("async function forgetDraftLinkAndResend", 1)[1][:900]
-        self.assertIn("window.confirm", flow,
+    def ask(self):
+        return self.VIEW.split("function askForget(stale)", 1)[1].split("\n  }\n", 1)[0]
+
+    def test_the_editor_asks_in_the_page_before_forgetting(self):
+        ask = self.ask()
+        self.assertIn("forget draft ${esc(stale)} and send this as a new draft?", ask)
+        self.assertIn('data-send-action="forget-yes"', ask)
+        self.assertIn('data-send-action="forget-no">keep the link', ask)
+        # The safe answer takes focus, so a stray enter keeps the link.
+        self.assertIn("querySelector('[data-send-action=\"forget-no\"]').focus()", ask)
+        self.assertNotIn("window.confirm", self.VIEW)
+
+    def test_the_question_says_what_the_wrong_answer_costs(self):
+        self.assertIn("a new draft would copy a post that is already live", self.ask(),
                       "a published-not-deleted draft would be duplicated; ask first")
-        self.assertIn("duplicate a post that is already live", flow,
-                      "the confirm must say what the wrong answer costs")
+
+    def test_only_the_yes_calls_the_route(self):
+        forget = self.VIEW.split("async function forgetAndSend()", 1)[1].split("\n  }\n", 1)[0]
+        self.assertIn("/forget-draft-link", forget)
+        self.assertEqual(self.VIEW.count("/forget-draft-link"), 1, "nothing else may clear the link")
+        actions = self.VIEW.split("async function onSendAction(event)", 1)[1].split("\n  }\n", 1)[0]
+        self.assertIn("} else if (action === 'forget') {\n      askForget(", actions)
+        self.assertIn("} else if (action === 'forget-yes') {\n      forgetAndSend();", actions)
 
     def test_the_editor_only_offers_recovery_when_there_is_a_dead_id(self):
-        self.assertIn("const stale = String(result.stale_draft_id || '').trim();", self.EDITOR)
-        self.assertIn("if (stale) {", self.EDITOR)
+        self.assertIn("const stale = String(result.stale_draft_id || '').trim();", self.RULES)
+        self.assertIn("if (stale) {", self.RULES)
 
     def test_server_still_parses(self):
         ast.parse(self.SERVER)
 
 
-class ArchiveSaysWhereItWentTests(unittest.TestCase):
-    EDITOR = (ROOT / "static" / "airdate.js").read_text(encoding="utf-8")
+class ParkingSaysWhereItWentTests(unittest.TestCase):
+    """The old page's archive button said where the file went ("archived"
+    alone reads as "deleted"). The room has no archive button: rainy day
+    parks an essay (Archive/ on disk, never named in the interface), and the
+    slip says where it went and carries an undo. Re-pinned in slice 7."""
 
-    def test_the_success_message_names_the_destination(self):
-        flow = self.EDITOR.split("async function archiveEssayFlow", 1)[1][:700]
-        self.assertIn("archived to ${where}", flow,
-                      '"archived" alone reads as "deleted"; name the file')
-        self.assertIn("result?.path", flow, "the server already returns the new path")
+    POOL = (ROOT / "static" / "room" / "pool.js").read_text(encoding="utf-8")
+    VIEW = (ROOT / "static" / "room" / "editor-view.js").read_text(encoding="utf-8")
+
+    def test_the_card_says_rainy_day_and_offers_undo(self):
+        flow = self.POOL.split("async function parkEssay(id)", 1)[1][:2200]
+        self.assertIn("saved for a rainy day.`", flow)
+        self.assertIn("undo: () => backToRoom(parkedId, title)", flow)
+
+    def test_the_editor_says_it_too(self):
+        self.assertIn("saved for a rainy day.`", self.VIEW)
+        self.assertIn("undo: () => bringBack(", self.VIEW)
 
 
 if __name__ == "__main__":

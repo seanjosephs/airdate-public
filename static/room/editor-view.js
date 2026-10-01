@@ -118,7 +118,7 @@
   }
 
   function roomUrl() {
-    return `/airdate/room${window.location.hash || ''}`;
+    return Editor.roomUrl(window.location.hash);
   }
 
   function close() {
@@ -129,6 +129,7 @@
     hideConflict();
     Feedback.clear(els.feedback);
     Feedback.clear(els.heroFeedback);
+    Feedback.clear(els.socialFeedback);
     Feedback.clear(els.resizeFeedback);
     Feedback.clear(els.moreFeedback);
     Feedback.clear(els.readinessFeedback);
@@ -279,6 +280,7 @@
   function setControl(el, key) {
     const value = state.values[key];
     if (el.type === 'checkbox') el.checked = value === true;
+    else if (el.type === 'date') el.value = Editor.dayValue(value);
     else if (el.type === 'radio') el.checked = String(value) === el.value;
     else if (Array.isArray(value)) el.value = value.join(', ');
     else el.value = value == null ? '' : String(value);
@@ -338,6 +340,30 @@
         els.heroImg.removeAttribute('src');
         els.heroImg.hidden = true;
       }
+    }
+  }
+
+  // The social image (slice 7): the hero's drop zone, without a preview.
+  // The upload lands in airdate's drafts folder, which the browser cannot
+  // show, so the zone names the file.
+  function drawSocial() {
+    const path = String(state.values.social_image || '').trim();
+    const filled = Boolean(path);
+    els.socialEmpty.hidden = filled;
+    els.socialFilled.hidden = !filled;
+    els.social.classList.toggle('is-filled', filled);
+    els.socialActions.hidden = !filled;
+    els.socialName.textContent = filled ? Editor.imageName(path) : '';
+  }
+
+  // A blank social title, social description or alt text falls back to the
+  // title or summary. The placeholder shows that fallback, and follows the
+  // title and summary as the writer types them.
+  function drawPlaceholders() {
+    const fallbacks = Editor.sendFieldPlaceholders(state.values);
+    for (const [key, text] of Object.entries(fallbacks)) {
+      const el = $(`ed-f-${key}`);
+      if (el) el.placeholder = text;
     }
   }
 
@@ -411,6 +437,8 @@
     drawPresets();
     drawChips();
     drawHero();
+    drawSocial();
+    drawPlaceholders();
     drawReadOnly();
     drawSections();
     drawHeader();
@@ -470,6 +498,7 @@
       state.values[key] = el.value;
     }
     if (key === 'title') drawTitle();
+    if (key === 'title' || key === 'summary' || key === 'subtitle') drawPlaceholders();
     refreshState();
   }
 
@@ -807,6 +836,8 @@
       }
       followId(oldId);
       drawHero();
+      // attach-hero points the social image at the hero too.
+      drawSocial();
       refreshState();
       Feedback.plaque(els.heroFeedback, { tone: 'green', text: 'the image is in your vault and the note points to it.' });
       runReadiness();
@@ -850,6 +881,76 @@
       const file = event.dataTransfer.files && event.dataTransfer.files[0];
       if (file) attachHero(file);
     });
+  }
+
+  // ---- the social image (slice 7) ------------------------------------------
+  //
+  // Through /api/upload-image, as the old editor did: the file lands in
+  // airdate's drafts folder and the field points at it. Unlike the hero,
+  // this is not its own save: the note changes when the writer presses save.
+
+  async function uploadSocial(file) {
+    if (!state || !file) return;
+    if (!IMAGE_TYPES.has(file.type)) {
+      Feedback.plaque(els.socialFeedback, { tone: 'amber', text: 'that is not an image airdate can use. choose a gif, jpeg, png or webp.' });
+      return;
+    }
+    const token = opening;
+    els.social.setAttribute('aria-busy', 'true');
+    Feedback.plaque(els.socialFeedback, { tone: 'green', text: `uploading ${file.name}…`, remaining: 60000 });
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const result = await Api.postJson('/api/upload-image', { filename: file.name, dataUrl });
+      if (token !== opening || !state) return;
+      state = Editor.adoptSocialImage(state, result);
+      drawSocial();
+      refreshState();
+      Feedback.plaque(els.socialFeedback, { tone: 'green', text: 'the image is uploaded. press save to put it in the note.' });
+    } catch (error) {
+      if (token !== opening || !state) return;
+      const text = error && error.kind === 'network'
+        ? 'airdate is not answering, so the image was not uploaded. try again.'
+        : `the image was not uploaded. ${String((error && error.message) || 'try again.').toLowerCase()}`;
+      Feedback.plaque(els.socialFeedback, { tone: 'red', text });
+    } finally {
+      els.social.removeAttribute('aria-busy');
+    }
+  }
+
+  function clearSocial() {
+    if (!state) return;
+    state.values.social_image = '';
+    drawSocial();
+    refreshState();
+    Feedback.plaque(els.socialFeedback, { tone: 'green', text: 'cleared. press save to take it off the note.' });
+    els.socialFile.focus();
+  }
+
+  function bindSocial() {
+    els.socialFile.addEventListener('change', () => {
+      const file = els.socialFile.files && els.socialFile.files[0];
+      els.socialFile.value = '';
+      if (file) uploadSocial(file);
+    });
+    const hasFiles = (event) => Array.from((event.dataTransfer && event.dataTransfer.types) || []).includes('Files');
+    for (const type of ['dragenter', 'dragover']) {
+      els.social.addEventListener(type, (event) => {
+        if (!hasFiles(event)) return;
+        event.preventDefault();
+        els.social.classList.add('is-dragging');
+      });
+    }
+    els.social.addEventListener('dragleave', (event) => {
+      if (!els.social.contains(event.relatedTarget)) els.social.classList.remove('is-dragging');
+    });
+    els.social.addEventListener('drop', (event) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      els.social.classList.remove('is-dragging');
+      const file = event.dataTransfer.files && event.dataTransfer.files[0];
+      if (file) uploadSocial(file);
+    });
+    els.socialClear.addEventListener('click', clearSocial);
   }
 
   // ---- substack: the connection line ----------------------------------------
@@ -1759,6 +1860,7 @@
     }
 
     bindHero();
+    bindSocial();
     bindResize();
     bindSend();
     bindGear();
@@ -1770,14 +1872,7 @@
       const link = event.target.closest && event.target.closest('a.card-link');
       if (!link || event.defaultPrevented) return;
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      let url;
-      try {
-        url = new URL(link.href, window.location.href);
-      } catch (error) {
-        return;
-      }
-      if (url.origin !== window.location.origin || url.pathname !== '/airdate/room') return;
-      const id = url.searchParams.get('essay');
+      const id = Editor.essayFromLink(link.href, window.location.href);
       if (!id) return;
       event.preventDefault();
       open(id, { push: true, returnFocus: link });
@@ -1849,6 +1944,14 @@
     els.heroImg = $('ed-hero-img');
     els.heroName = $('ed-hero-name');
     els.heroFeedback = $('ed-hero-feedback');
+    els.social = $('ed-social');
+    els.socialFile = $('ed-social-file');
+    els.socialEmpty = $('ed-social-empty');
+    els.socialFilled = $('ed-social-filled');
+    els.socialName = $('ed-social-name');
+    els.socialActions = $('ed-social-actions');
+    els.socialClear = $('ed-social-clear');
+    els.socialFeedback = $('ed-social-feedback');
     els.chips = $('ed-chips');
     els.tagInput = $('ed-tag-input');
     els.tagSay = $('ed-tag-say');

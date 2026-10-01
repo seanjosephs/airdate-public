@@ -5,15 +5,16 @@
 A local essay manager for writers who keep their essays in **Obsidian** and
 publish on **Substack**.
 
-![The airdate catalog: a calendar rail on the left, and essay cards showing
-each essay's state, tags and lifecycle buttons](docs/catalog.png)
+![The writers room: a cork board of weekly air dates across the top, with a
+sticky note on one Monday, and essay cards below it, each stamped with its
+phase](docs/room.png)
 
-*The catalog, running against a demo vault.*
+*The writers room, running against a demo vault.*
 
-- Reads a folder of Markdown notes in your Obsidian vault and shows them as a
-  catalog you can search, filter, and sort.
-- Tracks each essay from Writers Room to Published, with a weekly calendar on
-  your publish day.
+- Reads a folder of Markdown notes in your Obsidian vault and lays them out
+  as scripts on a desk you can search and filter.
+- Walks each essay through four phases (writers room, writers likey, ready
+  for air, live), with a board of weekly slots on your publish day.
 - Edits an essay's Substack metadata (subtitle, email subject, SEO and social
   text, hero image) and saves it back into the note's frontmatter.
 - Checks an essay before sending and refuses anything that would lose text on
@@ -52,7 +53,7 @@ Substack through Obsidian.
 | Path | What it is |
 |---|---|
 | `server.py` | The local web server (Python standard library only) |
-| `airdate.html`, `static/` | The interface (plain HTML, CSS, JavaScript) |
+| `room.html`, `static/` | The interface, the writers room (plain HTML, CSS, JavaScript) |
 | `airdate_config.py` | Settings: `.airdate-data/config.json`, with neutral defaults |
 | `substack_draft.py` | Creates one Substack draft; run only by the connector |
 | `obsidian-airdate-connector/` | The Obsidian plugin that holds your Substack session |

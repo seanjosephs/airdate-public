@@ -22,25 +22,29 @@
   // Swallowed outside the callout while a tour runs. Wheel and scroll are
   // deliberately absent: the page may still scroll and the ring follows it.
   const BLOCKED_POINTER_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'dragstart'];
+  // The room's nine home stops. The keys and their order are pinned
+  // (tests/test_airdate_tour.py); the anchors are the room's. A stop whose
+  // element is not showing is skipped: no publish day hides the board, and
+  // nothing to file hides the filing pill.
   const STOPS = [
-    { key: 'essays', anchor: '.all-ideas-head, #all-ideas-count', title: 'essays',
-      text: 'This is your catalog. Everything in your essays folder shows here.' },
-    { key: 'card', anchor: '#all-ideas-cards .garden-card', title: 'a card',
-      text: 'Each essay is a card. It shows where the essay stands, its totem slot, and the buttons that move it along.' },
-    { key: 'lifecycle', anchor: '#all-ideas-cards .garden-card .gc-lifecycle', title: 'the lifecycle',
-      text: 'Writers Room, Writers Likey, Ready for Air, Live, Published. The buttons move an essay forward: mark it ready to schedule, give it an air date, send it, then mark it published.' },
-    { key: 'calendar', anchor: '#month-rail', title: 'calendar',
-      text: 'One slot per week on your publish day. Drag a Writers Likey essay onto a week to schedule it.' },
-    { key: 'filing', anchor: '#inbox-lane', title: 'needs filing',
-      text: 'Essays sitting outside a topic folder land here. "File this" suggests a folder and moves the note once you confirm.' },
-    { key: 'filters', anchor: '.all-ideas-controls', title: 'filters',
-      text: 'Search across everything, or narrow the catalog by totem or state.' },
-    { key: 'editor', anchor: '#all-ideas-cards .garden-card .gc-title', title: 'the editor',
-      text: 'Click a card to open its essay. Fill the required fields, copy a thumbnail prompt, and send to Substack. Sending creates a draft, never a published post.' },
+    { key: 'essays', anchor: '.pool-title-row, #pool-heading', title: 'the essays',
+      text: 'every note in your essays folder lands on this desk as a script. search finds one fast.' },
+    { key: 'card', anchor: '#pool .card', title: 'a script',
+      text: 'each essay is a card. the paper ages with it, the bars show how long it runs, and the stamp says where it stands.' },
+    { key: 'lifecycle', anchor: '#pool .card .stamp', title: 'the stamp',
+      text: 'four phases: writers room, writers likey, ready for air, live. star a script to make it writers likey, and put it on the board to make it ready for air. it goes live when you paste the post link on its note.' },
+    { key: 'calendar', anchor: '#board', title: 'the board',
+      text: 'one slot a week, on your publish day. drag a writers likey script onto a week, or use the keys listed under the board. a writers room script cannot go up until it has its star.' },
+    { key: 'filing', anchor: '#pool-filing', title: 'needs filing',
+      text: 'scripts sitting outside a topic folder are counted here. "file it" on the card suggests a folder and moves the note once you confirm.' },
+    { key: 'filters', anchor: '.pool-filters', title: 'filters',
+      text: 'narrow the desk by phase or totem. the star pill shows only your writers likey.' },
+    { key: 'editor', anchor: '#pool .card .card-link', title: 'the editor',
+      text: 'click a title to open the essay: the script, everything substack needs, and send. send makes a draft in substack; airdate never publishes.' },
     { key: 'shelf', anchor: '#nav-shelf', title: 'the shelf',
-      text: 'Published essays move here, with their live links. Essays is what you are working on; the shelf is what is already out.' },
+      text: 'live essays go here, each with the link to its post. the essays are what you are working on; the shelf is what is already out.' },
     { key: 'settings', anchor: '#nav-settings', title: 'settings',
-      text: 'Everything from setup can be changed here. You can replay this tour from settings too.' },
+      text: 'everything from setup can be changed here. you can replay this tour from settings too.' },
   ];
 
   // The essay editor's five steps (TourSteps artboard). `side` is where the

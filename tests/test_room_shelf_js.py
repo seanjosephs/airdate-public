@@ -154,7 +154,7 @@ class FilterTests(unittest.TestCase):
 class RowMarkupTests(unittest.TestCase):
     def test_the_title_links_to_the_editor(self):
         html = run(f"shelf.rowMarkup({js(essay(id='xyz', title='Take <Care>'))}, {{}})")
-        self.assertIn('href="/airdate/room?essay=xyz"', html)
+        self.assertIn('href="/airdate?essay=xyz"', html)
         self.assertIn("Take &lt;Care&gt;", html)
 
     def test_a_subtitle_shows_under_the_title(self):

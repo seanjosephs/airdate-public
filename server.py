@@ -2308,6 +2308,14 @@ def local_app_url(path: str = "") -> str:
     return f"http://{display_host}:{PORT}{suffix}"
 
 
+def room_redirect_location(query: str) -> str:
+    """Where /airdate/room now sends a browser: /airdate, with the same query
+    string, so an old ?essay= link still opens that essay. A header cannot
+    carry a line break or other control character, so any are dropped."""
+    clean = "".join(ch for ch in str(query or "") if ch.isprintable() and ch not in "\r\n")
+    return f"/airdate?{clean}" if clean else "/airdate"
+
+
 def collection_counts(essays: list[dict[str, Any]]) -> dict[str, int]:
     counts = {"active": 0, "shelf": 0, "archived": 0}
     for essay in essays:
@@ -3892,14 +3900,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.redirect("/airdate")
                 return
             if path == "/airdate/room":
-                # The writers room, built beside the old page. Slice 7 makes
-                # /airdate serve this and deletes airdate.html.
-                self.serve_file(ROOT / "room.html", "text/html; charset=utf-8")
+                # Where the room lived while it was built beside the old page.
+                # Links to it still exist (?essay= deep links), so the query
+                # string travels with the redirect.
+                self.redirect(room_redirect_location(parsed.query))
                 return
             if path == "/airdate":
-                # First run is handled in the page: it reads /api/app/status and
-                # opens settings in its setup state until the vault is configured.
-                self.serve_file(ROOT / "airdate.html", "text/html; charset=utf-8")
+                # The writers room. First run is handled in the page: it reads
+                # /api/app/status and opens the setup wizard until the vault is
+                # configured.
+                self.serve_file(ROOT / "room.html", "text/html; charset=utf-8")
                 return
 
             if path.startswith("/static/"):
