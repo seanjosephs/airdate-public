@@ -51,10 +51,12 @@
     return new Promise((resolve) => { window.setTimeout(resolve, ms); });
   }
 
+  // The board lives in the sidebar and holds three weeks: last week, this
+  // week and next week (the window is last week plus two from this one). The
+  // pager moves them. config board.weeks_shown is still accepted but no
+  // longer read.
   function weeksShown() {
-    const board = state.config && state.config.board;
-    const n = Math.floor(Number(board && board.weeks_shown) || 3);
-    return Math.max(1, Math.min(12, n));
+    return 2;
   }
 
   // The writer's publish day: config.publish_day ("monday".."sunday") or ''

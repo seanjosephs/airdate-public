@@ -9,11 +9,8 @@
    hides the board and the pool. Each view still owns its own hidden state
    (settings.js, shelf.js, rainy-day.js). ---- */
 
-body.route-settings .board,
 body.route-settings #pool-section,
-body.route-shelf .board,
 body.route-shelf #pool-section,
-body.route-rainy-day .board,
 body.route-rainy-day #pool-section { display: none !important; }
 
 .set-view {

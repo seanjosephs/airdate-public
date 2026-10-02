@@ -1,9 +1,9 @@
 """The room's frame and motion: the locked deck, the grabber's flight, the
 brand marks.
 
-- the nav, the board and the pool's search and filters stay in view while the
-  page scrolls (sticky), and deck.js shrinks the board on a short window so the
-  two never take the screen;
+- the nav and the board (last week, this week, next week) live in the sidebar,
+  which stays in view while the page scrolls, and the pool's search and its
+  drop-down filters stay at the top of the essays;
 - the grabber: the card turns into its post-it, the post-it flies to the board,
   and the cards left behind slide up into the gap (flight.js, pool.js tuck and
   untuck, placing.js and board-view.js calling them). Putting a note back runs
@@ -11,7 +11,7 @@ brand marks.
 - the umbrella is the favicon's orange, and "open in obsidian" wears the real
   obsidian logo.
 
-flight.js and deck.js hold their rules and run through node; flip() runs
+flight.js holds its rules and runs through node; flip() runs
 against a small fake DOM that records the animations it starts.
 """
 
@@ -24,7 +24,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FLIGHT = ROOT / "static" / "room" / "flight.js"
-DECK = ROOT / "static" / "room" / "deck.js"
 NODE = shutil.which("node")
 
 if NODE is None:  # pragma: no cover - depends on the machine
@@ -47,14 +46,6 @@ def node(script: str):
 def flight(expression: str):
     return node(f"""
 const Flight = require({js(str(FLIGHT))});
-const result = (() => {{ return {expression}; }})();
-process.stdout.write(JSON.stringify(result === undefined ? null : result));
-""")
-
-
-def deck(expression: str):
-    return node(f"""
-const Deck = require({js(str(DECK))});
 const result = (() => {{ return {expression}; }})();
 process.stdout.write(JSON.stringify(result === undefined ? null : result));
 """)
@@ -132,25 +123,6 @@ class FlipTests(unittest.TestCase):
         self.assertEqual(result["animations"], [])
 
 
-class DeckRulesTests(unittest.TestCase):
-    def test_a_tall_window_keeps_the_board_full_size(self):
-        self.assertEqual(deck("Deck.zoomFor(1600, 440, 300)"), 1)
-
-    def test_a_short_window_shrinks_the_board_to_keep_to_its_share(self):
-        zoom = deck("Deck.zoomFor(900, 440, 150)")
-        self.assertLess(zoom, 1)
-        self.assertGreaterEqual(zoom, deck("Deck.FLOOR"))
-        # What the deck takes at that zoom is within its share of the window.
-        self.assertLessEqual(440 * zoom + 150, 900 * deck("Deck.SHARE") + 1)
-
-    def test_the_board_never_shrinks_past_where_it_can_be_read(self):
-        self.assertEqual(deck("Deck.zoomFor(500, 440, 400)"), deck("Deck.FLOOR"))
-
-    def test_nothing_measured_leaves_it_alone(self):
-        self.assertEqual(deck("Deck.zoomFor(0, 440, 100)"), 1)
-        self.assertEqual(deck("Deck.zoomFor(900, 0, 100)"), 1)
-
-
 class WiringTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -164,17 +136,43 @@ class WiringTests(unittest.TestCase):
     def script_order(self):
         return re.findall(r'<script src="/static/(?:room/)?([\w-]+)\.js\?v=\d+" defer>', self.html)
 
-    def test_flight_loads_before_the_pool_and_deck_is_in_the_page(self):
+    def test_flight_loads_before_the_pool(self):
         order = self.script_order()
         self.assertIn("flight", order)
         self.assertLess(order.index("flight"), order.index("pool"))
-        self.assertIn("deck", order)
+        self.assertNotIn("deck", order)
 
-    def test_the_nav_the_board_and_the_filters_are_locked_in_place(self):
-        self.assertRegex(self.room_css, r"\.room-sidebar \{[^}]*position: sticky;[^}]*top: 0;[^}]*height: 100vh;")
-        self.assertRegex(self.room_css, r"\.room-main > \.board \{[^}]*position: sticky;[^}]*top: 0;")
-        self.assertRegex(self.room_css, r"\.pool-head \{[^}]*position: sticky;[^}]*top: var\(--deck-board-h")
-        self.assertIn("scroll-padding-top: var(--deck-h", self.room_css)
+    def test_the_board_is_in_the_sidebar_under_the_logo(self):
+        side = self.html.split('<aside class="room-sidebar">')[1].split("</aside>")[0]
+        self.assertIn('id="board"', side)
+        self.assertLess(side.index('class="room-brand"'), side.index('id="board"'))
+        main = self.html.split('<main class="room-main"')[1]
+        self.assertNotIn('id="board"', main)
+
+    def test_the_sidebar_is_wide_enough_for_a_note_and_locked_in_place(self):
+        self.assertRegex(self.room_css, r"\.room-sidebar \{[^}]*flex: 0 0 348px;")
+        self.assertRegex(self.room_css, r"\.room-sidebar \{[^}]*position: sticky;[^}]*top: 0;[^}]*height: 100vh;[^}]*overflow-y: auto;")
+
+    def test_the_board_shows_last_week_this_week_and_next_week_top_to_bottom(self):
+        self.assertRegex(read("static/room/board.css"), r"\.board-slots \{[^}]*flex-direction: column;")
+        self.assertRegex(self.board_view, r"function weeksShown\(\) \{\s*return 2;")
+        self.assertNotIn("set-weeks-shown", self.html)
+
+    def test_the_essays_search_and_drop_downs_stay_at_the_top_of_the_essays(self):
+        self.assertRegex(self.room_css, r"\.pool-head \{[^}]*position: sticky;[^}]*top: 0;")
+
+    def test_the_quick_selects_are_drop_downs_in_one_row_between_the_title_and_the_search(self):
+        head = self.html.split('<div class="pool-head">')[1].split('<div class="pool-columns"')[0]
+        title = head.index('id="pool-heading"')
+        show = head.index('id="pool-drop-show"')
+        totem = head.index('id="pool-totem-drop"')
+        topic = head.index('id="pool-topic"')
+        sort = head.index('id="pool-sort"')
+        search = head.index('id="pool-search"')
+        self.assertTrue(title < show < totem < topic < sort < search)
+        for pill in ('data-phase="writers-likey"', 'id="pool-star"', 'id="pool-filing"'):
+            self.assertGreater(head.index(pill), show)
+            self.assertLess(head.index(pill), totem)
 
     def test_the_shelf_and_rainy_day_keep_their_search_at_the_top(self):
         self.assertRegex(read("static/room/shelf.css"), r"\.shelf-head \{[^}]*position: sticky;")

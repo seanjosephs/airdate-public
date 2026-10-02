@@ -152,6 +152,55 @@
     for (const button of els.totemGroup.querySelectorAll('button[data-totem]')) {
       button.setAttribute('aria-pressed', String(state.totems.has(button.dataset.totem)));
     }
+    renderDropLabels();
+  }
+
+  // The drop-downs say what they are set to, so a closed one still reads.
+  const SHOW_LABELS = {
+    all: 'all',
+    'writers-room': 'writers room',
+    'writers-likey': 'writers likey',
+    'ready-for-air': 'ready for air',
+  };
+  function renderDropLabels() {
+    if (els.showLabel) els.showLabel.textContent = state.phase === NEEDS_FILING ? 'needs filing' : (SHOW_LABELS[state.phase] || 'all');
+    if (els.totemLabel) {
+      const picked = Array.from(els.totemGroup.querySelectorAll('button[data-totem]'))
+        .filter((button) => state.totems.has(button.dataset.totem));
+      els.totemLabel.textContent = !picked.length ? 'any' : (picked.length === 1 ? picked[0].textContent.trim() : `${picked.length} picked`);
+    }
+  }
+
+  // A drop-down closes when something outside it is pressed, on Escape (focus
+  // goes back to its label), and, for "show", once a choice is made. The totem
+  // menu stays open while totems are ticked, since more than one can be.
+  function bindDrops() {
+    const drops = Array.from(document.querySelectorAll('.pool-drop'));
+    document.addEventListener('click', (event) => {
+      for (const drop of drops) if (drop.open && !drop.contains(event.target)) drop.open = false;
+    });
+    for (const drop of drops) {
+      drop.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || !drop.open) return;
+        event.stopPropagation();
+        drop.open = false;
+        const summary = drop.querySelector('summary');
+        if (summary) summary.focus();
+      });
+      drop.addEventListener('toggle', () => {
+        if (!drop.open) return;
+        for (const other of drops) if (other !== drop) other.open = false;
+      });
+    }
+    const show = document.getElementById('pool-drop-show');
+    const menu = show && show.querySelector('.pool-drop-menu');
+    if (menu) {
+      menu.addEventListener('click', (event) => {
+        if (!event.target.closest('button')) return;
+        show.open = false;
+        show.querySelector('summary').focus();
+      });
+    }
   }
 
   // The topic menu offers the topics the essays in the room carry. A topic no
@@ -176,7 +225,7 @@
     const cfg = state.config || {};
     const items = cfg.totems && cfg.totems.enabled && Array.isArray(cfg.totems.items) ? cfg.totems.items : [];
     els.totemGroup.hidden = !items.length;
-    els.totemDivider.hidden = !items.length;
+    els.totemDrop.hidden = !items.length;
     els.totemGroup.innerHTML = items.map((item) => {
       const key = Cards.escapeHtml(String(item.key).toLowerCase());
       const label = Cards.escapeHtml(String(item.label || item.key).toLowerCase());
@@ -698,7 +747,9 @@
     els.topic = $('pool-topic');
     els.sort = $('pool-sort');
     els.totemGroup = $('pool-totems');
-    els.totemDivider = $('pool-totem-divider');
+    els.totemDrop = $('pool-totem-drop');
+    els.showLabel = $('pool-show-label');
+    els.totemLabel = $('pool-totem-label');
     if (!els.pool || !Cards || !Api || !Keys || !Feedback) return;
     roving = Keys.createRoving({
       container: els.pool,
@@ -707,6 +758,7 @@
       columnSelector: '.pool-column',
     });
     bind();
+    bindDrops();
     document.addEventListener('room:essay', (event) => {
       const detail = event.detail || {};
       if (detail.source === 'pool' || !state.loaded) return;

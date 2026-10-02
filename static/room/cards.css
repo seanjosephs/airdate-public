@@ -43,6 +43,9 @@
   flex-wrap: wrap;
 }
 .pool-title-row { gap: 12px; }
+/* One row: the title, the drop-downs, then the search at the right. It wraps
+   only when the window is too narrow for them. */
+.pool-title-row .pool-filters { flex: 0 1 auto; }
 
 .pool-title-row h1 {
   margin: 0;
@@ -65,7 +68,8 @@
 
 .pool-search {
   position: relative;
-  width: 300px;
+  flex: 0 1 240px;
+  width: 240px;
   max-width: 100%;
 }
 .pool-search svg {
@@ -133,6 +137,59 @@
   background: rgba(255, 106, 0, 0.14);
   color: var(--orange-soft);
 }
+
+/* A drop-down in the toolbar: "show" and "totem". The label says what it is
+   set to; the menu opens under it. */
+.pool-drop { position: relative; }
+.pool-drop[hidden] { display: none; }
+.pool-drop > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r-md);
+  background: var(--s2);
+  color: var(--text);
+  font: 600 13px/1 var(--font-ui);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.pool-drop > summary::-webkit-details-marker { display: none; }
+.pool-drop > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 4px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.pool-drop[open] > summary { border-color: var(--orange-soft); }
+.pool-drop-name { color: var(--muted); font-size: 12px; }
+.pool-drop-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(320px, 80vw);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r-md);
+  background: var(--s1);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.55);
+}
+.pool-drop-menu .pool-phases { display: flex; flex-direction: column; gap: 6px; }
+.pool-drop-menu .pool-pill,
+.pool-drop-menu .pool-totem { width: 100%; justify-content: flex-start; }
+.pool-drop-menu .pool-totems { display: flex; flex-direction: column; gap: 6px; }
 
 .pool-divider {
   width: 1px;
