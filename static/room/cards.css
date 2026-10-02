@@ -847,35 +847,30 @@
 }
 .card-handle:hover { border-color: var(--muted); }
 .card-handle:active { cursor: grabbing; }
-.card-handle[aria-pressed="true"] {
-  border-color: var(--orange-soft);
-  background: rgba(255, 178, 77, 0.14);
-  color: var(--orange-soft);
-}
 
-/* The note is up on the board: a dashed spot marks where it was. The card
-   keeps full strength. */
-.card-postit-spot {
-  position: absolute;
-  left: 6px;
-  top: 6px;
-  z-index: 2;
-  width: 84px;
-  height: 76px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed rgba(243, 234, 211, 0.75);
-  border-radius: 2px 2px 9px 2px;
-  transform: rotate(-7deg);
-  color: var(--cream);
-  font: 700 11px/1.2 var(--font-ui);
-  text-align: center;
-}
+/* The card's note is up on the board (lifted with the grabber, or being
+   dragged): the card leaves the pool's layout, and the cards below slide up
+   into the space (flight.js). */
+.card.is-up { display: none; }
 
-/* While the note rides the cursor the card stays in the pool at half
-   strength. */
-.card.is-lifted { opacity: 0.5; }
+/* The post-it that flies from the card to the board and back. flight.js puts
+   a copy of the card's post-it in a box that rides above the page. */
+.flying-note {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 70;
+  margin: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+}
+.flying-note .card-postit.flying-note-face {
+  position: static;
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
 
 /* After a schedule the card pulses once: its note is gone and the dater is on. */
 .card.is-pulsing { animation: card-pulse 900ms ease-out 1; }
@@ -903,10 +898,10 @@
   border-radius: var(--r-md);
   border: 1.5px solid var(--b2);
   background: transparent;
-  color: var(--muted);
+  color: var(--umbrella);
   cursor: pointer;
 }
-.card-umbrella:hover { border-color: var(--muted); color: var(--orange-soft); }
+.card-umbrella:hover { border-color: var(--umbrella); color: var(--umbrella); }
 
 /* ---- a parked card's footer: no handle, "in the rain since", and the way
    back (rainy day, slice 6) ---- */

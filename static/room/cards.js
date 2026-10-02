@@ -52,7 +52,7 @@
 
   const STAR_PATH = 'M20 4.5 L24.6 15.2 L36.5 16 L27.4 23.8 L30.6 35.5 L20 29 L9.8 35.8 L12.8 23.6 L3.5 16.4 L15.3 15.3 Z';
   // The gem for "open in obsidian", at the card's 26px.
-  const OBSIDIAN_GEM = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 4 9l3 13h10l3-13z"/><path d="M12 2 7 22"/><path d="M12 2 17 22"/><path d="M4 9h16"/></svg>';
+  const OBSIDIAN_GEM = '<img class="obsidian-logo" src="/static/brand/obsidian-logo.png" alt="" width="26" height="26">';
   const AIR_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.5 6.5 0 0 0 0 9M16.5 7.5a6.5 6.5 0 0 1 0 9M4.5 4.5a10.5 10.5 0 0 0 0 15M19.5 4.5a10.5 10.5 0 0 1 0 15"/></svg>';
   const HANDLE_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M5 7h14M5 12h14M5 17h14"/></svg>';
   const LIVE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>';
@@ -563,12 +563,12 @@
       + `<button type="button" class="card-unpark" data-action="unpark">${BACK_ICON}back to the room</button>`;
   }
 
-  function handleMarkup(placing) {
-    return `<button type="button" class="card-handle" data-action="place" draggable="true" aria-pressed="${placing ? 'true' : 'false'}" aria-label="place on the board" title="drag to the board, or press to place it with the keyboard">${HANDLE_ICON}</button>`;
+  function handleMarkup() {
+    return `<button type="button" class="card-handle" data-action="place" draggable="true" aria-label="place on the board" title="drag to the board, or press to place it with the keyboard">${HANDLE_ICON}</button>`;
   }
 
   // ctx: { now, totems: {key: {label, image}}, redPen: {enabled, lines},
-  //        presets: [...], error: '', placing: false, intake: {},
+  //        presets: [...], error: '', intake: {},
   //        attention: false }
   function cardMarkup(essay, ctx) {
     const context = ctx || {};
@@ -589,13 +589,8 @@
     // gone up to the board and the page is done with.
     const showTool = phase === 'room' || phase === 'likey';
     const titleId = `card-title-${escapeHtml(id)}`;
-    // Placing mode: the note is up on the board, and a dashed spot marks where
-    // it was. Only a likey card can be placing - never a parked one.
-    const placing = !isParked && Boolean(context.placing) && phase === 'likey';
-
     const classes = ['card', `size-${size.key}`, `phase-${phase}`, `age-${tier}`];
     if (isParked) classes.push('is-parked');
-    if (placing) classes.push('is-placing');
     let cover = '';
     if (totem) {
       cover += `<img class="card-totem" src="${escapeHtml(totem.image)}" alt="${escapeHtml(totem.label)} totem" decoding="async" loading="lazy">`;
@@ -617,8 +612,7 @@
       + '<span class="card-page-gap" aria-hidden="true"></span>'
       + stampMarkup(stamp)
       + '</div>';
-    if (placing) cover += '<div class="card-postit-spot" aria-hidden="true">note is<br>up</div>';
-    else if (showPostit) cover += postitMarkup(shown);
+    if (showPostit) cover += postitMarkup(shown);
 
     let meta = '';
     if (topic) {
@@ -639,7 +633,7 @@
       const since = formatStampDate(essay?.archived_at, 'instant');
       actions += unparkMarkup(since ? `in the rain since ${since}` : 'in the rain');
     } else if (phase === 'likey') {
-      actions += handleMarkup(placing);
+      actions += handleMarkup();
     } else if (phase === 'ready' && essay?.scheduled_at) {
       actions += `<span class="card-air">${AIR_ICON}airs ${escapeHtml(formatAirDay(essay.scheduled_at))}</span>`;
     } else if (phase === 'live' && isPostLink(essay?.substack_url)) {

@@ -20,6 +20,7 @@ body.route-rainy-day #pool-section { display: none !important; }
   display: flex;
   flex-direction: column;
   gap: 20px;
+  padding-top: 32px;
 }
 
 .set-bar {

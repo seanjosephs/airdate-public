@@ -36,8 +36,9 @@
     busy: new Set(),
     errors: new Map(),
     loaded: false,
-    // The card whose note is up on the board in placing mode.
-    placing: '',
+    // Cards whose note has gone up to the board (lifted with the grabber, or
+    // dragged): they leave the pool's layout until the note is set or put back.
+    up: new Set(),
     // The needs-filing lane (slice 6): the last /intake-suggest answer for an
     // essay, keyed by id. Undefined until the writer asks ("file it").
     intake: {},
@@ -74,7 +75,6 @@
       redPen: cfg.red_pen || { enabled: true, lines: [] },
       presets: presets(),
       error: essay ? state.errors.get(String(essay.id)) || '' : '',
-      placing: Boolean(essay && state.placing && state.placing === String(essay.id)),
       intake: state.intake,
       attention: state.attention,
     };
@@ -222,6 +222,7 @@
       const card = cardElement(id);
       if (card) card.setAttribute('aria-busy', 'true');
     }
+    for (const id of state.up) cardElement(id)?.classList.add('is-up');
     roving.refresh();
   }
 
@@ -237,6 +238,7 @@
     holder.innerHTML = cardHtml(essay);
     const next = holder.firstElementChild;
     if (state.busy.has(String(essay.id))) next.setAttribute('aria-busy', 'true');
+    if (state.up.has(String(oldId)) || state.up.has(String(essay.id))) next.classList.add('is-up');
     card.replaceWith(next);
     roving.refresh(String(essay.id));
     if (focusStar) {
@@ -311,7 +313,8 @@
       replaceCard(oldId, row, card.contains(document.activeElement));
       return;
     }
-    render(false);
+    // A card that leaves (or one that arrives) moves the rest: let them glide.
+    flight(() => render(false));
   }
 
   // ---- the umbrella: save for a rainy day (slice 6) ------------------------
@@ -477,14 +480,74 @@
     }
   }
 
-  function setPlacing(id) {
-    const before = state.placing;
-    state.placing = id ? String(id) : '';
-    for (const key of new Set([before, state.placing])) {
-      if (!key) continue;
-      const essay = state.essays.find((row) => String(row.id) === key);
-      if (essay && cardElement(key)) replaceCard(key, essay, false);
+  // ---- the grabber: a card's note goes up to the board and comes back ------
+
+  function flight(change) {
+    const Flight = window.RoomFlight;
+    return Flight ? Flight.flip(els.pool, change) : change();
+  }
+
+  // The card's note goes up: the card shrinks into its post-it and the cards
+  // below slide up into the space. Returns what a flight needs (where the
+  // post-it was, and a copy of it to fly), or null when the card is not showing.
+  // options.collapse: false hides it at once, for a drag, where the browser is
+  // already carrying the note.
+  function tuck(id, options) {
+    const key = String(id);
+    if (state.up.has(key)) return null;
+    const card = cardElement(key);
+    state.up.add(key);
+    if (!card) return null;
+    const postit = card.querySelector('.card-postit');
+    const rect = (postit || card).getBoundingClientRect();
+    const note = postit ? postit.cloneNode(true) : null;
+    const Flight = window.RoomFlight;
+    const hide = () => {
+      card.classList.add('is-up');
+      roving.refresh();
+    };
+    if (!Flight) {
+      hide();
+    } else if (options && options.collapse === false) {
+      Flight.flip(els.pool, hide);
+    } else {
+      // The slide waits for the card to be gone, or the cards below would
+      // move under it.
+      Flight.collapse(card, rect).then(() => {
+        if (state.up.has(key)) Flight.flip(els.pool, hide);
+      });
     }
+    return { rect, note };
+  }
+
+  // The note comes back (put back, or set and done): the card takes its place
+  // again, the cards around it make room, and the card settles in.
+  // options.from: a rectangle to fly the note back from (the board's ghost);
+  // the card waits for it to land.
+  function untuck(id, options) {
+    const key = String(id);
+    if (!state.up.delete(key)) return Promise.resolve();
+    const card = cardElement(key);
+    if (!card) return Promise.resolve();
+    const Flight = window.RoomFlight;
+    const show = () => {
+      card.classList.remove('is-up');
+      roving.refresh();
+    };
+    if (!Flight) {
+      show();
+      return Promise.resolve();
+    }
+    // Hidden (opacity 0) but laid out, so the cards around it make room now.
+    card.style.opacity = '0';
+    Flight.flip(els.pool, show);
+    const postit = card.querySelector('.card-postit');
+    const from = options && options.from;
+    if (from && postit && !Flight.reducedMotion()) {
+      return Flight.fly(postit, from, postit.getBoundingClientRect(), { turnFrom: 0, turnTo: -7 })
+        .then(() => Flight.arrive(card));
+    }
+    return Flight.arrive(card);
   }
 
   function setPhase(phase) {
@@ -639,7 +702,7 @@
     if (!els.pool || !Cards || !Api || !Keys || !Feedback) return;
     roving = Keys.createRoving({
       container: els.pool,
-      itemSelector: '.card',
+      itemSelector: '.card:not(.is-up)',
       primarySelector: '.card-link',
       columnSelector: '.pool-column',
     });
@@ -654,7 +717,8 @@
       onKey: (handler) => roving.onKey(handler),
       card: (id) => cardElement(id),
       feedbackHost: (id) => cardElement(id)?.querySelector('.card-feedback') || null,
-      setPlacing,
+      tuck,
+      untuck,
       isLoaded: () => state.loaded,
     };
     load();

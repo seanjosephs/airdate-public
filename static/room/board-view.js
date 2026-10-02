@@ -31,6 +31,10 @@
     busy: new Set(),
     placing: null,
     dragging: null,
+    // The card being dragged, and whether it was dropped on a day (the drop's
+    // own schedule() brings the card back; a drag that ends elsewhere does).
+    lastDrag: '',
+    dropped: false,
     // Plaques survive a re-render: monday -> { tone, text, until, onGone }.
     plaques: new Map(),
   };
@@ -284,6 +288,16 @@
 
   // Put an essay on a Monday. Returns true when it landed.
   async function schedule(id, monday, options) {
+    try {
+      return await scheduleNote(id, monday, options);
+    } finally {
+      // However it ended, the card's note is no longer up: the card comes back
+      // (a no-op when it already has, or is not in the pool).
+      if (window.RoomPool) window.RoomPool.untuck(id);
+    }
+  }
+
+  async function scheduleNote(id, monday, options) {
     const opts = options || {};
     const essay = byId(id);
     if (!essay || state.busy.has(String(id))) return false;
@@ -310,6 +324,8 @@
       state.offset = Board.offsetShowing(monday, state.today, weeksShown(), state.offset, anchorWeekday());
       render();
       land(monday);
+      // The card is back before it pulses, so the pulse is seen.
+      if (window.RoomPool) window.RoomPool.untuck(row.id);
       report(monday, 'green', Board.say.scheduled(monday), {
         undo: () => undoSchedule(row.id, monday, result && result.content_hash),
       });
@@ -498,7 +514,6 @@
     state.dragging = null;
     els.board.classList.remove('is-dragging');
     for (const el of els.slots.querySelectorAll('.slot.is-over')) el.classList.remove('is-over');
-    for (const el of document.querySelectorAll('.card.is-lifted')) el.classList.remove('is-lifted');
   }
 
   function bindDrag() {
@@ -513,15 +528,30 @@
       }
       if (state.placing && window.RoomPlacing) window.RoomPlacing.cancel({ quiet: true });
       state.dragging = { id: String(essay.id) };
+      state.lastDrag = String(essay.id);
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('essayId', String(essay.id));
       // What travels is the note peeling off the script, not the card.
       const note = card.querySelector('.card-postit');
       if (note) event.dataTransfer.setDragImage(note, 42, 38);
       els.board.classList.add('is-dragging');
-      card.classList.add('is-lifted');
+      // The browser carries the note now; the card leaves the pool's layout and
+      // the cards below slide up. Not in the same tick: hiding the element
+      // being dragged would end the drag before it began.
+      const id = String(essay.id);
+      state.dropped = false;
+      window.setTimeout(() => {
+        if (state.dragging && state.dragging.id === id && window.RoomPool) window.RoomPool.tuck(id, { collapse: false });
+      }, 0);
     });
-    document.addEventListener('dragend', clearDragging);
+    document.addEventListener('dragend', () => {
+      const id = state.dragging ? state.dragging.id : state.lastDrag;
+      clearDragging();
+      // Let go over nothing (or over a day that takes no drop): the note goes
+      // back to its card. A drop is schedule()'s to finish.
+      if (!state.dropped && id && window.RoomPool) window.RoomPool.untuck(id);
+      state.dropped = false;
+    });
 
     els.slots.addEventListener('dragover', (event) => {
       if (!state.dragging) return;
@@ -544,6 +574,7 @@
       const dragging = state.dragging;
       if (!slot || !dragging) return;
       event.preventDefault();
+      state.dropped = true;
       clearDragging();
       schedule(dragging.id, slot.dataset.monday, { origin: 'drag' });
     });
@@ -694,6 +725,7 @@
     reveal,
     zone: zoneEl,
     schedule,
+    ghost: () => (els.slots ? els.slots.querySelector('.slot-ghost .board-note') : null),
     announce,
     showLifted,
     report,

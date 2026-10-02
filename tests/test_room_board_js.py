@@ -464,18 +464,20 @@ class CardHandleTests(unittest.TestCase):
 
     def test_a_likey_card_has_the_handle(self):
         html = self.markup()
-        self.assertIn('class="card-handle" data-action="place" draggable="true" aria-pressed="false" aria-label="place on the board"', html)
+        self.assertIn('class="card-handle" data-action="place" draggable="true" aria-label="place on the board"', html)
 
     def test_room_and_scheduled_cards_have_none(self):
         self.assertNotIn("card-handle", self.markup(status="Writers Room"))
         self.assertNotIn("card-handle", self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
 
-    def test_placing_presses_the_handle_and_leaves_a_dashed_spot(self):
+    def test_the_card_has_no_placing_state(self):
+        """A lifted card leaves the pool (flight.js hides it); it is never drawn
+        half-there with a dashed spot, so the markup has nothing for it."""
         html = self.markup({"now": "2026-09-30T12:00:00-07:00", "placing": True})
-        self.assertIn('aria-pressed="true" aria-label="place on the board"', html)
-        self.assertIn("card-postit-spot", html)
-        self.assertNotIn("card-postit note", html)
-        self.assertIn("is-placing", html)
+        self.assertNotIn("card-postit-spot", html)
+        self.assertNotIn("is-placing", html)
+        self.assertNotIn("aria-pressed", html.split('class="card-handle"')[1].split(">")[0])
+        self.assertIn("card-postit note", html)
 
     def test_each_card_has_a_place_for_its_plaque(self):
         self.assertIn('<div class="card-feedback"></div>', self.markup())

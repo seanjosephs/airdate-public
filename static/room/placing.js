@@ -1,11 +1,14 @@
 // Placing mode: the keyboard route onto the board (build spec §6.5, the
 // Placing board). A first-class route, not a fallback.
 //
-//   A (a writers likey card focused), or a click on its handle, lifts the note.
+//   A (a writers likey card focused), or a click on its handle, lifts the note:
+//   the card shrinks into its post-it, the post-it flies to the board, and the
+//   cards below slide up into the space (flight.js).
 //   Left and right move between open publish days only; taken and past ones are
 //   skipped and dimmed. At either end the board pages a week. No wrap.
 //   Enter or S sets it: the same round trip as a drop.
-//   Escape or Tab puts it back, and focus returns to the handle.
+//   Escape or Tab puts it back (the post-it flies home and the card opens a
+//   place for itself again), and focus returns to the handle.
 //
 // Focus moves to the candidate slot itself, so its two-tone ring is the focus
 // ring and not a decoration. The legend strip under the board is role=status
@@ -55,7 +58,7 @@
       cardSay(id, 'amber', Board.say.cannotLift(essay.status));
       return true;
     }
-    if (current) finish();
+    if (current) cancel({ quiet: true });
     const candidate = Board.firstOpen(board.today(), board.index(), board.anchor());
     if (!candidate) {
       cardSay(id, 'amber', Board.say.noOpen(board.weekdayName()));
@@ -63,10 +66,26 @@
     }
     // Where the board was paged, so putting the note back puts the board back.
     current = { id: String(id), essay, candidate, offset: board.offset() };
-    pool().setPlacing(String(id));
+    const lifted = pool().tuck(String(id));
     board.showLifted(essay.title);
     moveTo(candidate, Board.say.lifting(essay.title, candidate));
+    flyUp(lifted);
     return true;
+  }
+
+  // The card's post-it flies to the Monday it is up for. The note that stays
+  // on the board (the ghost) is held back until the post-it has landed on it.
+  function flyUp(lifted) {
+    const Flight = window.RoomFlight;
+    const ghost = view().ghost();
+    if (!Flight || !lifted || !lifted.note || !ghost) return;
+    ghost.style.opacity = '0';
+    const release = () => {
+      ghost.style.transition = 'opacity 200ms ease';
+      ghost.style.opacity = '';
+    };
+    Flight.fly(lifted.note, lifted.rect, ghost.getBoundingClientRect(), { onLanding: release })
+      .then(release);
   }
 
   function finish() {
@@ -75,7 +94,6 @@
     current = null;
     moving = true;
     try {
-      if (pool()) pool().setPlacing(null);
       if (view()) {
         view().setPlacing(null);
         view().showLifted('');
@@ -89,10 +107,15 @@
   // Put the note back on its card. options: { quiet, focusHandle }
   function cancel(options) {
     const opts = options || {};
+    // Where the note is on the board, before the board lets go of it: the
+    // post-it flies home from there.
+    const ghost = current && view().ghost();
+    const from = ghost ? ghost.getBoundingClientRect() : null;
     const ended = finish();
     if (!ended) return;
     view().setOffset(ended.offset);
     view().announce('');
+    pool().untuck(ended.id, { from });
     if (opts.focusHandle) focusHandle(ended.id);
     if (!opts.quiet) cardSay(ended.id, 'green', Board.say.putBack());
   }
@@ -103,6 +126,7 @@
     // The last step's "<day> is open." is not true once the note is set; the
     // slot's own plaque says where it landed.
     view().announce('');
+    // schedule() brings the card back on its own, set or not.
     const landed = await view().schedule(ended.id, ended.candidate, { origin: 'placing' });
     if (!landed) focusHandle(ended.id);
   }
@@ -168,11 +192,6 @@
       return lift(item.dataset.essayId);
     });
     const poolEl = document.getElementById('pool');
-    // The handle keeps focus where it is on press, so a second press puts the
-    // note back instead of focus leaving the board first.
-    poolEl.addEventListener('mousedown', (event) => {
-      if (current && event.target.closest('[data-action="place"]')) event.preventDefault();
-    });
     poolEl.addEventListener('click', (event) => {
       const handle = event.target.closest('[data-action="place"]');
       if (!handle) return;
@@ -180,8 +199,7 @@
       const card = handle.closest('.card');
       const id = card && card.dataset.essayId;
       if (!id) return;
-      if (current && current.id === String(id)) cancel({ focusHandle: true });
-      else lift(id);
+      lift(id);
     });
     document.addEventListener('keydown', onKeydown, true);
     document.addEventListener('focusout', onFocusout);

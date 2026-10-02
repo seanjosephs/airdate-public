@@ -547,8 +547,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px 18px;
-  padding: 10px 16px;
+  gap: 6px 18px;
+  padding: 6px 16px;
   border: 1px solid var(--b2);
   border-radius: var(--r-md);
   background: var(--s1);
