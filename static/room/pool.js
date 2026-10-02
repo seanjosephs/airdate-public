@@ -39,6 +39,10 @@
     // Cards whose note has gone up to the board (lifted with the grabber, or
     // dragged): they leave the pool's layout until the note is set or put back.
     up: new Set(),
+    // The card being dragged by its grabber, and the cards dropped on rainy
+    // day whose save is still on its way (they stay out of the layout).
+    dragId: '',
+    parking: new Set(),
     // The needs-filing lane (slice 6): the last /intake-suggest answer for an
     // essay, keyed by id. Undefined until the writer asks ("file it").
     intake: {},
@@ -418,7 +422,11 @@
   // the slip, with an undo - the umbrella's own promise (§15.2).
   async function parkEssay(id) {
     const index = state.essays.findIndex((essay) => String(essay.id) === id);
-    if (index < 0 || state.busy.has(id)) return;
+    if (index < 0 || state.busy.has(id)) {
+      state.parking.delete(id);
+      untuck(id);
+      return;
+    }
     const essay = state.essays[index];
     const card = cardElement(id);
     state.busy.add(id);
@@ -426,6 +434,8 @@
     try {
       const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/archive`, {});
       state.busy.delete(id);
+      state.parking.delete(id);
+      state.up.delete(id);
       const fresh = result && result.row;
       const neighbourId = Keys.afterLeaving(shownEssays().map((row) => row.id), id);
       const at = state.essays.findIndex((row) => String(row.id) === id);
@@ -449,11 +459,49 @@
     } catch (error) {
       state.busy.delete(id);
       if (card) card.removeAttribute('aria-busy');
+      // The card comes back before it says why.
+      state.parking.delete(id);
+      untuck(id);
       const host = cardElement(id)?.querySelector('.card-feedback');
       if (host) {
         Feedback.plaque(host, { tone: error && error.kind === 'refused' ? 'amber' : 'red', text: parkFailure(error) });
       }
     }
+  }
+
+  // Rainy day, in the sidebar, takes a card dropped on it: the grabber's way
+  // of saving an essay for later.
+  function bindRainyDrop() {
+    const target = document.getElementById('nav-rainy-day');
+    if (!target) return;
+    els.pool.addEventListener('dragstart', (event) => {
+      const handle = event.target.closest && event.target.closest('.card-handle');
+      const card = handle && handle.closest('.card');
+      const essay = card && state.essays.find((row) => String(row.id) === card.dataset.essayId);
+      state.dragId = essay && (essay.status === 'Writers Room' || essay.status === 'Writers Likey') ? String(essay.id) : '';
+    });
+    document.addEventListener('dragend', () => {
+      state.dragId = '';
+      target.classList.remove('is-drop-target');
+    });
+    target.addEventListener('dragover', (event) => {
+      if (!state.dragId) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+      target.classList.add('is-drop-target');
+    });
+    target.addEventListener('dragleave', (event) => {
+      if (!target.contains(event.relatedTarget)) target.classList.remove('is-drop-target');
+    });
+    target.addEventListener('drop', (event) => {
+      const id = state.dragId;
+      if (!id) return;
+      event.preventDefault();
+      state.dragId = '';
+      target.classList.remove('is-drop-target');
+      state.parking.add(id);
+      parkEssay(id);
+    });
   }
 
   // ---- the needs-filing lane (slice 6) --------------------------------------
@@ -575,6 +623,8 @@
   // the card waits for it to land.
   function untuck(id, options) {
     const key = String(id);
+    // A card dropped on rainy day stays out until its save has an answer.
+    if (state.parking.has(key)) return Promise.resolve();
     if (!state.up.delete(key)) return Promise.resolve();
     const card = cardElement(key);
     if (!card) return Promise.resolve();
@@ -611,13 +661,6 @@
         event.preventDefault();
         const card = star.closest('.card');
         if (card) toggleStar(card);
-        return;
-      }
-      const park = event.target.closest('[data-action="park"]');
-      if (park) {
-        event.preventDefault();
-        const card = park.closest('.card');
-        if (card) parkEssay(card.dataset.essayId);
         return;
       }
       const suggest = event.target.closest('[data-action="intake-suggest"]');
@@ -759,6 +802,7 @@
     });
     bind();
     bindDrops();
+    bindRainyDrop();
     document.addEventListener('room:essay', (event) => {
       const detail = event.detail || {};
       if (detail.source === 'pool' || !state.loaded) return;

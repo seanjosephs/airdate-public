@@ -214,9 +214,18 @@ class BrandTests(unittest.TestCase):
         tokens = read("static/room/tokens.css")
         color = re.search(r"--umbrella:\s*(#[0-9A-Fa-f]{6});", tokens)
         self.assertIsNotNone(color)
-        self.assertRegex(read("static/room/cards.css"), r"\.card-umbrella \{[^}]*color: var\(--umbrella\);")
+        self.assertNotIn("card-umbrella", read("static/room/cards.css"))
         self.assertRegex(read("static/room/editor.css"), r"\.ed-umbrella \{[^}]*color: var\(--umbrella\);")
         self.assertIn("var(--umbrella)", read("static/room/room.css"))
+
+    def test_the_card_has_no_umbrella_and_rainy_day_takes_a_dropped_card(self):
+        self.assertNotIn("card-umbrella", read("static/room/cards.js"))
+        html = read("room.html")
+        self.assertIn('id="nav-rainy-day"', html)
+        pool = read("static/room/pool.js")
+        self.assertIn("getElementById('nav-rainy-day')", pool)
+        self.assertIn("state.parking.add(id);", pool)
+        self.assertIn(".room-nav a.is-drop-target", read("static/room/room.css"))
 
     def test_the_umbrella_orange_is_close_to_the_favicons(self):
         """Sampled from static/brand/airdate-icon-256.png: the field is about

@@ -466,8 +466,8 @@ class CardHandleTests(unittest.TestCase):
         html = self.markup()
         self.assertIn('class="card-handle" data-action="place" draggable="true" aria-label="place on the board"', html)
 
-    def test_room_and_scheduled_cards_have_none(self):
-        self.assertNotIn("card-handle", self.markup(status="Writers Room"))
+    def test_a_room_card_has_one_for_rainy_day_and_a_scheduled_card_none(self):
+        self.assertIn("move to rainy day", self.markup(status="Writers Room"))
         self.assertNotIn("card-handle", self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
 
     def test_the_card_has_no_placing_state(self):

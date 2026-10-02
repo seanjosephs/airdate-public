@@ -350,20 +350,49 @@ class CardMarkupTests(unittest.TestCase):
         self.assertNotIn("card-postit", html)
         self.assertIn("airs mon oct 5", html)
 
-    def test_a_room_card_has_no_handle_but_has_the_umbrella(self):
-        # A writers room essay cannot go on the board, so it has no handle
-        # (tests/test_room_board_js.py covers the likey card's). The umbrella
-        # (slice 6) is on both room and likey cards.
+    def test_a_room_card_has_the_grabber_for_rainy_day_only(self):
+        """A writers room essay cannot go on the board, but its grabber drags it
+        to rainy day in the sidebar. There is no umbrella on any card."""
         html = self.markup()
-        self.assertNotIn("drag", html)
-        self.assertIn('data-action="park"', html)
-        self.assertIn("rainy", html)
-        self.assertEqual(html.count("<button"), 2, "the post-it and the umbrella")
+        self.assertIn('class="card-handle"', html)
+        self.assertIn('aria-label="move to rainy day"', html)
+        self.assertNotIn("card-umbrella", html)
+        self.assertNotIn('data-action="park"', html)
 
-    def test_the_umbrella_is_on_likey_too_but_not_on_scheduled_or_live(self):
-        self.assertIn('data-action="park"', self.markup(status="Writers Likey"))
-        self.assertNotIn('data-action="park"', self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
-        self.assertNotIn('data-action="park"', self.markup(status="Live", published_date="2026-09-21"))
+    def test_the_grabber_is_a_six_dot_grip_on_room_and_likey_cards_only(self):
+        for status in ("Writers Room", "Writers Likey"):
+            html = self.markup(status=status)
+            self.assertEqual(html.split('class="card-handle"')[1].split("</button>")[0].count("<circle"), 6, status)
+        self.assertNotIn("card-handle", self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
+        self.assertNotIn("card-handle", self.markup(status="Live", published_date="2026-09-21"))
+
+    def test_the_footer_is_obsidian_then_the_grabber_and_nothing_else(self):
+        html = self.markup(status="Writers Likey", obsidian_url="obsidian://open?vault=v&file=A")
+        actions = html.split('<div class="card-actions">')[1]
+        self.assertLess(actions.index("card-obsidian"), actions.index("card-handle"))
+        self.assertEqual(actions.count("<button") + actions.count("<a "), 2)
+
+    def test_a_card_with_nothing_to_do_has_no_footer_row(self):
+        self.assertNotIn("card-actions", self.markup(status="Ready for Air", scheduled_at="2026-10-05", obsidian_url=""))
+
+    def test_the_air_chip_is_brief_and_sits_in_the_middle_of_the_row_above_the_title(self):
+        html = self.markup(status="Ready for Air", scheduled_at="2026-10-05")
+        meta = html.split('<div class="card-meta">')[1].split("</div>")[0]
+        self.assertLess(meta.index("card-meta-start"), meta.index("card-meta-mid"))
+        self.assertLess(meta.index("card-meta-mid"), meta.index("card-meta-end"))
+        mid = meta.split("card-meta-mid")[1].split("card-meta-end")[0]
+        self.assertIn("airs 10/5/26", mid)
+        self.assertLess(html.index("card-meta"), html.index('class="card-title"'))
+
+    def test_file_it_is_just_left_of_the_word_count(self):
+        html = self.markup(needs_intake=True)
+        end = html.split('class="card-meta-end"')[1].split("</div>")[0]
+        self.assertLess(end.index("data-action=\"intake-suggest\""), end.index("card-length"))
+
+    def test_once_a_topic_is_suggested_the_picker_moves_under_the_title(self):
+        html = self.markup({**self.CTX, 'intake': {'abc': {'category': 'x', 'categories': ['x', 'y']}}}, id='abc', needs_intake=True)
+        self.assertIn("data-action=\"intake-apply\"", html)
+        self.assertNotIn("data-action=\"intake-suggest\"", html)
 
     def test_a_parked_card_shows_its_previous_phase(self):
         html = self.markup(status="Archived", previous_status="Writers Likey", archived_at="2026-05-12T18:00:00Z",

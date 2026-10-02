@@ -104,11 +104,12 @@ body {
   scrollbar-color: var(--b2) transparent;
 }
 
-.room-brand { display: block; line-height: 0; }
+.room-brand { display: block; line-height: 0; text-align: center; }
 .room-brand img {
   width: 100%;
   height: auto;
-  max-width: 168px;
+  max-width: 264px;
+  margin: 0 auto;
 }
 
 .room-nav { display: flex; flex-direction: column; gap: 4px; }
@@ -285,3 +286,12 @@ html { scroll-padding-top: 76px; }
 .room-sidebar .board-sign { flex: 1 1 100%; text-align: center; font-size: 11px; letter-spacing: 0.14em; white-space: normal; }
 .room-sidebar .board-cork { padding: 14px 12px; border-width: 10px; }
 .room-sidebar .board-slots { padding: 6px 2px 2px; }
+.room-sidebar .board-head { justify-content: center; text-align: center; }
+.room-sidebar .board-head .board-grow { display: none; }
+.room-sidebar .board-pager { flex: 1 1 100%; justify-content: center; }
+.room-nav a.is-drop-target {
+  background: rgba(217, 80, 10, 0.20);
+  outline: 2px dashed var(--umbrella);
+  outline-offset: -2px;
+  color: var(--text);
+}

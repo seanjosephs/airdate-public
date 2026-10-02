@@ -524,30 +524,33 @@
       if (!handle) return;
       const card = handle.closest('.card');
       const essay = card ? byId(card.dataset.essayId) : null;
-      if (!essay || essay.status !== 'Writers Likey' || !state.loaded) {
+      // A writers room card can be dragged too, but only to rainy day (the
+      // pool takes that drop): the board's days take a writers likey card.
+      const placeable = Boolean(essay) && essay.status === 'Writers Likey';
+      if (!essay || !state.loaded || (!placeable && essay.status !== 'Writers Room')) {
         event.preventDefault();
         return;
       }
       if (state.placing && window.RoomPlacing) window.RoomPlacing.cancel({ quiet: true });
-      state.dragging = { id: String(essay.id) };
+      state.dragging = placeable ? { id: String(essay.id) } : null;
       state.lastDrag = String(essay.id);
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('essayId', String(essay.id));
       // What travels is the note peeling off the script, not the card.
       const note = card.querySelector('.card-postit');
       if (note) event.dataTransfer.setDragImage(note, 42, 38);
-      els.board.classList.add('is-dragging');
+      if (placeable) els.board.classList.add('is-dragging');
       // The browser carries the note now; the card leaves the pool's layout and
       // the cards below slide up. Not in the same tick: hiding the element
       // being dragged would end the drag before it began.
       const id = String(essay.id);
       state.dropped = false;
       window.setTimeout(() => {
-        if (state.dragging && state.dragging.id === id && window.RoomPool) window.RoomPool.tuck(id, { collapse: false });
+        if (state.lastDrag === id && !state.dropped && window.RoomPool) window.RoomPool.tuck(id, { collapse: false });
       }, 0);
     });
     document.addEventListener('dragend', () => {
-      const id = state.dragging ? state.dragging.id : state.lastDrag;
+      const id = state.lastDrag;
       clearDragging();
       // Let go over nothing (or over a day that takes no drop): the note goes
       // back to its card. A drop is schedule()'s to finish.
