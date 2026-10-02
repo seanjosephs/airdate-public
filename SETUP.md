@@ -262,9 +262,14 @@ Notes written before these four phases keep their words until airdate next
 writes their status: `Published` reads as live, and an old `Live` reads as
 live when it has a post link and as ready for air when it only has a draft.
 
-The essays view filters by phase and by totem, and the star pill shows only
-writers likey. When essays sit outside a topic folder, a "needs filing" pill
-appears and shows only those.
+The essays view filters by phase, by totem and by topic, and the star pill
+shows only writers likey. Two more pills appear when they have something to
+show: a "needs attention" pill lists the essays missing details or a hero
+image, and writes what is missing on each card; a "needs filing" pill lists the
+essays that sit outside a topic folder. The filters stack, so writers likey
+plus needs attention is your starred essays that cannot go yet. The sort menu
+orders the essays by closest to air (the default), last touched, longest or
+title.
 
 ## Thumbnails
 

@@ -175,6 +175,15 @@
   font-size: 12px;
 }
 
+/* Needs attention: essays missing details or a hero image. The same amber as
+   needs filing; unlike it, this one stacks with the other filters. */
+.pool-attention {
+  padding: 0 12px 0 8px;
+  border-width: 1px;
+  color: var(--orange-soft);
+  font-size: 12px;
+}
+
 .pool-sort {
   display: flex;
   align-items: center;
@@ -756,6 +765,17 @@
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
+}
+
+/* What the card is missing, written under its title while needs attention is
+   on. Amber on the footer, the ink the needs-filing pill uses. */
+.card-attention {
+  margin: 0;
+  color: var(--orange-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .card-actions {
