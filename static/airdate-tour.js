@@ -38,7 +38,7 @@
     { key: 'filing', anchor: '#pool-filing', title: 'needs filing',
       text: 'scripts sitting outside a topic folder are counted here. "file it" on the card suggests a folder and moves the note once you confirm.' },
     { key: 'filters', anchor: '.pool-filters', title: 'filters',
-      text: 'narrow the desk by phase or totem. the star pill shows only your writers likey.' },
+      text: 'narrow the desk by phase, totem or topic, and sort it on the right. the star pill shows only your writers likey. when a script is missing details or a hero image, a needs attention pill shows just those.' },
     { key: 'editor', anchor: '#pool .card .card-link', title: 'the editor',
       text: 'click a title to open the essay: the script, everything substack needs, and send. send makes a draft in substack; airdate never publishes.' },
     { key: 'shelf', anchor: '#nav-shelf', title: 'the shelf',

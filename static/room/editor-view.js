@@ -1047,8 +1047,11 @@
   function rowMarkup(row, index) {
     const words = `<span class="ed-ready-dot" aria-hidden="true"></span><span class="ed-ready-text">${esc(row.text)}</span>`;
     if (row.kind === 'source') {
-      return `<li><button type="button" class="ed-ready-row" data-make-draft="1">${words}`
-        + `<span class="ed-ready-go">${esc(row.action)}${GO}</span></button></li>`;
+      // The hint describes the button, so a screen reader reads it with it.
+      const hint = row.hint ? `<p class="ed-ready-hint" id="ed-ready-hint">${esc(row.hint)}</p>` : '';
+      const describedby = row.hint ? ' aria-describedby="ed-ready-hint"' : '';
+      return `<li><button type="button" class="ed-ready-row" data-make-draft="1"${describedby}>${words}`
+        + `<span class="ed-ready-go">${esc(row.action)}${GO}</span></button>${hint}</li>`;
     }
     const target = row.target ? $(row.target) : null;
     if (!target || !isShown(target)) return `<li><p class="ed-ready-row is-static">${words}</p></li>`;
@@ -1106,17 +1109,21 @@
   }
 
   // A source note is never sent. Its row makes the linked draft, which is a
-  // new note: this one is not touched.
+  // new note: this one is not touched. The draft starts with the passage
+  // selected in the script, read now, before the round trip: the writer's
+  // selection can move while it is out.
   async function makeLinkedDraft(button) {
     if (!state) return;
     const token = opening;
+    const payload = Editor.linkedDraftPayload(els.script.value, els.script.selectionStart, els.script.selectionEnd);
     button.setAttribute('aria-busy', 'true');
     try {
-      const result = await Api.postJson(`/api/essays/${encodeURIComponent(state.id)}/create-draft`, {});
+      const result = await Api.postJson(`/api/essays/${encodeURIComponent(state.id)}/create-draft`, payload);
       if (token !== opening || !state) return;
       madeDraft = { id: String(result.draft_essay_id || ''), title: String((result.draft && result.draft.title) || 'the draft') };
+      const started = payload.selected_text ? ', started with your selection' : '';
       const item = button.closest('li');
-      item.innerHTML = `<p class="ed-ready-row is-static is-good"><span class="ed-ready-text">made a linked draft: ${esc(madeDraft.title)}. </span>`
+      item.innerHTML = `<p class="ed-ready-row is-static is-good"><span class="ed-ready-text">made a linked draft: ${esc(madeDraft.title)}${started}. </span>`
         + `<a class="ed-ready-open" href="${esc(Editor.editorUrl(madeDraft.id))}" data-open-draft="${esc(madeDraft.id)}">open it</a></p>`;
       const row = result.draft && result.draft.row;
       if (row) document.dispatchEvent(new CustomEvent('room:essay', { detail: { oldId: '', essay: row, source: 'editor' } }));

@@ -436,6 +436,16 @@
     return Math.min(SCRIPT_HEIGHT_MAX, Math.max(SCRIPT_HEIGHT_MIN, n));
   }
 
+  // What the room sends when it makes a linked draft: the passage selected in
+  // the script (the textarea's own offsets), so the new note starts with it.
+  // Nothing selected, or only blank space, sends nothing and the draft starts
+  // empty. The server trims what it is sent.
+  function linkedDraftPayload(script, start, end) {
+    if (typeof script !== 'string' || !Number.isFinite(start) || !Number.isFinite(end)) return {};
+    const passage = script.slice(start, end);
+    return passage.trim() ? { selected_text: passage } : {};
+  }
+
   // ---- tags -----------------------------------------------------------------
 
   function addTags(tags, more) {
@@ -702,7 +712,10 @@
       return {
         source: true,
         connection,
-        rows: [rowFor('source_role', 'this is a source note. make a linked draft to send it', '', 'make a linked draft', { kind: 'source' })],
+        rows: [rowFor('source_role', 'this is a source note. make a linked draft to send it', '', 'make a linked draft', {
+          kind: 'source',
+          hint: 'select a passage in the script first and the draft starts with it.',
+        })],
       };
     }
     const direct = new Set();
@@ -1176,6 +1189,7 @@
     wordCount,
     wordLine,
     clampScriptHeight,
+    linkedDraftPayload,
     addTags,
     removeTag,
     noteFor,

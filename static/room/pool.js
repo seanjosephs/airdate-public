@@ -19,6 +19,7 @@
     'writers-likey': 'Writers Likey',
     'ready-for-air': 'Ready for Air',
   };
+  const DEFAULT_SORT = 'closest-to-air';
 
   const state = {
     essays: [],
@@ -26,6 +27,11 @@
     phase: 'all',
     totems: new Set(),
     query: '',
+    // Needs attention stacks with the phase, totem and topic filters, so it
+    // is a switch of its own and not another phase.
+    attention: false,
+    topic: '',
+    sort: DEFAULT_SORT,
     columns: 0,
     busy: new Set(),
     errors: new Map(),
@@ -45,8 +51,16 @@
   const els = {};
   let roving = null;
   let searchTimer = 0;
+  // The last option list written into the topic menu, so it is only rewritten
+  // when the topics change.
+  let topicOptions = '';
 
   function $(id) { return document.getElementById(id); }
+
+  function presets() {
+    const cfg = state.config || {};
+    return Array.isArray(cfg.tag_presets) ? cfg.tag_presets : [];
+  }
 
   function context(essay) {
     const cfg = state.config || {};
@@ -58,11 +72,23 @@
       now: new Date(),
       totems,
       redPen: cfg.red_pen || { enabled: true, lines: [] },
-      presets: Array.isArray(cfg.tag_presets) ? cfg.tag_presets : [],
+      presets: presets(),
       error: essay ? state.errors.get(String(essay.id)) || '' : '',
       placing: Boolean(essay && state.placing && state.placing === String(essay.id)),
       intake: state.intake,
+      attention: state.attention,
     };
+  }
+
+  // The topic the card's own line names, so what the menu picks is what the
+  // card says.
+  function topicName(essay) {
+    const topic = Cards.topicFor(essay, presets());
+    return topic ? topic.name : '';
+  }
+
+  function validSort(value) {
+    return Cards.POOL_SORTS.some((sort) => sort.key === value) ? value : DEFAULT_SORT;
   }
 
   function matches(essay) {
@@ -71,11 +97,18 @@
     } else if (state.phase !== 'all' && essay.status !== PHASE_STATUS[state.phase]) {
       return false;
     }
+    if (state.attention && !Cards.needsAttention(essay)) return false;
+    if (state.topic && topicName(essay) !== state.topic) return false;
     if (state.totems.size && !state.totems.has(String(essay.totem_raw || '').trim().toLowerCase())) return false;
     const terms = state.query.toLowerCase().split(/\s+/).filter(Boolean);
     if (!terms.length) return true;
     const hay = `${essay.search_blob || ''} ${String(essay.excerpt || '').toLowerCase()}`;
     return terms.every((term) => hay.includes(term));
+  }
+
+  // What the pool shows, in the order the sort menu names.
+  function shownEssays() {
+    return Cards.poolSort(state.essays.filter(matches), state.sort);
   }
 
   function columnCount() {
@@ -107,9 +140,36 @@
       els.filingPill.setAttribute('aria-label', `needs filing, ${filing}`);
       els.filingPill.setAttribute('aria-pressed', String(state.phase === NEEDS_FILING));
     }
+    renderTopics();
+    const attention = state.essays.filter((essay) => Cards.needsAttention(essay)).length;
+    if (els.attentionPill) {
+      // It stays while it is on, so it can be turned off with nothing left to show.
+      els.attentionPill.hidden = attention === 0 && !state.attention;
+      els.attentionCount.textContent = String(attention);
+      els.attentionPill.setAttribute('aria-label', `needs attention, ${attention}`);
+      els.attentionPill.setAttribute('aria-pressed', String(state.attention));
+    }
     for (const button of els.totemGroup.querySelectorAll('button[data-totem]')) {
       button.setAttribute('aria-pressed', String(state.totems.has(button.dataset.totem)));
     }
+  }
+
+  // The topic menu offers the topics the essays in the room carry. A topic no
+  // essay has any more (the last one was moved or went live) is dropped
+  // rather than left filtering to nothing.
+  function renderTopics() {
+    if (!els.topic) return;
+    const names = Cards.distinctTopics(state.essays, presets());
+    if (state.topic && !names.includes(state.topic)) state.topic = '';
+    const options = ['<option value="">all topics</option>']
+      .concat(names.map((name) => `<option value="${Cards.escapeHtml(name)}">${Cards.escapeHtml(name)}</option>`))
+      .join('');
+    if (options !== topicOptions) {
+      els.topic.innerHTML = options;
+      topicOptions = options;
+    }
+    els.topic.value = state.topic;
+    els.topicBox.hidden = !names.length;
   }
 
   function renderTotems() {
@@ -129,12 +189,22 @@
     els.pool.innerHTML = `<div class="pool-message"${role ? ` role="${role}"` : ''}>${html}</div>`;
   }
 
-  function render(announce) {
+  function sortLabel() {
+    const sort = Cards.POOL_SORTS.find((item) => item.key === state.sort);
+    return sort ? sort.label : DEFAULT_SORT;
+  }
+
+  // announce says how many essays to a screen reader; a note (a new sort says
+  // how the essays are sorted) goes on the end.
+  function render(announce, note) {
     renderHead();
     if (!state.loaded) return;
-    const shown = Cards.closestToAirSort(state.essays.filter(matches));
+    const shown = shownEssays();
     els.count.textContent = String(shown.length);
-    if (announce) els.results.textContent = shown.length === 1 ? '1 essay' : `${shown.length} essays`;
+    if (announce) {
+      const words = shown.length === 1 ? '1 essay' : `${shown.length} essays`;
+      els.results.textContent = note ? `${words}, ${note}` : words;
+    }
     if (!state.essays.length) {
       renderMessage('<p>no essays yet. a note in your essays folder shows up here.</p>');
       return;
@@ -305,7 +375,7 @@
       const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/archive`, {});
       state.busy.delete(id);
       const fresh = result && result.row;
-      const neighbourId = Keys.afterLeaving(Cards.closestToAirSort(state.essays.filter(matches)).map((row) => row.id), id);
+      const neighbourId = Keys.afterLeaving(shownEssays().map((row) => row.id), id);
       const at = state.essays.findIndex((row) => String(row.id) === id);
       if (at >= 0) state.essays.splice(at, 1);
       render(false);
@@ -453,8 +523,12 @@
         return;
       }
       if (event.target.closest('[data-action="reset"]')) {
+        // Every filter, not the sort: the order is how the writer reads the
+        // pool, not something that hides an essay.
         state.phase = 'all';
         state.totems.clear();
+        state.attention = false;
+        state.topic = '';
         state.query = '';
         els.search.value = '';
         render(true);
@@ -473,6 +547,25 @@
     if (els.filingPill) {
       els.filingPill.addEventListener('click', () => {
         setPhase(state.phase === NEEDS_FILING ? 'all' : NEEDS_FILING);
+      });
+    }
+    if (els.attentionPill) {
+      els.attentionPill.addEventListener('click', () => {
+        state.attention = !state.attention;
+        render(true);
+      });
+    }
+    if (els.topic) {
+      els.topic.addEventListener('change', () => {
+        state.topic = els.topic.value;
+        render(true);
+      });
+    }
+    if (els.sort) {
+      els.sort.addEventListener('change', () => {
+        state.sort = validSort(els.sort.value);
+        els.sort.value = state.sort;
+        render(true, `sorted by ${sortLabel()}`);
       });
     }
     els.totemGroup.addEventListener('click', (event) => {
@@ -536,6 +629,11 @@
     els.likeyCount = $('pool-likey-count');
     els.filingPill = $('pool-filing');
     els.filingCount = $('pool-filing-count');
+    els.attentionPill = $('pool-attention');
+    els.attentionCount = $('pool-attention-count');
+    els.topicBox = $('pool-topic-box');
+    els.topic = $('pool-topic');
+    els.sort = $('pool-sort');
     els.totemGroup = $('pool-totems');
     els.totemDivider = $('pool-totem-divider');
     if (!els.pool || !Cards || !Api || !Keys || !Feedback) return;

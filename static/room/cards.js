@@ -265,6 +265,16 @@
     return 4;
   }
 
+  function byTitle(a, b) {
+    return String(a?.title || '').localeCompare(String(b?.title || ''));
+  }
+
+  // A date field as milliseconds, 0 when the essay has none.
+  function timeOf(value) {
+    const date = toDate(value);
+    return date ? date.getTime() : 0;
+  }
+
   // "closest to air": what is on the board by air date, then likey and
   // complete, then likey, then the room. Oldest paper first inside each.
   function closestToAirSort(essays) {
@@ -278,13 +288,12 @@
       }
       const age = arrivalTime(a) - arrivalTime(b);
       if (age) return age;
-      return String(a.title || '').localeCompare(String(b.title || ''));
+      return byTitle(a, b);
     });
   }
 
   function archivedTime(essay) {
-    const date = toDate(essay?.archived_at);
-    return date ? date.getTime() : 0;
+    return timeOf(essay?.archived_at);
   }
 
   // Rainy day's three sorts. Default is "longest in the rain": oldest parked
@@ -295,9 +304,60 @@
       return list.sort((a, b) => archivedTime(b) - archivedTime(a));
     }
     if (mode === 'title') {
-      return list.sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+      return list.sort(byTitle);
     }
     return list.sort((a, b) => archivedTime(a) - archivedTime(b));
+  }
+
+  // The pool's sorts, in the order the menu shows them. The first is the
+  // default and is closestToAirSort; the rest are flat lists by one thing. An
+  // essay with no date or word count has nothing to rank by, so it goes last,
+  // and ties fall back to the title so the order never shuffles between loads.
+  // Each `order` sorts the list it is given, a copy poolSort made.
+  const POOL_SORTS = [
+    { key: 'closest-to-air', label: 'closest to air', order: closestToAirSort },
+    {
+      key: 'last-touched',
+      label: 'last touched',
+      order: (list) => list.sort((a, b) => timeOf(b?.last_touched) - timeOf(a?.last_touched) || byTitle(a, b)),
+    },
+    {
+      key: 'longest',
+      label: 'longest',
+      order: (list) => list.sort((a, b) => (Number(b?.word_count) || 0) - (Number(a?.word_count) || 0) || byTitle(a, b)),
+    },
+    { key: 'title', label: 'title', order: (list) => list.sort(byTitle) },
+  ];
+
+  function poolSort(essays, mode) {
+    const sort = POOL_SORTS.find((item) => item.key === mode) || POOL_SORTS[0];
+    return sort.order([...(Array.isArray(essays) ? essays : [])]);
+  }
+
+  function readinessOf(essay) {
+    const readiness = essay?.publish_readiness;
+    return readiness && typeof readiness === 'object' ? readiness : {};
+  }
+
+  // An essay that cannot go yet: details missing, or only its hero image. A
+  // long source is never sent, so its readiness does not count; needing a
+  // folder is the filing pill's business, not this one's.
+  function needsAttention(essay) {
+    if (!essay || essay.source_role === 'source') return false;
+    const status = readinessOf(essay).status;
+    return status === 'metadata' || status === 'image';
+  }
+
+  function missingWords(list) {
+    return (Array.isArray(list) ? list : []).map((word) => String(word).trim().toLowerCase()).filter(Boolean);
+  }
+
+  // What is missing, in the room's words: the details first, then the hero.
+  function attentionLine(essay) {
+    if (!needsAttention(essay)) return '';
+    const readiness = readinessOf(essay);
+    const missing = [...missingWords(readiness.missing_metadata), ...missingWords(readiness.missing_images)];
+    return missing.length ? `missing: ${missing.join(', ')}` : '';
   }
 
   function estimatedHeight(essay) {
@@ -343,6 +403,17 @@
     if (best) return best;
     const category = String(essay?.category || '').trim();
     return category ? { name: category.toLowerCase(), color: '' } : null;
+  }
+
+  // The topics the essays carry, named as the card line names them, sorted.
+  // The pool's topic menu and the shelf's both list these.
+  function distinctTopics(essays, presets) {
+    const names = new Set();
+    for (const essay of Array.isArray(essays) ? essays : []) {
+      const topic = topicFor(essay, presets);
+      if (topic && topic.name) names.add(topic.name);
+    }
+    return Array.from(names).sort();
   }
 
   function padFor(essay) {
@@ -444,6 +515,12 @@
     return `<div class="card-filing">${picker}<button type="button" class="card-file-btn" data-action="intake-apply"${stuck ? ' disabled' : ''}>${label}</button></div>`;
   }
 
+  // Why a card is showing while "needs attention" is on: what it is missing.
+  function attentionMarkup(essay) {
+    const line = attentionLine(essay);
+    return line ? `<p class="card-attention">${escapeHtml(line)}</p>` : '';
+  }
+
   function toolMarkup(tierKey) {
     const tool = toolFor(tierKey);
     const parts = '<span class="tool-part"></span>'.repeat(tool.parts);
@@ -491,7 +568,8 @@
   }
 
   // ctx: { now, totems: {key: {label, image}}, redPen: {enabled, lines},
-  //        presets: [...], error: '', placing: false }
+  //        presets: [...], error: '', placing: false, intake: {},
+  //        attention: false }
   function cardMarkup(essay, ctx) {
     const context = ctx || {};
     const id = String(essay?.id || '');
@@ -584,6 +662,7 @@
       + '<div class="card-foot">'
       + `<div class="card-meta">${meta}</div>`
       + `<h3 class="card-title"><a class="card-link" id="${titleId}" href="${escapeHtml(editorHref(essay))}">${escapeHtml(title)}</a></h3>`
+      + (context.attention ? attentionMarkup(essay) : '')
       + filingMarkup(essay, context.intake && context.intake[id])
       + error
       + '<div class="card-feedback"></div>'
@@ -611,11 +690,16 @@
     pageLine,
     closestToAirSort,
     rainyDaySort,
+    POOL_SORTS,
+    poolSort,
+    needsAttention,
+    attentionLine,
     displayStatusOf,
     displayEssay,
     distribute,
     estimatedHeight,
     topicFor,
+    distinctTopics,
     padFor,
     totemFor,
     ROOM_PATH,

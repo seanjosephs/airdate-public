@@ -6,31 +6,32 @@
   <title>airdate</title>
   <link rel="icon" href="/static/brand/airdate-icon-256.png?v=1" type="image/png">
   <link rel="stylesheet" href="/static/room/tokens.css?v=2">
-  <link rel="stylesheet" href="/static/room/room.css?v=4">
-  <link rel="stylesheet" href="/static/room/cards.css?v=3">
+  <link rel="stylesheet" href="/static/room/room.css?v=5">
+  <link rel="stylesheet" href="/static/room/cards.css?v=4">
   <link rel="stylesheet" href="/static/room/board.css?v=1">
-  <link rel="stylesheet" href="/static/room/editor.css?v=5">
+  <link rel="stylesheet" href="/static/room/editor.css?v=6">
   <link rel="stylesheet" href="/static/room/settings.css?v=5">
   <link rel="stylesheet" href="/static/room/shelf.css?v=2">
   <link rel="stylesheet" href="/static/room/rainy-day.css?v=1">
   <script src="/static/room/api.js?v=1" defer></script>
-  <script src="/static/room/cards.js?v=7" defer></script>
+  <script src="/static/room/cards.js?v=8" defer></script>
   <script src="/static/room/keys.js?v=2" defer></script>
   <script src="/static/room/feedback.js?v=2" defer></script>
-  <script src="/static/room/pool.js?v=8" defer></script>
+  <script src="/static/room/pool.js?v=9" defer></script>
   <script src="/static/room/dates.js?v=3" defer></script>
   <script src="/static/room/board.js?v=3" defer></script>
   <script src="/static/room/board-view.js?v=3" defer></script>
   <script src="/static/room/placing.js?v=3" defer></script>
-  <script src="/static/room/editor.js?v=4" defer></script>
-  <script src="/static/airdate-tour.js?v=6" defer></script>
-  <script src="/static/room/editor-view.js?v=7" defer></script>
+  <script src="/static/room/editor.js?v=5" defer></script>
+  <script src="/static/airdate-tour.js?v=7" defer></script>
+  <script src="/static/room/editor-view.js?v=8" defer></script>
   <script src="/static/airdate-presets.js?v=1" defer></script>
   <script src="/static/airdate-wizard.js?v=5" defer></script>
   <script src="/static/room/settings.js?v=6" defer></script>
-  <script src="/static/room/shelf.js?v=5" defer></script>
+  <script src="/static/room/shelf.js?v=6" defer></script>
   <script src="/static/room/shelf-view.js?v=1" defer></script>
   <script src="/static/room/rainy-day.js?v=3" defer></script>
+  <script src="/static/room/links.js?v=1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#room-main">skip to the essays</a>
@@ -70,6 +71,9 @@
         settings
       </a>
     </nav>
+
+    <!-- The writer's own links from config.json. links.js fills and shows it. -->
+    <nav class="room-links" id="room-links" aria-label="your links" hidden></nav>
   </aside>
 
   <main class="room-main" id="room-main" tabindex="-1">
@@ -143,11 +147,25 @@
             <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v6h6"/><path d="M9 13h7"/><path d="M9 17h5"/></svg>
             needs filing &middot; <span id="pool-filing-count">0</span>
           </button>
+          <!-- Missing details or a hero image. A switch of its own, so it narrows
+               whichever phase is chosen, as the totem and topic filters do.
+               pool.js shows it when there is something to show. -->
+          <button type="button" class="pool-pill pool-attention" id="pool-attention" aria-pressed="false" hidden>
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false"><path d="M12 4l9 16H3z"/><path d="M12 10v4"/><path d="M12 17v.5"/></svg>
+            needs attention &middot; <span id="pool-attention-count">0</span>
+          </button>
           <span class="pool-grow"></span>
-          <div class="pool-sort">
+          <div class="pool-select" id="pool-topic-box" hidden>
+            <label for="pool-topic">topic</label>
+            <select id="pool-topic"><option value="">all topics</option></select>
+          </div>
+          <div class="pool-select">
             <label for="pool-sort">sort</label>
             <select id="pool-sort">
               <option value="closest-to-air">closest to air</option>
+              <option value="last-touched">last touched</option>
+              <option value="longest">longest</option>
+              <option value="title">title</option>
             </select>
           </div>
         </div>
