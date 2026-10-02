@@ -419,8 +419,10 @@
   padding: 0 10px;
   border: 0;
   border-radius: var(--r-sm);
-  background: var(--ink);
-  color: var(--pad);
+  /* The date labels' off-white, with red lettering (#B3140F on cream is
+     5.6:1). */
+  background: var(--cream);
+  color: #B3140F;
   font: 700 12px/1 var(--font-ui);
   cursor: pointer;
 }

@@ -735,35 +735,36 @@
 /* ---- the footer ---- */
 
 .card-foot {
-  padding: 12px 18px 14px;
+  padding: 10px 14px 14px 18px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* Three parts on one line above the title: the topic at the left, the air
-   chip centred between it and the word count, "file it" and the word count at
-   the right. The outer two share what is left, so a long topic name is cut
-   short before it can reach the chip. */
+/* One line above the title: the topic (it takes what is left), then the air
+   chip, "file it", the length bars, obsidian and the grabber at the right. */
 .card-meta {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 32px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
 }
-.card-meta-start,
-.card-meta-end {
+.card-meta-start {
+  flex: 1 1 0;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
-.card-meta-start { justify-self: start; max-width: 100%; }
-.card-meta-end { justify-self: end; }
-.card-meta-mid { display: flex; justify-content: center; }
+/* Controls on the line sit above the title's stretched link. */
+.card-meta .card-file-btn,
+.card-meta .card-live { position: relative; z-index: 2; flex-shrink: 0; }
+.card-meta .card-air { flex-shrink: 0; }
+.card-meta .card-obsidian,
+.card-meta .card-handle { width: 32px; height: 32px; }
 .card-topic-dot {
   width: 9px;
   height: 9px;
@@ -792,10 +793,12 @@
 .bar:nth-child(2) { height: 8px; }
 .bar:nth-child(3) { height: 11px; }
 .bar:nth-child(4) { height: 14px; }
+.bar:nth-child(5) { height: 17px; }
 .bars-1 .bar.is-filled { background: var(--bar-1); }
 .bars-2 .bar.is-filled { background: var(--bar-2); }
 .bars-3 .bar.is-filled { background: var(--bar-3); }
 .bars-4 .bar.is-filled { background: var(--bar-4); }
+.bars-5 .bar.is-filled { background: var(--bar-5); }
 
 .card-title {
   margin: 0;

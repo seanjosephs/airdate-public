@@ -129,7 +129,7 @@ class CardShowsWhyTests(unittest.TestCase):
         html = self.markup({"publish_readiness": NO_TAGS})
         self.assertIn('<p class="card-attention">missing: tags, hero image</p>', html)
         self.assertGreater(html.index("card-attention"), html.index("</h3>"))
-        self.assertLess(html.index("card-attention"), html.index('class="card-actions"'))
+        self.assertLess(html.index("card-attention"), html.index('class="card-feedback"'))
 
     def test_no_line_when_the_filter_is_off(self):
         self.assertNotIn("card-attention", self.markup({"publish_readiness": NO_TAGS}, attention=False))

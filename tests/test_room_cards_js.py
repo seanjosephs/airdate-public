@@ -118,13 +118,23 @@ class ToolTests(unittest.TestCase):
 
 class SignalBarTests(unittest.TestCase):
     def test_the_thresholds(self):
-        for words, bars in [(0, 1), (799, 1), (800, 2), (1499, 2), (1500, 3), (2999, 3), (3000, 4), (17400, 4)]:
+        for words, bars in [(0, 1), (499, 1), (500, 2), (1199, 2), (1200, 3), (2499, 3), (2500, 4), (4999, 4),
+                            (5000, 5), (17400, 5)]:
             with self.subTest(words=words):
                 self.assertEqual(run(f"cards.barCount({words})"), bars)
 
     def test_every_artboard_example_fits(self):
-        # 251 words one bar, 954 and 1.3k two, 1.6k three, 13.3k and 17.4k four.
-        self.assertEqual(run("[251, 954, 1300, 1600, 13300, 17400].map(cards.barCount)"), [1, 2, 2, 3, 4, 4])
+        # 251 words one bar, 954 two, 1.3k and 1.6k three, 13.3k and 17.4k five.
+        self.assertEqual(run("[251, 954, 1300, 1600, 13300, 17400].map(cards.barCount)"), [1, 2, 3, 3, 5, 5])
+
+    def test_there_are_five_bars_and_the_card_shows_no_number(self):
+        html = run(f"cards.cardMarkup({js(essay(word_count=1300))}, {js({'now': '2026-09-30T12:00:00-07:00'})})")
+        length = html.split('class="card-length"')[1].split("</span></span>")[0]
+        self.assertEqual(length.count('class="bar'), 6)  # the .bars wrapper and five bars
+        self.assertEqual(length.count("is-filled"), 3)
+        self.assertIn('title="1,300 words', html)
+        self.assertIn('<span class="visually-hidden">1,300 words</span>', html)
+        self.assertNotIn("1.3k", html)
 
     def test_word_counts_read_short(self):
         self.assertEqual(run("[251, 954, 1300, 1000, 17400].map(cards.formatWords)"),
@@ -366,28 +376,26 @@ class CardMarkupTests(unittest.TestCase):
         self.assertNotIn("card-handle", self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
         self.assertNotIn("card-handle", self.markup(status="Live", published_date="2026-09-21"))
 
-    def test_the_footer_is_obsidian_then_the_grabber_and_nothing_else(self):
-        html = self.markup(status="Writers Likey", obsidian_url="obsidian://open?vault=v&file=A")
-        actions = html.split('<div class="card-actions">')[1]
-        self.assertLess(actions.index("card-obsidian"), actions.index("card-handle"))
-        self.assertEqual(actions.count("<button") + actions.count("<a "), 2)
+    def test_one_line_above_the_title_holds_everything_in_order(self):
+        html = self.markup(status="Writers Likey", needs_intake=True, category="Craft",
+                           obsidian_url="obsidian://open?vault=v&file=A")
+        meta = html.split('<div class="card-meta">')[1].split("</div>")[0]
+        order = [meta.index(part) for part in ("card-topic", 'data-action="intake-suggest"', "card-length",
+                                               "card-obsidian", "card-handle")]
+        self.assertEqual(order, sorted(order))
+        self.assertLess(html.index("card-meta"), html.index('class="card-title"'))
+        self.assertNotIn("card-actions", html)
 
-    def test_a_card_with_nothing_to_do_has_no_footer_row(self):
-        self.assertNotIn("card-actions", self.markup(status="Ready for Air", scheduled_at="2026-10-05", obsidian_url=""))
-
-    def test_the_air_chip_is_brief_and_sits_in_the_middle_of_the_row_above_the_title(self):
+    def test_the_air_chip_is_brief_and_sits_between_the_topic_and_the_bars(self):
         html = self.markup(status="Ready for Air", scheduled_at="2026-10-05")
         meta = html.split('<div class="card-meta">')[1].split("</div>")[0]
-        self.assertLess(meta.index("card-meta-start"), meta.index("card-meta-mid"))
-        self.assertLess(meta.index("card-meta-mid"), meta.index("card-meta-end"))
-        mid = meta.split("card-meta-mid")[1].split("card-meta-end")[0]
-        self.assertIn("airs 10/5/26", mid)
-        self.assertLess(html.index("card-meta"), html.index('class="card-title"'))
+        self.assertIn("airs 10/5/26", meta)
+        self.assertLess(meta.index("card-meta-start"), meta.index("card-air"))
+        self.assertLess(meta.index("card-air"), meta.index("card-length"))
 
-    def test_file_it_is_just_left_of_the_word_count(self):
-        html = self.markup(needs_intake=True)
-        end = html.split('class="card-meta-end"')[1].split("</div>")[0]
-        self.assertLess(end.index("data-action=\"intake-suggest\""), end.index("card-length"))
+    def test_only_a_parked_card_has_a_row_under_the_title(self):
+        self.assertNotIn("card-actions", self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
+        self.assertIn("card-actions", self.markup(status="Archived", previous_status="Writers Room"))
 
     def test_once_a_topic_is_suggested_the_picker_moves_under_the_title(self):
         html = self.markup({**self.CTX, 'intake': {'abc': {'category': 'x', 'categories': ['x', 'y']}}}, id='abc', needs_intake=True)
@@ -446,7 +454,8 @@ class CardMarkupTests(unittest.TestCase):
         self.assertIn("phase-room", self.markup())
 
     def test_stacked_sheets_follow_the_length(self):
-        self.assertEqual(self.markup(word_count=500).count("card-sheet-"), 0)
+        self.assertEqual(self.markup(word_count=400).count("card-sheet-"), 0)
+        self.assertEqual(self.markup(word_count=1300).count("card-sheet-"), 2)
         self.assertEqual(self.markup(word_count=5000).count("card-sheet-"), 3)
 
     def test_the_stamp_is_one_image_with_its_date(self):

@@ -52,11 +52,11 @@
 
   const STAR_PATH = 'M20 4.5 L24.6 15.2 L36.5 16 L27.4 23.8 L30.6 35.5 L20 29 L9.8 35.8 L12.8 23.6 L3.5 16.4 L15.3 15.3 Z';
   // The gem for "open in obsidian", at the card's 26px.
-  const OBSIDIAN_GEM = '<img class="obsidian-logo" src="/static/brand/obsidian-logo.png" alt="" width="26" height="26">';
+  const OBSIDIAN_GEM = '<img class="obsidian-logo" src="/static/brand/obsidian-logo.png" alt="" width="22" height="22">';
   const AIR_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.5 6.5 0 0 0 0 9M16.5 7.5a6.5 6.5 0 0 1 0 9M4.5 4.5a10.5 10.5 0 0 0 0 15M19.5 4.5a10.5 10.5 0 0 1 0 15"/></svg>';
   const LIVE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>';
   // The six-dot grip on the grabber.
-  const GRIP_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="9" cy="6" r="1.9"/><circle cx="15" cy="6" r="1.9"/><circle cx="9" cy="12" r="1.9"/><circle cx="15" cy="12" r="1.9"/><circle cx="9" cy="18" r="1.9"/><circle cx="15" cy="18" r="1.9"/></svg>';
+  const GRIP_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="9" cy="6" r="1.9"/><circle cx="15" cy="6" r="1.9"/><circle cx="9" cy="12" r="1.9"/><circle cx="15" cy="12" r="1.9"/><circle cx="9" cy="18" r="1.9"/><circle cx="15" cy="18" r="1.9"/></svg>';
   // Back to the room: a parked card's umbrella becomes this.
   const BACK_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>';
 
@@ -112,14 +112,14 @@
     };
   }
 
-  // Length as signal bars: under 800 words one, to 1,499 two, to 2,999
-  // three, 3,000 and up four.
+  // Length as five signal bars, with no number beside them on a card:
+  // under 500 words one, to 1,199 two, to 2,499 three, to 4,999 four, 5,000
+  // and up five. The exact count is the bars' tooltip.
+  const BAR_STEPS = [500, 1200, 2500, 5000];
+  const BAR_NAMES = ['a note', 'short', 'essay length', 'long', 'very long'];
   function barCount(words) {
     const n = Number(words) || 0;
-    if (n >= 3000) return 4;
-    if (n >= 1500) return 3;
-    if (n >= 800) return 2;
-    return 1;
+    return 1 + BAR_STEPS.filter((step) => n >= step).length;
   }
 
   function formatWords(words) {
@@ -535,7 +535,7 @@
   function barsMarkup(words) {
     const filled = barCount(words);
     let bars = '';
-    for (let i = 1; i <= 4; i += 1) {
+    for (let i = 1; i <= 5; i += 1) {
       bars += `<span class="bar${i <= filled ? ' is-filled' : ''}"></span>`;
     }
     return `<span class="bars bars-${filled}" aria-hidden="true">${bars}</span>`;
@@ -599,7 +599,8 @@
     if (totem) {
       cover += `<img class="card-totem" src="${escapeHtml(totem.image)}" alt="${escapeHtml(totem.label)} totem" decoding="async" loading="lazy">`;
     }
-    for (let k = 0; k < bars - 1; k += 1) {
+    // The stack of sheets behind the page tops out at three.
+    for (let k = 0; k < Math.min(bars, 4) - 1; k += 1) {
       cover += `<div class="card-sheet card-sheet-${k}" aria-hidden="true"></div>`;
     }
     let lineMarkup = '';
@@ -618,9 +619,10 @@
       + '</div>';
     if (showPostit) cover += postitMarkup(shown);
 
-    // The row above the title: the topic at the left, the air chip in the
-    // middle, and at the right "file it" (while there is nothing suggested yet)
-    // and the word count.
+    // One line above the title, left to right: the topic, the air chip, "file
+    // it" (while nothing is suggested yet), the length bars, obsidian, and the
+    // grabber. The topic takes what is left and is cut short before it can
+    // push the rest off the card.
     let topicMarkup = '';
     if (topic) {
       // A preset colour is the writer's own setting, so it is shape-checked
@@ -628,39 +630,31 @@
       const dot = /^#[0-9a-f]{3,8}$/i.test(topic.color) ? ` style="--topic:${topic.color}"` : '';
       topicMarkup = `<span class="card-topic-dot"${dot} aria-hidden="true"></span><span class="card-topic">${escapeHtml(topic.name)}</span>`;
     }
-    let middle = '';
+    let meta = `<span class="card-meta-start">${topicMarkup}</span>`;
     if (phase === 'ready' && essay?.scheduled_at) {
       const short = formatAirShort(essay.scheduled_at);
-      middle = `<span class="card-air" title="airs ${escapeHtml(formatAirDay(essay.scheduled_at))}">${AIR_ICON}airs ${escapeHtml(short)}</span>`;
+      meta += `<span class="card-air" title="airs ${escapeHtml(formatAirDay(essay.scheduled_at))}">${AIR_ICON}airs ${escapeHtml(short)}</span>`;
     } else if (phase === 'live' && isPostLink(essay?.substack_url)) {
-      middle = `<a class="card-live" href="${escapeHtml(essay.substack_url)}" rel="noopener">${LIVE_ICON}live</a>`;
+      meta += `<a class="card-live" href="${escapeHtml(essay.substack_url)}" rel="noopener">${LIVE_ICON}live</a>`;
+    }
+    if (essay?.needs_intake && !(context.intake && context.intake[id])) {
+      meta += '<button type="button" class="card-file-btn" data-action="intake-suggest">file it</button>';
     }
     const words = Number(essay?.word_count) || 0;
-    const fileIt = essay?.needs_intake && !(context.intake && context.intake[id])
-      ? '<button type="button" class="card-file-btn" data-action="intake-suggest">file it</button>'
-      : '';
-    const meta = `<span class="card-meta-start">${topicMarkup}</span>`
-      + `<span class="card-meta-mid">${middle}</span>`
-      + '<span class="card-meta-end">'
-      + fileIt
-      + `<span class="card-length" title="${escapeHtml(words.toLocaleString('en-US'))} words">${barsMarkup(words)}${escapeHtml(formatWords(words))}<span class="visually-hidden"> words</span></span>`
-      + '</span>';
+    const count = words.toLocaleString('en-US');
+    meta += `<span class="card-length" title="${escapeHtml(count)} words · ${BAR_NAMES[barCount(words) - 1]}">${barsMarkup(words)}<span class="visually-hidden">${escapeHtml(count)} words</span></span>`;
+    if (essay?.obsidian_url) {
+      meta += `<a class="card-obsidian" href="${escapeHtml(essay.obsidian_url)}" aria-label="open in obsidian" title="open in obsidian">${OBSIDIAN_GEM}</a>`;
+    }
+    if (!isParked && (phase === 'likey' || phase === 'room')) meta += handleMarkup(phase);
 
-    // The footer's two icons, at the right: obsidian, then the grabber. A
-    // parked card has the way back instead of the grabber.
+    // A parked card has one more row: when it was parked, and the way back.
+    // An essay parked by an older airdate has no archived_at, so no date.
     let actions = '';
     if (isParked) {
-      // An essay parked by an older airdate has no archived_at, so no date.
       const since = formatStampDate(essay?.archived_at, 'instant');
-      actions += unparkMarkup(since ? `in the rain since ${since}` : 'in the rain');
-      actions += '<span class="card-spacer"></span>';
-    } else {
-      actions += '<span class="card-spacer"></span>';
+      actions = unparkMarkup(since ? `in the rain since ${since}` : 'in the rain');
     }
-    if (essay?.obsidian_url) {
-      actions += `<a class="card-obsidian" href="${escapeHtml(essay.obsidian_url)}" aria-label="open in obsidian" title="open in obsidian">${OBSIDIAN_GEM}</a>`;
-    }
-    if (!isParked && (phase === 'likey' || phase === 'room')) actions += handleMarkup(phase);
 
     const error = context.error
       ? `<p class="card-error" role="alert">${escapeHtml(context.error)}</p>`
@@ -675,7 +669,7 @@
       + filingMarkup(essay, context.intake && context.intake[id])
       + error
       + '<div class="card-feedback"></div>'
-      + (actions.replace('<span class="card-spacer"></span>', '') ? `<div class="card-actions">${actions}</div>` : '')
+      + (actions ? `<div class="card-actions">${actions}</div>` : '')
       + '</div></article>';
   }
 
@@ -686,6 +680,7 @@
     ageTier,
     toolFor,
     barCount,
+    BAR_STEPS,
     barsMarkup,
     formatWords,
     phaseOf,
