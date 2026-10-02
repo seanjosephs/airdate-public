@@ -149,5 +149,36 @@
     return { refresh, setActive, onKey, active: () => active };
   }
 
-  return { createRoving, neighbour, isTyping };
+  // Which card takes focus when card `id` leaves a view: the next one in the
+  // order the view shows, or the previous one when it was last. Pure.
+  function afterLeaving(order, id) {
+    const ids = order.map(String);
+    const at = ids.indexOf(String(id));
+    if (at < 0) return null;
+    return ids[at + 1] || (at > 0 ? ids[at - 1] : null) || null;
+  }
+
+  // A card the writer acted on has left the view (parked, brought back to
+  // the room), and focus went with it to <body>. Hand it on: the slip's undo
+  // when the slip has one, else the neighbouring card's title, else the
+  // view's heading. Focus the writer has already moved elsewhere stays put.
+  function focusAfterLeaving(options) {
+    const doc = globalThis.document;
+    const now = doc.activeElement;
+    if (now && now !== doc.body && now.isConnected !== false) return null;
+    const slip = options.slip && options.slip.element;
+    let target = slip ? slip.querySelector('.slip-undo') : null;
+    if (!target && options.neighbourId) {
+      const card = options.card(options.neighbourId);
+      target = card ? card.querySelector('.card-link') : null;
+    }
+    if (!target && options.heading) {
+      if (!options.heading.hasAttribute('tabindex')) options.heading.setAttribute('tabindex', '-1');
+      target = options.heading;
+    }
+    if (target) target.focus();
+    return target;
+  }
+
+  return { createRoving, neighbour, isTyping, afterLeaving, focusAfterLeaving };
 });

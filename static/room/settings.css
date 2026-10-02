@@ -1,6 +1,5 @@
-/* The settings view (slice 5) and the first-run wizard it shares with the
- * old page's static/airdate-wizard.js. Dark theme, the room's own tokens;
- * the wizard markup here is new (room-styled), the module driving it is not.
+/* The settings view and the first-run wizard (static/airdate-wizard.js
+ * drives it). Dark theme, the room's own tokens.
  */
 
 .room-grow { flex-grow: 1; }

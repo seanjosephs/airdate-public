@@ -16,6 +16,7 @@ import re
 import tempfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 CONFIG_VERSION = 1
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
@@ -430,6 +431,57 @@ def publication_url(value: str) -> str:
     if not re.match(r"^https?://", value):
         value = f"https://{value}"
     return value
+
+
+PUBLICATION_ERROR = "substack.publication must be your publication's web address, like yourname.substack.com."
+DNS_LABEL_RE = re.compile(r"^[a-z0-9-]+$")
+
+
+def publication_error(value: Any) -> str:
+    """Why a publication from the settings form is not a web address, or "".
+
+    A publication is a host (yourname.substack.com, or a custom domain), with
+    or without http(s):// and a trailing slash. Nothing else: no path, no
+    login, no spaces, every label letters, digits or hyphens."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        return PUBLICATION_ERROR
+    url = publication_url(value)
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(url)
+        parsed.port  # noqa: B018 - raises on a port that is not a number
+    except ValueError:
+        return PUBLICATION_ERROR
+    host = (parsed.hostname or "").rstrip(".")
+    labels = host.split(".")
+    if (
+        parsed.scheme not in ("http", "https")
+        or parsed.username is not None
+        or parsed.path not in ("", "/")
+        or parsed.query or parsed.fragment
+        or len(labels) < 2
+        or not all(DNS_LABEL_RE.match(label) for label in labels)
+    ):
+        return PUBLICATION_ERROR
+    return ""
+
+
+def form_errors(form: dict[str, Any]) -> list[str]:
+    """Fields of the settings form that cannot become a config at all. Checked
+    before settings_from_form, so a bad shape is a sentence, not a crash."""
+    errors: list[str] = []
+    if "publication" in form:
+        message = publication_error(form.get("publication"))
+        if message:
+            errors.append(message)
+    if "red_pen_lines" in form:
+        lines = form.get("red_pen_lines")
+        if lines is not None and not isinstance(lines, str) and not _is_str_list(lines):
+            errors.append("red_pen.lines must be text, one line each, or a list of lines.")
+    return errors
 
 
 def check_vault(config: dict[str, Any]) -> dict[str, Any]:

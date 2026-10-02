@@ -2,7 +2,7 @@
 // Placing board). A first-class route, not a fallback.
 //
 //   A (a writers likey card focused), or a click on its handle, lifts the note.
-//   Left and right move between open Mondays only; taken and past ones are
+//   Left and right move between open publish days only; taken and past ones are
 //   skipped and dimmed. At either end the board pages a week. No wrap.
 //   Enter or S sets it: the same round trip as a drop.
 //   Escape or Tab puts it back, and focus returns to the handle.
@@ -100,6 +100,9 @@
   async function set() {
     const ended = finish();
     if (!ended) return;
+    // The last step's "<day> is open." is not true once the note is set; the
+    // slot's own plaque says where it landed.
+    view().announce('');
     const landed = await view().schedule(ended.id, ended.candidate, { origin: 'placing' });
     if (!landed) focusHandle(ended.id);
   }

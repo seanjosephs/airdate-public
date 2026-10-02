@@ -11,6 +11,7 @@
   const Cards = window.AirdateCards;
   const Api = window.RoomApi;
   const Feedback = window.RoomFeedback;
+  const Keys = window.RoomKeys;
 
   const state = {
     essays: [],
@@ -110,13 +111,15 @@
       const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/back-to-room`, {});
       state.busy.delete(id);
       const row = result && result.row;
+      const neighbourId = Keys.afterLeaving(Cards.rainyDaySort(state.essays.filter(matches), state.sort).map((essay) => essay.id), id);
       const at = state.essays.findIndex((essay) => String(essay.id) === id);
       if (at >= 0) state.essays.splice(at, 1);
       render(false);
       document.dispatchEvent(new CustomEvent('room:essay', {
         detail: { oldId: id, essay: row, source: 'rainy-day' },
       }));
-      Feedback.slip({ tone: 'green', text: `${String((row && row.title) || 'the essay').toLowerCase()} is back in the room as ${phaseWord(row && row.status)}.` });
+      const slip = Feedback.slip({ tone: 'green', text: `${String((row && row.title) || 'the essay').toLowerCase()} is back in the room as ${phaseWord(row && row.status)}.` });
+      Keys.focusAfterLeaving({ slip, neighbourId, card: cardElement, heading: $('rainy-heading') });
     } catch (error) {
       state.busy.delete(id);
       if (card) card.removeAttribute('aria-busy');
@@ -198,7 +201,7 @@
     els.results = $('rainy-results');
     els.search = $('rainy-search');
     els.sort = $('rainy-sort');
-    if (!els.view || !Cards || !Api || !Feedback) return;
+    if (!els.view || !Cards || !Api || !Feedback || !Keys) return;
     bind();
     window.addEventListener('hashchange', applyRoute);
     document.addEventListener('room:essay', (event) => {

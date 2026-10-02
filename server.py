@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import functools
 import hashlib
 import hmac
 import ipaddress
@@ -100,7 +101,6 @@ CONTENT_TYPES = {
 }
 VAULT_ASSET_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 UPLOADS = DRAFTS / "assets"
-CONTACT_LOG = STATE_DIR / "creative_contact.json"
 # When each essay first showed up in airdate, keyed by essay id. The five ages
 # of paper on a script card count from here, not from the file's mtime, which
 # moves every time the writer saves. Runtime only: nothing about arrival is
@@ -116,13 +116,6 @@ STARRED_LOG = STATE_DIR / "starred.json"
 CONNECTOR_PAIRING_FILE = SECRET_DIR / "connector.json"
 
 PLACEHOLDER_PUBLICATION_MARKERS = {"yourname", "yourpublication"}
-
-
-def env_flag(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in TRUE_VALUES
 
 
 def is_loopback_host(host: str) -> bool:
@@ -679,16 +672,6 @@ def decode_image_upload(payload: dict[str, Any]) -> tuple[str, str, bytes]:
     if len(raw) > MAX_UPLOAD_BYTES:
         raise ValueError(f"Image uploads are limited to {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.")
     return filename, suffix, raw
-
-
-def unique_upload_path(stem: str, suffix: str) -> Path:
-    safe_stem = slugify(stem)
-    path = UPLOADS / f"{safe_stem}{suffix}"
-    counter = 2
-    while path.exists():
-        path = UPLOADS / f"{safe_stem}-{counter}{suffix}"
-        counter += 1
-    return path
 
 
 def unique_obsidian_asset_path(stem: str, suffix: str) -> Path:
@@ -1261,12 +1244,6 @@ def publish_readiness_for_card(
         "missing_images": missing_images,
         "defaults": defaults,
     }
-
-
-def _tail(value: Any) -> str:
-    if isinstance(value, bytes):
-        value = value.decode("utf-8", errors="replace")
-    return _stringify(value)[-4000:]
 
 
 def transport_payload(result: dict[str, Any]) -> dict[str, Any]:
@@ -2097,6 +2074,11 @@ def discover_essays() -> tuple[list[dict[str, Any]], dict[str, Path]]:
             id_map[legacy_path_id] = path
             if uid:
                 seen_uids[uid] = (essays[-1], path, stat.st_mtime)
+        except FileNotFoundError:
+            # Moved or deleted between the directory walk and the read (an
+            # airdate write, Obsidian sync). Not unparseable: it is simply not
+            # here now, and the next scan finds it wherever it went.
+            continue
         except Exception as exc:  # noqa: BLE001
             # A single malformed essay must not blank the whole catalog — skip it,
             # but record + log it so the failure is visible, not silent (the old
@@ -2508,6 +2490,9 @@ def save_settings(form: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(f"{load_error} Fix or remove the file, then try again.")
     if not EXPOSE_LOCAL_PATHS:
         form = {key: value for key, value in form.items() if key != "vault_path"}
+    errors = airdate_config.form_errors(form)
+    if errors:
+        return {"ok": False, "errors": errors, "setup": setup_payload()}
     updated = airdate_config.settings_from_form(current, form)
     errors = airdate_config.validate_config(updated)
     if errors:
@@ -2534,13 +2519,19 @@ def candidate_config(form: dict[str, Any]) -> dict[str, Any]:
 def check_settings(form: dict[str, Any]) -> dict[str, Any]:
     """Validate a form without saving it: the wizard checks each step this
     way, so config.json is written once, at finish."""
+    shape_errors = airdate_config.form_errors(form)
+    if shape_errors:
+        # Check the rest of the form as if the malformed fields were not sent,
+        # so each step still hears about its own fields.
+        form = {key: value for key, value in form.items()
+                if not airdate_config.form_errors({key: value})}
     candidate = candidate_config(form)
     vault = candidate["vault"]
     raw_path = str(vault.get("path") or "").strip()
     check = airdate_config.check_vault(candidate)
     return {
         "ok": True,
-        "errors": airdate_config.validate_config(candidate),
+        "errors": shape_errors + airdate_config.validate_config(candidate),
         "vault_ok": bool(check.get("vault_ok")),
         "essays_ok": bool(check.get("essays_ok")),
         "vault_message": check.get("vault_message", ""),
@@ -2603,6 +2594,8 @@ def resolve_essay_path(essay_id: str) -> Path:
     if path is None or not path.exists():
         _, id_map = refresh_essay_index()
         path = id_map.get(essay_id)
+    if path is None and current_id(essay_id) != essay_id:
+        path = id_map.get(current_id(essay_id))
     if path is None:
         raise FileNotFoundError("Essay not found")
     return path
@@ -2652,6 +2645,33 @@ def conflict_payload(essay_id: str, path: Path, text: str | None = None) -> dict
     }
 
 
+CONTENT_HASH_SHAPE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def parse_expected_file_state(expected_mtime: Any, expected_content_hash: Any) -> tuple[float | None, str]:
+    """The file state a write names, checked for shape before anything is read.
+
+    Absent (None or "") means the caller names no state. Anything present but
+    malformed is a bad request: skipping the guard would let a write through
+    that the caller meant to be conditional."""
+    digest = ""
+    if expected_content_hash not in (None, ""):
+        if not isinstance(expected_content_hash, str) or not CONTENT_HASH_SHAPE.match(expected_content_hash):
+            raise ValueError("expected_content_hash must be the 64-character hash airdate sent.")
+        digest = expected_content_hash
+    mtime: float | None = None
+    if expected_mtime not in (None, ""):
+        if isinstance(expected_mtime, bool) or not isinstance(expected_mtime, (int, float, str)):
+            raise ValueError("expected_mtime must be the number airdate sent.")
+        try:
+            mtime = float(expected_mtime)
+        except ValueError:
+            raise ValueError("expected_mtime must be the number airdate sent.") from None
+        if mtime != mtime or mtime in (float("inf"), float("-inf")):
+            raise ValueError("expected_mtime must be the number airdate sent.")
+    return mtime, digest
+
+
 def assert_expected_file_state(
     essay_id: str,
     path: Path,
@@ -2659,18 +2679,61 @@ def assert_expected_file_state(
     expected_mtime: Any = None,
     expected_content_hash: Any = None,
 ) -> None:
-    if expected_content_hash:
-        if content_hash(text) != str(expected_content_hash):
+    mtime, digest = parse_expected_file_state(expected_mtime, expected_content_hash)
+    if digest:
+        if content_hash(text) != digest:
             raise EssayConflictError(conflict_payload(essay_id, path, text))
         return
-    if expected_mtime in (None, ""):
+    if mtime is None:
         return
-    try:
-        expected = float(expected_mtime)
-    except (TypeError, ValueError):
-        return
-    if abs(path.stat().st_mtime - expected) > 0.001:
+    if abs(path.stat().st_mtime - mtime) > 0.001:
         raise EssayConflictError(conflict_payload(essay_id, path, text))
+
+
+# One lock for every write to the vault. The server answers each request on its
+# own thread, and a write is a read, a check of the file state the caller named,
+# then the write: without one lock two requests can both pass the check and the
+# last one wins silently. Reentrant, because the routes are built on each other
+# (park -> set_essay_status -> save_essay_updates).
+VAULT_WRITE_LOCK = threading.RLock()
+
+
+def vault_write(func):
+    """Run a vault write path under VAULT_WRITE_LOCK, check and write together."""
+    @functools.wraps(func)
+    def locked(*args: Any, **kwargs: Any) -> Any:
+        with VAULT_WRITE_LOCK:
+            return func(*args, **kwargs)
+    locked.__vault_write__ = True  # type: ignore[attr-defined]
+    return locked
+
+
+# Ids a write retired, old -> new: a uid mint (path hash -> uid) or a folder
+# move (old path hash -> new). A request that names the old id after the write
+# that retired it (a double click, two tabs) still finds the note, instead of
+# a 404. Memory only; the client remaps from new_id on its next answer.
+_RETIRED_IDS: dict[str, str] = {}
+_RETIRED_IDS_MAX = 2000
+
+
+def retire_id(old_id: str, new_id: str) -> None:
+    old_key, new_key = str(old_id or "").strip(), str(new_id or "").strip()
+    if not old_key or not new_key or old_key == new_key:
+        return
+    with VAULT_WRITE_LOCK:
+        _RETIRED_IDS[old_key] = new_key
+        while len(_RETIRED_IDS) > _RETIRED_IDS_MAX:
+            _RETIRED_IDS.pop(next(iter(_RETIRED_IDS)))
+
+
+def current_id(essay_id: str) -> str:
+    """Follow retired ids to the one a note answers to now."""
+    seen = set()
+    key = str(essay_id or "")
+    while key in _RETIRED_IDS and key not in seen:
+        seen.add(key)
+        key = _RETIRED_IDS[key]
+    return key
 
 
 def warm_essay_index() -> int | None:
@@ -2873,6 +2936,7 @@ def preview_essay_updates(essay_id: str, updates: dict[str, Any], body: str | No
     }
 
 
+@vault_write
 def save_essay_updates(
     essay_id: str,
     updates: dict[str, Any],
@@ -2887,15 +2951,19 @@ def save_essay_updates(
     frontmatter, current_body = split_frontmatter(text)
     sanitized = sanitize_updates(updates)
     # The scheduling gate. It lives here, at the write, rather than on one
-    # route: /ready-for-air used to be the only guarded door, while /set-status
-    # and /save both reached Ready for Air without it (sanitize_updates promotes
-    # a bare scheduled_at to Ready for Air). One rule at the write closes every
+    # route: /save reaches Ready for Air too (sanitize_updates promotes a bare
+    # scheduled_at to Ready for Air), so one rule at the write closes every
     # path, including routes that do not exist yet.
     if sanitized.get("status") == "Ready for Air":
         current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
         refusal = scheduling_refusal(current)
         if refusal:
             raise SchedulingRefusedError(refusal)
+    if sanitized.get("status") == "Live":
+        # A live essay has no rainy-day phase to go back to, whichever route
+        # took it live. Blank removes the keys.
+        sanitized["previous_status"] = ""
+        sanitized["archived_at"] = ""
     # Durable identity, stamped lazily on the write this call already performs
     # (no extra write, no extra mtime bump). Assigned AFTER sanitize_updates so a
     # client payload can never set or overwrite uid — "uid" is deliberately not
@@ -2930,6 +2998,7 @@ def save_essay_updates(
         # its very first write, which is usually the star.
         carry_arrival(essay_id, sanitized[UID_KEY])
         carry_star(essay_id, sanitized[UID_KEY])
+        retire_id(essay_id, sanitized[UID_KEY])
         # The essay's id flips here (path hash -> uid). Refresh blocking, as the
         # other re-id sites do, so the client's very next /api/essays already
         # reports the canonical id — a background rescan loses that race and the
@@ -3009,6 +3078,7 @@ def folder_for_status(status: str, frontmatter: dict[str, Any], relative_path: s
     return None
 
 
+@vault_write
 def set_essay_status(
     essay_id: str,
     status_value: Any,
@@ -3041,13 +3111,14 @@ def set_essay_status(
             new_path = move_essay_file(path, target)
             moved = new_path != path
         except OSError as exc:
-            warning = f"Status saved, but the file move failed: {exc}"
+            warning = without_local_paths(f"Status saved, but the file move failed: {exc}")
 
     refresh_essay_index()  # blocking, so the path-derived id resolves immediately
     new_relative = new_path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix()
     # The uid survives the move (save_essay_updates above stamped it if absent),
     # so a uid'd essay keeps its id across a folder move — no client remap needed.
     new_id = frontmatter_uid(frontmatter) or essay_id_for(new_relative)
+    retire_id(essay_id, new_id)
     new_text = new_path.read_text(encoding="utf-8", errors="ignore")
     state = file_state(new_path, new_text)
     result: dict[str, Any] = {
@@ -3072,6 +3143,14 @@ def set_essay_status(
 
 
 NOT_A_POST_LINK = "that is not a substack post link."
+POST_PATH_SHAPE = re.compile(r"^/p/[^/\s]+/?$")
+DNS_LABEL_SHAPE = re.compile(r"^[a-z0-9-]+$")
+
+
+def is_dns_host(host: str) -> bool:
+    """A host made of DNS labels: letters, digits and hyphens, none empty."""
+    labels = str(host or "").split(".")
+    return len(labels) >= 2 and all(DNS_LABEL_SHAPE.match(label) for label in labels)
 
 
 def _bare_host(value: str) -> str:
@@ -3094,8 +3173,10 @@ def live_link_refusal(url: Any) -> str | None:
     Checked by shape and never fetched, so airdate never claims live about a
     post it cannot see. A post link is https, on substack.com, a subdomain of
     it, or the writer's own custom domain from settings (with or without www),
-    and names a post under /p/. The host is compared whole, never as a
-    substring, so substack.com.evil.test and a user@host prefix are both out."""
+    and names one post: the path is /p/<slug>, with a query or fragment
+    allowed, so two links glued together are out. The host is compared whole,
+    never as a substring, and must be DNS labels, so substack.com.evil.test, a
+    user@host prefix, an empty label and a %-escaped host are all out."""
     text = str(url or "").strip()
     if not text:
         return NOT_A_POST_LINK
@@ -3109,12 +3190,14 @@ def live_link_refusal(url: Any) -> str | None:
     if port not in (None, 443):
         return NOT_A_POST_LINK
     host = (parsed.hostname or "").lower().rstrip(".")
+    if not is_dns_host(host):
+        return NOT_A_POST_LINK
     custom = _bare_host(SUBSTACK_PUBLICATION)
     on_substack = host == "substack.com" or host.endswith(".substack.com")
     on_custom = bool(custom) and host in (custom, f"www.{custom}")
     if not (on_substack or on_custom):
         return NOT_A_POST_LINK
-    if not re.search(r"/p/[^/]+", parsed.path or ""):
+    if not POST_PATH_SHAPE.match(parsed.path or ""):
         return NOT_A_POST_LINK
     return None
 
@@ -3139,6 +3222,7 @@ def with_index_row(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+@vault_write
 def publish_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Bookkeeping for a publish the writer performed on Substack themselves:
     stamp the live URL + date, set status Live, move the file to Published/.
@@ -3146,13 +3230,19 @@ def publish_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
 
     Going live stamps the air date, not today: the essay aired on its Monday,
     whenever the writer got round to pasting the link. Today is the fallback
-    only for an essay that never had an air date. The air date itself stays."""
+    only for an essay that never had an air date. The air date itself stays.
+    A rainy-day essay is refused: it comes back to the room first. The
+    parking stamps are cleared at the write (save_essay_updates), as for every
+    route to live."""
     substack_url = str(payload.get("substack_url") or "").strip()
     refusal = live_link_refusal(substack_url)
     if refusal:
         raise ValueError(refusal)
     path = resolve_essay_path(essay_id)
     frontmatter, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+    if current == "Archived":
+        raise RefusedError(SCHEDULE_REFUSALS["Archived"], "archived")
     published_date = air_day_of(frontmatter.get("scheduled_at"))
     if not published_date:
         published_date = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
@@ -3173,9 +3263,23 @@ SCHEDULE_REFUSALS = {
     "Archived": "it is saved for a rainy day. bring it back to the room first.",
 }
 
-AIR_DATE_SHAPE = re.compile(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$")
+AIR_DATE_SHAPE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}"
+    r"(T(?P<hour>\d{2}):(?P<minute>\d{2})(:(?P<second>\d{2})(\.\d+)?)?"
+    r"(Z|[+-](?P<tzh>\d{2}):(?P<tzm>\d{2}))?)?$"
+)
 
 
+def air_date_is_valid(value: str) -> bool:
+    """A real calendar date, and when it carries a time, a real clock time."""
+    match = AIR_DATE_SHAPE.match(value)
+    if not match or not air_day_of(value):
+        return False
+    limits = {"hour": 23, "minute": 59, "second": 59, "tzh": 23, "tzm": 59}
+    return all(match.group(name) is None or int(match.group(name)) <= top for name, top in limits.items())
+
+
+@vault_write
 def schedule_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Put an essay on the board: write scheduled_at and move it to Ready for Air.
 
@@ -3187,7 +3291,7 @@ def schedule_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     scheduled_at = str(payload.get("scheduled_at") or payload.get("scheduledAt") or "").strip()
     if not scheduled_at:
         raise ValueError("scheduled_at (an air date) is required")
-    if not AIR_DATE_SHAPE.match(scheduled_at) or not air_day_of(scheduled_at):
+    if not air_date_is_valid(scheduled_at):
         raise ValueError("scheduled_at must be a calendar date, like 2026-10-05.")
     path = resolve_essay_path(essay_id)
     frontmatter, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
@@ -3203,10 +3307,19 @@ def schedule_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     ))
 
 
+@vault_write
 def unschedule_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Clear the air date and drop back to Writers Likey, same folder, with the
-    draft link and sent marker kept. An undo of a schedule sends the hash the
-    schedule answered with, so a stale or doubled undo is a conflict."""
+    draft link and sent marker kept. Only an essay on the board can come off
+    it; anything else is refused with a sentence, so a direct POST cannot pull
+    a live essay off the shelf or a parked one out of the rain. An undo of a
+    schedule sends the hash the schedule answered with, so a stale or doubled
+    undo is a conflict."""
+    path = resolve_essay_path(essay_id)
+    frontmatter, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+    if current != "Ready for Air":
+        raise RefusedError("it is not on the board, so there is nothing to take down.", "not-on-the-board")
     return with_index_row(set_essay_status(
         essay_id,
         "Writers Likey",
@@ -3216,15 +3329,12 @@ def unschedule_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     ))
 
 
+@vault_write
 def did_not_air(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """The board note's "it did not air": the Monday passed and the essay did
     not go out. Back to writers likey with its star date, and the slot stays
-    empty. Only an essay on the board can not-air."""
-    path = resolve_essay_path(essay_id)
-    frontmatter, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
-    current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
-    if current != "Ready for Air":
-        raise RefusedError("it is not on the board, so there is nothing to take down.", "not-on-the-board")
+    empty. Only an essay on the board can not-air; unschedule_essay holds
+    that rule."""
     return unschedule_essay(essay_id, payload)
 
 
@@ -3238,6 +3348,7 @@ PARK_REFUSALS = {
 }
 
 
+@vault_write
 def park_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Save an essay for a rainy day: Archived, with the phase it had and the
     moment it was parked stamped into frontmatter so "back to the room" can
@@ -3252,10 +3363,12 @@ def park_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     if current in PARK_REFUSALS:
         raise RefusedError(PARK_REFUSALS[current], current.lower().replace(" ", "-"))
     if current == "Archived":
-        row = index_row_for(essay_id)
-        new_id = (row or {}).get("id") or essay_id
+        # The id the note answers to now, which is not the one the caller
+        # holds when the first park minted a uid and moved the file.
+        new_id = frontmatter_uid(frontmatter) or essay_id_for(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix())
+        row = index_row_for(new_id)
         return {"ok": True, "changed": False, "status": "Archived",
-                "old_id": essay_id, "new_id": new_id, "row": row}
+                "old_id": essay_id, "new_id": (row or {}).get("id") or new_id, "row": row}
     archived_at = datetime.now(timezone.utc).isoformat()
     return with_index_row(set_essay_status(
         essay_id,
@@ -3266,6 +3379,7 @@ def park_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     ))
 
 
+@vault_write
 def back_to_room(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Undo a parking: restore the phase stamped by park_essay (falling back
     to Writers Room when it is absent or not a phase a parked essay can come
@@ -3357,19 +3471,46 @@ def intake_suggest(essay_id: str) -> dict[str, Any]:
     }
 
 
+# Why filing will not touch an essay in these phases. Their folders
+# (Published/, Archive/) are airdate's own, so a topic folder is not theirs.
+INTAKE_REFUSALS = {
+    "Live": "it is live, so it stays on the shelf.",
+    "Archived": "it is saved for a rainy day. bring it back to the room first.",
+}
+INTAKE_STATUSES = ("Writers Room", "Writers Likey")
+
+
+@vault_write
 def intake_apply(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """Confirmed intake: create/complete frontmatter and sort the file into its
-    category folder. Works on files with no frontmatter at all."""
+    """Confirmed intake: complete the frontmatter and sort the file into its
+    category folder. Works on files with no frontmatter at all.
+
+    Filing is not a phase change. The note keeps the phase it has and every
+    lifecycle field with it (scheduled_at, the star, the sent marker), so a
+    starred essay stays starred and a scheduled one stays on the board. Only a
+    note with no status at all is given one: writers room, or the room phase
+    the request names. Live and rainy-day essays are not filed: their folders
+    are airdate's own."""
     category = str(payload.get("category") or "").strip()
     if CATEGORY_MODE == "folders":
         if not category or "/" in category or "\\" in category or category.startswith((".", "_")):
             raise ValueError("category must be a plain folder name")
         if category.lower() in airdate_config.RESERVED_FOLDERS:
             raise ValueError(f"{category} is a folder airdate manages; pick a category folder.")
+    requested = payload.get("status")
+    if requested not in (None, ""):
+        if not isinstance(requested, str) or requested.strip() not in INTAKE_STATUSES:
+            raise ValueError("a filed note can start in writers room or writers likey only.")
+        requested = requested.strip()
     path = resolve_essay_path(essay_id)
     text = path.read_text(encoding="utf-8", errors="ignore")
     frontmatter, _ = split_frontmatter(text)
-    updates: dict[str, Any] = {"status": str(payload.get("status") or "Writers Room")}
+    current = effective_status(path.relative_to(OBSIDIAN_ESSAYS_DIR).as_posix(), frontmatter)
+    if current in INTAKE_REFUSALS:
+        raise RefusedError(INTAKE_REFUSALS[current], current.lower())
+    updates: dict[str, Any] = {}
+    if not str(frontmatter.get("status") or "").strip():
+        updates["status"] = requested or "Writers Room"
     if CATEGORY_MODE == "folders":
         updates["category"] = category
     if payload.get("totem"):
@@ -3386,6 +3527,7 @@ def intake_apply(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     # save_essay_updates just applied, so the uid is only visible from disk now.
     moved_frontmatter, _ = split_frontmatter(new_path.read_text(encoding="utf-8", errors="ignore"))
     new_id = frontmatter_uid(moved_frontmatter) or essay_id_for(new_relative)
+    retire_id(essay_id, new_id)
     result: dict[str, Any] = {
         "ok": True,
         "old_id": essay_id,
@@ -3401,6 +3543,7 @@ def intake_apply(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+@vault_write
 def create_linked_draft(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     source_path = resolve_essay_path(essay_id)
     source_text = source_path.read_text(encoding="utf-8", errors="ignore")
@@ -3453,6 +3596,7 @@ def create_linked_draft(essay_id: str, payload: dict[str, Any]) -> dict[str, Any
     }
 
 
+@vault_write
 def attach_hero_image_to_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     path = resolve_essay_path(essay_id)
     text = path.read_text(encoding="utf-8", errors="ignore")
@@ -3738,6 +3882,7 @@ STAR_REFUSALS = {
 }
 
 
+@vault_write
 def star_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Press the post-it: writers room -> writers likey, or back.
 
@@ -3807,34 +3952,25 @@ def star_essay(essay_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def load_contact_log() -> dict[str, Any]:
-    if not CONTACT_LOG.exists():
-        return {"total": 0, "events": []}
-    try:
-        return json.loads(CONTACT_LOG.read_text(encoding="utf-8"))
-    except Exception:
-        return {"total": 0, "events": []}
+def object_field(payload: dict[str, Any], key: str) -> dict[str, Any]:
+    """A request field that must be an object when present; absent is {}."""
+    value = payload.get(key)
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object.")
+    return value
 
 
-def save_contact_log(data: dict[str, Any]) -> None:
-    atomic_write_text(CONTACT_LOG, json.dumps(data, indent=2))
+ABSOLUTE_PATH_IN_TEXT = re.compile(r"(?<![\w:/])/(?:[^\s'\"/]+/)+[^\s'\"]*")
 
 
-def track_contact(essay_id: str, action: str) -> dict[str, Any]:
-    log = load_contact_log()
-    events = log.get("events", [])
-    action = re.sub(r"[^a-zA-Z0-9_.:-]+", "_", str(action or "contact"))[:80]
-    events.append(
-        {
-            "essay_id": essay_id,
-            "action": action,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    )
-    log["events"] = events[-1200:]
-    log["total"] = int(log.get("total", 0)) + 1
-    save_contact_log(log)
-    return {"ok": True, "total": log["total"], "last_action": action}
+def without_local_paths(message: str) -> str:
+    """An error message with every absolute filesystem path reduced to its
+    file name. OSError text names the path it failed on, and a message is
+    shown to whoever is looking at the room; where the vault lives is not
+    theirs to read there."""
+    return ABSOLUTE_PATH_IN_TEXT.sub(lambda match: Path(match.group(0)).name or "a file", str(message or ""))
 
 
 def parse_essay_route(path: str) -> tuple[str | None, str | None]:
@@ -3848,6 +3984,20 @@ def parse_essay_route(path: str) -> tuple[str | None, str | None]:
 
 
 class Handler(BaseHTTPRequestHandler):
+    # HEAD answers exactly what GET would, headers and all, without the body.
+    head_only = False
+
+    def do_HEAD(self) -> None:
+        self.head_only = True
+        try:
+            self.do_GET()
+        finally:
+            self.head_only = False
+
+    def write_body(self, data: bytes) -> None:
+        if not self.head_only:
+            self.wfile.write(data)
+
     def is_authenticated(self) -> bool:
         if not AUTH_REQUIRED:
             return True
@@ -3871,7 +4021,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("content-type", "text/plain; charset=utf-8")
         self.send_security_headers(no_store=True)
         self.end_headers()
-        self.wfile.write(b"Authentication required.")
+        self.write_body(b"Authentication required.")
         return False
 
     def request_is_same_origin(self) -> bool:
@@ -3900,9 +4050,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.redirect("/airdate")
                 return
             if path == "/airdate/room":
-                # Where the room lived while it was built beside the old page.
-                # Links to it still exist (?essay= deep links), so the query
-                # string travels with the redirect.
+                # An older address for the room. Links to it still exist
+                # (?essay= deep links), so the query string travels with the
+                # redirect.
                 self.redirect(room_redirect_location(parsed.query))
                 return
             if path == "/airdate":
@@ -4046,12 +4196,12 @@ class Handler(BaseHTTPRequestHandler):
 
             essay_id, action = parse_essay_route(path)
             if essay_id and action == "preview":
-                updates = payload.get("updates", {}) if isinstance(payload, dict) else {}
+                updates = object_field(payload, "updates")
                 body = payload.get("body") if isinstance(payload.get("body"), str) else None
                 self.send_json(preview_essay_updates(essay_id, updates, body))
                 return
             if essay_id and action == "save":
-                updates = payload.get("updates", {}) if isinstance(payload, dict) else {}
+                updates = object_field(payload, "updates")
                 body = payload.get("body") if isinstance(payload.get("body"), str) else None
                 result = save_essay_updates(
                     essay_id,
@@ -4063,7 +4213,8 @@ class Handler(BaseHTTPRequestHandler):
                 if payload.get("return_row") is True:
                     # The room's editor hands the fresh card to the pool and
                     # the board, so it asks for the row as it is on disk now.
-                    # The old page does not ask and keeps its background rescan.
+                    # Without it the save leaves the index to its background
+                    # rescan.
                     refresh_essay_index()
                     result["row"] = index_row_for(str(result.get("new_id") or essay_id))
                 self.send_json(result)
@@ -4075,8 +4226,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(attach_hero_image_to_essay(essay_id, payload))
                 return
             if essay_id and action == "send":
-                updates = payload.get("updates", {}) if isinstance(payload, dict) else {}
-                publish_updates = payload.get("publish", {}) if isinstance(payload, dict) else {}
+                updates = object_field(payload, "updates")
+                publish_updates = object_field(payload, "publish")
                 body = payload.get("body") if isinstance(payload.get("body"), str) else None
                 self.send_json(send_essay_to_substack(
                     essay_id,
@@ -4088,30 +4239,17 @@ class Handler(BaseHTTPRequestHandler):
                 ))
                 return
             if essay_id and action == "preflight":
-                publish_updates = payload.get("publish", {}) if isinstance(payload, dict) else {}
+                publish_updates = object_field(payload, "publish")
                 body = payload.get("body") if isinstance(payload.get("body"), str) else None
                 self.send_json(preflight_essay_for_substack(essay_id, publish_updates, body))
                 return
             if essay_id and action == "thumbnail-prompt":
-                publish_updates = payload.get("publish", {}) if isinstance(payload, dict) else {}
+                publish_updates = object_field(payload, "publish")
                 self.send_json(essay_thumbnail_prompt(essay_id, publish_updates))
-                return
-            if essay_id and action == "contact":
-                act = str(payload.get("action") or "contact")
-                self.send_json(track_contact(essay_id, act))
                 return
             if essay_id and action == "star":
                 # The post-it on a card: writers room <-> writers likey only.
                 self.send_json(star_essay(essay_id, payload))
-                return
-            if essay_id and action == "set-status":
-                self.send_json(set_essay_status(
-                    essay_id,
-                    payload.get("status"),
-                    None,
-                    payload.get("expected_mtime"),
-                    payload.get("expected_content_hash"),
-                ))
                 return
             if essay_id and action == "ready-for-air":
                 # Schedule (write scheduled_at to frontmatter, durable) AND
@@ -4153,14 +4291,15 @@ class Handler(BaseHTTPRequestHandler):
                 # The effective status, which honors folder placement, not the
                 # raw frontmatter value: clearing the link must not also move
                 # the note.
-                current = _stringify(get_essay_detail(essay_id).get("status")) or "Live"
-                self.send_json(set_essay_status(
-                    essay_id,
-                    current,
-                    {"substack_draft_id": "", "substack_draft_url": ""},
-                    payload.get("expected_mtime"),
-                    payload.get("expected_content_hash"),
-                ))
+                with VAULT_WRITE_LOCK:
+                    current = _stringify(get_essay_detail(essay_id).get("status")) or "Live"
+                    self.send_json(set_essay_status(
+                        essay_id,
+                        current,
+                        {"substack_draft_id": "", "substack_draft_url": ""},
+                        payload.get("expected_mtime"),
+                        payload.get("expected_content_hash"),
+                    ))
                 return
             if essay_id and action == "intake-suggest":
                 self.send_json(intake_suggest(essay_id))
@@ -4172,16 +4311,17 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "Not found"}, status=404)
         except json.JSONDecodeError:
             self.send_json({"error": "Request body must be valid JSON."}, status=400)
-        except FileNotFoundError as exc:
-            self.send_json({"error": str(exc)}, status=404)
+        except FileNotFoundError:
+            # Never the OSError's own text: it names the absolute path.
+            self.send_json({"error": "Essay not found"}, status=404)
         except RefusedError as exc:
             self.send_json(exc.payload, status=409)
         except EssayConflictError as exc:
             self.send_json(exc.payload, status=409)
         except ValueError as exc:
-            self.send_json({"error": str(exc), "ok": False}, status=400)
+            self.send_json({"error": without_local_paths(str(exc)), "ok": False}, status=400)
         except Exception as exc:
-            self.send_json({"error": str(exc)}, status=500)
+            self.send_json({"error": without_local_paths(str(exc))}, status=500)
 
     def serve_file(self, path: Path, content_type: str) -> None:
         data = path.read_bytes()
@@ -4190,7 +4330,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("content-length", str(len(data)))
         self.send_security_headers(no_store=content_type.startswith("text/html"))
         self.end_headers()
-        self.wfile.write(data)
+        self.write_body(data)
 
     def send_setup_required(self) -> None:
         self.send_json({
@@ -4208,7 +4348,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("content-length", str(len(data)))
         self.send_security_headers(no_store=True)
         self.end_headers()
-        self.wfile.write(data)
+        self.write_body(data)
 
     def send_json(self, payload: dict[str, Any], status: int = 200) -> None:
         data = json.dumps(payload, indent=2).encode("utf-8")
@@ -4217,7 +4357,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("content-length", str(len(data)))
         self.send_security_headers(no_store=True)
         self.end_headers()
-        self.wfile.write(data)
+        self.write_body(data)
 
     def send_security_headers(self, no_store: bool = False) -> None:
         self.send_header("x-content-type-options", "nosniff")

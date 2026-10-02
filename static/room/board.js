@@ -272,9 +272,23 @@
   }
 
   // The same rule the server holds (live_link_refusal): https, substack.com or
-  // a subdomain or the writer's custom domain, a post under /p/. Never fetched.
+  // a subdomain or the writer's custom domain, and one post: the path is
+  // /p/<slug>, a query or fragment allowed. The host is DNS labels, none
+  // empty, never %-escaped. Never fetched.
+  const POST_PATH = /^\/p\/[^/\s]+\/?$/;
+  const DNS_LABEL = /^[a-z0-9-]+$/;
+
+  function isDnsHost(host) {
+    const labels = String(host || '').split('.');
+    return labels.length >= 2 && labels.every((label) => DNS_LABEL.test(label));
+  }
+
   function liveLinkRefusal(value, publication) {
     const text = String(value || '').trim();
+    // The URL parser decodes a %-escape in the host; the server does not, so
+    // the raw text is checked before it gets the chance.
+    const authority = (text.match(/^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i) || [])[1] || '';
+    if (authority.includes('%')) return say.notAPost();
     let url;
     try {
       url = new URL(text);
@@ -284,11 +298,12 @@
     if (url.protocol !== 'https:' || url.username || url.password) return say.notAPost();
     if (url.port && url.port !== '443') return say.notAPost();
     const host = url.hostname.toLowerCase().replace(/\.$/, '');
+    if (!isDnsHost(host)) return say.notAPost();
     const custom = bareHost(publication);
     const onSubstack = host === 'substack.com' || host.endsWith('.substack.com');
     const onCustom = Boolean(custom) && (host === custom || host === `www.${custom}`);
     if (!onSubstack && !onCustom) return say.notAPost();
-    if (!/\/p\/[^/]+/.test(url.pathname)) return say.notAPost();
+    if (!POST_PATH.test(url.pathname)) return say.notAPost();
     return null;
   }
 

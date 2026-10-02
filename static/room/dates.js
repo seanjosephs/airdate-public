@@ -108,6 +108,18 @@
     return p ? `${MONTHS[p.month - 1]} ${p.day}` : '';
   }
 
+  // An instant (an ISO timestamp from the server) as the writer's local date
+  // and time: "thu oct 1, 5:35 am". '' when it is not an instant.
+  function formatMoment(value) {
+    const text = String(value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(text)) return '';
+    const d = new Date(text);
+    if (Number.isNaN(d.getTime())) return '';
+    const hour = d.getHours() % 12 || 12;
+    const half = d.getHours() < 12 ? 'am' : 'pm';
+    return `${formatDay(localIso(d))}, ${hour}:${pad(d.getMinutes())} ${half}`;
+  }
+
   // How long until the writer's next local midnight, in milliseconds.
   function msUntilMidnight(now) {
     const d = now instanceof Date ? now : new Date();
@@ -156,6 +168,7 @@
     mondayOf,
     formatDay,
     formatShort,
+    formatMoment,
     msUntilMidnight,
     watchDay,
   };

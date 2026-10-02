@@ -331,6 +331,36 @@ class LiveLinkTests(unittest.TestCase):
             with self.subTest(url=url):
                 self.assertEqual(self.refusal(url), "that is not a substack post link.")
 
+    def test_one_post_with_a_slash_query_or_fragment_is_still_a_post_link(self):
+        for url in (
+            "https://writer.substack.com/p/a-post/",
+            "https://writer.substack.com/p/a-post?utm_source=x#top",
+            "https://my-writer.substack.com/p/a-post",
+        ):
+            with self.subTest(url=url):
+                self.assertIsNone(self.refusal(url))
+
+    def test_two_links_glued_together_are_not_a_post_link(self):
+        for url in (
+            "https://example.substack.com/p/ahttps://other.substack.com/p/b",
+            "https://example.substack.com/p/a https://other.substack.com/p/b",
+            "https://example.substack.com/p/a/https://other.substack.com/p/b",
+            "https://writer.substack.com/x/p/a-post",
+            "https://writer.substack.com/p/a/comments",
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.refusal(url), "that is not a substack post link.")
+
+    def test_a_host_that_is_not_dns_labels_is_not_a_post_link(self):
+        for url in (
+            "https://.substack.com/p/a",
+            "https://evil.com%2F.substack.com/p/a",
+            "https://a..substack.com/p/a",
+            "https://a_b.substack.com/p/a",
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.refusal(url), "that is not a substack post link.")
+
 
 class NoteMarkupTests(unittest.TestCase):
     def slot_html(self, monday, rows, today=TODAY, markup_ctx=None, **ctx):

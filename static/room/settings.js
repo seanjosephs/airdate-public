@@ -1,8 +1,7 @@
-// The settings view in the room (slice 5), plus the bootstrap that opens the
-// first-run wizard. One page, written through the existing /api/settings*
-// routes; nothing saves until "save settings" is pressed. The wizard writes
-// through the shared static/airdate-wizard.js module, unmodified markup-wise
-// beyond the ids it already expects.
+// The settings view in the room, plus the bootstrap that opens the first-run
+// wizard. One page, written through the /api/settings* routes; nothing saves
+// until "save settings" is pressed. The wizard itself is
+// static/airdate-wizard.js, driving the wizard markup in room.html.
 (function startRoomSettings() {
   const esc = window.AirdateCards ? window.AirdateCards.escapeHtml : (value) => String(value ?? '');
   const BOARD_COLORS = ['canary', 'blue', 'orange', 'pink', 'green'];
@@ -48,10 +47,6 @@
 
   function currentRoute() {
     return Cards.routeOfHash(window.location.hash);
-  }
-
-  function isSettingsRoute() {
-    return currentRoute() === 'settings';
   }
 
   function applyRoute() {
@@ -119,10 +114,15 @@
       label: row.querySelector('.set-totem-label').value.trim(),
       color: row.querySelector('.set-totem-color').value,
       // The writer's own art: a path in the vault. Blank falls back to the art
-      // airdate ships (slice 1), not to a placeholder. The old page had this
-      // field; without it the room could never change a totem's art.
+      // airdate ships, not to a placeholder.
       image: row.querySelector('.set-totem-image').value.trim(),
     }));
+  }
+
+  // When the vault was last indexed, in the writer's own time zone.
+  function indexedMoment(appStatus) {
+    const Dates = window.RoomDates;
+    return Dates ? Dates.formatMoment(appStatus.scanned_at) : '';
   }
 
   function fillUnderTheHood(appStatus) {
@@ -134,7 +134,8 @@
     $('set-uh-vault').textContent = expose ? (appStatus.obsidian_dir || '') : 'hidden';
     $('set-uh-data').textContent = expose ? (appStatus.data_dir || '') : 'hidden';
     $('set-uh-drafts').textContent = expose ? (appStatus.drafts_dir || '') : 'hidden';
-    const scanned = appStatus.scanned_at ? `, ${appStatus.scanned_at}` : '';
+    const indexedAt = indexedMoment(appStatus);
+    const scanned = indexedAt ? `, ${indexedAt}` : '';
     $('set-uh-index').textContent = `${appStatus.essay_count || 0} essays${scanned}`;
   }
 
@@ -181,7 +182,7 @@
     fillConnection(appStatus);
 
     const vaultStatus = [setup.vault_message, setup.essays_message].filter(Boolean).join(' ')
-      || (setup.vault_ok && setup.essays_ok ? `vault found. ${appStatus.essay_count || 0} essays, indexed ${appStatus.scanned_at || 'just now'}.` : '');
+      || (setup.vault_ok && setup.essays_ok ? `vault found. ${appStatus.essay_count || 0} essays, indexed ${indexedMoment(appStatus) || 'just now'}.` : '');
     els.vaultStatus.textContent = vaultStatus;
     els.vaultStatus.dataset.kind = setup.vault_ok && setup.essays_ok ? 'good' : 'bad';
 
@@ -254,8 +255,8 @@
     });
   }
 
-  // Never pair, never call connect from here while under test; this wires the
-  // real route for normal use, same as the old page's settings view.
+  // The connect button: asks the connector to open the substack sign-in
+  // window in obsidian. Tests never press it; it would pair for real.
   function bindConnect() {
     els.connectButton.addEventListener('click', async () => {
       setMessage('opening the secure substack sign-in window…', '');
@@ -388,9 +389,9 @@
     window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
   }
 
-  // The sticky is taller than the old page's callout, so it sits beside its
-  // anchor, never over it (the editor tour's own rule). Everything else is
-  // the home tour's default: its nine stops and its key in this browser.
+  // The sticky sits beside its anchor, never over it (the editor tour's own
+  // rule). Everything else is the home tour's default: its nine stops and its
+  // key in this browser.
   function tourOptions(Tour) {
     return { place: Tour.placeBeside };
   }
@@ -426,8 +427,8 @@
       return;
     }
     if (!(appStatus.setup && appStatus.setup.wizard) || !window.AirdateWizard) return;
-    // Settings is the background behind the wizard, same as the old page: a
-    // fresh install has no board or pool worth showing through the overlay.
+    // Settings is the background behind the wizard: a fresh install has no
+    // board or pool worth showing through the overlay.
     if (window.location.hash !== '#settings') window.location.hash = '#settings';
     window.AirdateWizard.open({
       status: appStatus,

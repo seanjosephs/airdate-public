@@ -1480,7 +1480,7 @@
         // The ChatGPT bridge (Product Bible #8): copy the prompt, open ChatGPT,
         // and the writer drags the image back onto the hero. Kept by Sean on
         // 2026-09-30 over the design's copy-only "for your image tool". It
-        // opens only after the copy worked, as the old page did.
+        // opens only after the copy worked.
         window.open('https://chatgpt.com', '_blank', 'noopener');
         Feedback.plaque(els.moreFeedback, { tone: 'green', text: 'the prompt is on your clipboard and chatgpt is open. make the image there, then drop it on the hero.' });
       } catch (error) {

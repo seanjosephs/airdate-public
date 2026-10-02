@@ -141,8 +141,9 @@
     return span.innerHTML;
   }
 
-  // The sign and the slot list's label name the configured weekday. "none"
-  // hides the board outright: nothing airs on a day that is not set.
+  // The sign, the slot list's label and the legend name the configured
+  // weekday. "none" hides the board outright: nothing airs on a day that is
+  // not set.
   function renderChrome() {
     const enabled = boardEnabled();
     if (els.board) {
@@ -156,6 +157,7 @@
       els.sign.setAttribute('aria-label', `air dates: ${plural}. one essay a week.`);
     }
     if (els.slots) els.slots.setAttribute('aria-label', plural);
+    if (els.legendMove) els.legendMove.textContent = `move between open ${plural}`;
   }
 
   function render() {
@@ -663,6 +665,7 @@
     els.range = $('board-range');
     els.say = $('board-legend-say');
     els.placingLabel = $('board-legend-placing');
+    els.legendMove = $('board-legend-move');
     els.pagers = Array.from(document.querySelectorAll('[data-page]'));
     if (!els.board || !els.slots) return;
     bindBoard();

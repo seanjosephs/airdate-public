@@ -1,8 +1,8 @@
 // The pool: every essay in the room as a script card, three flex columns.
 //
-// Loads the same /api/essays the old page uses (default scope, active), plus
-// the writer's config from /api/app/status for totems, tag presets and the
-// red pen. Owns search, the filters, the sort and the star round trip.
+// Loads /api/essays (default scope, active), plus the writer's config from
+// /api/app/status for totems, tag presets and the red pen. Owns search, the
+// filters, the sort and the star round trip.
 //
 // The board (board-view.js) changes essays too. Every changed row travels as
 // one "room:essay" event on document, { oldId, essay, source }, and both sides
@@ -278,6 +278,15 @@
         tone: 'green',
         text: `${String((fresh && fresh.title) || fallbackTitle).toLowerCase()} is back in the room as ${phaseWord(fresh && fresh.status)}.`,
       });
+      // The undo that brought it back is going with its slip (it may still be
+      // fading out, focus and all). The card that returned takes focus, unless
+      // the writer has already moved it somewhere else.
+      const now = document.activeElement;
+      if (fresh && (!now || now === document.body || !now.isConnected || now.closest('.slip'))) {
+        const card = cardElement(fresh.id);
+        const link = card ? card.querySelector('.card-link') : null;
+        if (link) link.focus();
+      }
     } catch (error) {
       Feedback.slip({ tone: 'red', text: `could not bring it back. ${error && error.message ? error.message : 'try again.'}` });
     }
@@ -296,6 +305,7 @@
       const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/archive`, {});
       state.busy.delete(id);
       const fresh = result && result.row;
+      const neighbourId = Keys.afterLeaving(Cards.closestToAirSort(state.essays.filter(matches)).map((row) => row.id), id);
       const at = state.essays.findIndex((row) => String(row.id) === id);
       if (at >= 0) state.essays.splice(at, 1);
       render(false);
@@ -308,11 +318,12 @@
       // so the old path-based id no longer resolves - undo would 404. That is
       // most real notes, which is how this was found at review.
       const parkedId = String((result && result.new_id) || (fresh && fresh.id) || id);
-      Feedback.slip({
+      const slip = Feedback.slip({
         tone: 'green',
         text: `${String(title).toLowerCase()} saved for a rainy day.`,
         undo: () => backToRoom(parkedId, title),
       });
+      Keys.focusAfterLeaving({ slip, neighbourId, card: cardElement, heading: $('pool-heading') });
     } catch (error) {
       state.busy.delete(id);
       if (card) card.removeAttribute('aria-busy');
@@ -368,8 +379,9 @@
     state.busy.add(id);
     card.setAttribute('aria-busy', 'true');
     try {
+      // No status: filing sorts the note into a topic and keeps its phase.
       const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/intake-apply`, {
-        category, totem: suggestion.totem || '', status: 'Writers Room',
+        category, totem: suggestion.totem || '',
       });
       state.busy.delete(id);
       delete state.intake[id];
