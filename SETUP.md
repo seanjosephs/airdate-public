@@ -217,6 +217,12 @@ Reloading the app itself does not reload the plugin.
   the card shows its art. A value airdate does not recognize shows in the
   picker as "not one of your totems" and is left alone until you pick.
 - **Images you attach** are written to `<essays folder>/_assets/substack/`.
+- **Long source notes.** A note with `source_role: source`, a file name that
+  starts with `RAW_`, or 10,000 words or more is a source, and airdate never
+  sends a source. Open it in the editor and press "make a linked draft" in the
+  readiness list: airdate makes a new note beside it, tied back to it by
+  `draft_of`, and starts it with the passage you have selected in the script
+  (empty if you selected nothing). The source note is not changed.
 - **Frontmatter.** airdate reads and writes these keys and keeps every other
   key you have exactly as it was: `title`, `subtitle`, `summary`, `status`,
   `totem`, `category`, `published_date`, `substack_url`, `substack_draft_id`,

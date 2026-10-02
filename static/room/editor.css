@@ -775,6 +775,12 @@ button.ed-ready-row[aria-busy="true"] { cursor: progress; opacity: 0.7; }
   white-space: nowrap;
 }
 .ed-ready-open { color: var(--orange-soft); font-weight: 700; }
+/* Under the source note's row: how to start the linked draft from a passage. */
+.ed-ready-hint {
+  margin: 6px 4px 0;
+  color: var(--muted);
+  font: 600 12px/1.35 var(--font-ui);
+}
 
 /* The same sentence under the field the row points at. */
 .ed-problem {
