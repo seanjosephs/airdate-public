@@ -265,6 +265,16 @@
     return 4;
   }
 
+  function byTitle(a, b) {
+    return String(a?.title || '').localeCompare(String(b?.title || ''));
+  }
+
+  // A date field as milliseconds, 0 when the essay has none.
+  function timeOf(value) {
+    const date = toDate(value);
+    return date ? date.getTime() : 0;
+  }
+
   // "closest to air": what is on the board by air date, then likey and
   // complete, then likey, then the room. Oldest paper first inside each.
   function closestToAirSort(essays) {
@@ -278,13 +288,12 @@
       }
       const age = arrivalTime(a) - arrivalTime(b);
       if (age) return age;
-      return String(a.title || '').localeCompare(String(b.title || ''));
+      return byTitle(a, b);
     });
   }
 
   function archivedTime(essay) {
-    const date = toDate(essay?.archived_at);
-    return date ? date.getTime() : 0;
+    return timeOf(essay?.archived_at);
   }
 
   // Rainy day's three sorts. Default is "longest in the rain": oldest parked
@@ -295,40 +304,34 @@
       return list.sort((a, b) => archivedTime(b) - archivedTime(a));
     }
     if (mode === 'title') {
-      return list.sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+      return list.sort(byTitle);
     }
     return list.sort((a, b) => archivedTime(a) - archivedTime(b));
   }
 
-  // The pool's sorts. "closest to air" is the default and is the sort above;
-  // the other three are flat lists by one thing.
+  // The pool's sorts, in the order the menu shows them. The first is the
+  // default and is closestToAirSort; the rest are flat lists by one thing. An
+  // essay with no date or word count has nothing to rank by, so it goes last,
+  // and ties fall back to the title so the order never shuffles between loads.
+  // Each `order` sorts the list it is given, a copy poolSort made.
   const POOL_SORTS = [
-    { key: 'closest-to-air', label: 'closest to air' },
-    { key: 'last-touched', label: 'last touched' },
-    { key: 'longest', label: 'longest' },
-    { key: 'title', label: 'title' },
+    { key: 'closest-to-air', label: 'closest to air', order: closestToAirSort },
+    {
+      key: 'last-touched',
+      label: 'last touched',
+      order: (list) => list.sort((a, b) => timeOf(b?.last_touched) - timeOf(a?.last_touched) || byTitle(a, b)),
+    },
+    {
+      key: 'longest',
+      label: 'longest',
+      order: (list) => list.sort((a, b) => (Number(b?.word_count) || 0) - (Number(a?.word_count) || 0) || byTitle(a, b)),
+    },
+    { key: 'title', label: 'title', order: (list) => list.sort(byTitle) },
   ];
 
-  function byTitle(a, b) {
-    return String(a?.title || '').localeCompare(String(b?.title || ''));
-  }
-
-  function touchedTime(essay) {
-    const date = toDate(essay?.last_touched);
-    return date ? date.getTime() : 0;
-  }
-
-  // An essay with no date or word count has nothing to rank by, so it goes
-  // last. Ties fall back to the title, so the order never shuffles between
-  // loads.
   function poolSort(essays, mode) {
-    const list = [...(Array.isArray(essays) ? essays : [])];
-    if (mode === 'last-touched') return list.sort((a, b) => touchedTime(b) - touchedTime(a) || byTitle(a, b));
-    if (mode === 'longest') {
-      return list.sort((a, b) => (Number(b?.word_count) || 0) - (Number(a?.word_count) || 0) || byTitle(a, b));
-    }
-    if (mode === 'title') return list.sort(byTitle);
-    return closestToAirSort(list);
+    const sort = POOL_SORTS.find((item) => item.key === mode) || POOL_SORTS[0];
+    return sort.order([...(Array.isArray(essays) ? essays : [])]);
   }
 
   function readinessOf(essay) {
@@ -341,8 +344,8 @@
   // folder is the filing pill's business, not this one's.
   function needsAttention(essay) {
     if (!essay || essay.source_role === 'source') return false;
-    const readiness = readinessOf(essay);
-    return readiness.status === 'metadata' || readiness.status === 'image' || readiness.ready_except_image === true;
+    const status = readinessOf(essay).status;
+    return status === 'metadata' || status === 'image';
   }
 
   function missingWords(list) {
@@ -403,7 +406,7 @@
   }
 
   // The topics the essays carry, named as the card line names them, sorted.
-  // The same rule the shelf's topic menu uses, which keeps its own copy.
+  // The pool's topic menu and the shelf's both list these.
   function distinctTopics(essays, presets) {
     const names = new Set();
     for (const essay of Array.isArray(essays) ? essays : []) {

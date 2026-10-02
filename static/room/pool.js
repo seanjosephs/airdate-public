@@ -189,21 +189,22 @@
     els.pool.innerHTML = `<div class="pool-message"${role ? ` role="${role}"` : ''}>${html}</div>`;
   }
 
-  // The line a screen reader hears when the pool changes. A new sort says so.
-  function resultsText(count, withSort) {
-    const words = count === 1 ? '1 essay' : `${count} essays`;
-    if (!withSort) return words;
+  function sortLabel() {
     const sort = Cards.POOL_SORTS.find((item) => item.key === state.sort);
-    return `${words}, sorted by ${sort ? sort.label : DEFAULT_SORT}`;
+    return sort ? sort.label : DEFAULT_SORT;
   }
 
-  // announce: true says how many essays; 'sort' adds how they are sorted.
-  function render(announce) {
+  // announce says how many essays to a screen reader; a note (a new sort says
+  // how the essays are sorted) goes on the end.
+  function render(announce, note) {
     renderHead();
     if (!state.loaded) return;
     const shown = shownEssays();
     els.count.textContent = String(shown.length);
-    if (announce) els.results.textContent = resultsText(shown.length, announce === 'sort');
+    if (announce) {
+      const words = shown.length === 1 ? '1 essay' : `${shown.length} essays`;
+      els.results.textContent = note ? `${words}, ${note}` : words;
+    }
     if (!state.essays.length) {
       renderMessage('<p>no essays yet. a note in your essays folder shows up here.</p>');
       return;
@@ -564,7 +565,7 @@
       els.sort.addEventListener('change', () => {
         state.sort = validSort(els.sort.value);
         els.sort.value = state.sort;
-        render('sort');
+        render(true, `sorted by ${sortLabel()}`);
       });
     }
     els.totemGroup.addEventListener('click', (event) => {

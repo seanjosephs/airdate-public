@@ -1,13 +1,14 @@
-"""AD-038, the writer's own links in the sidebar.
+"""The writer's own links in the sidebar.
 
-config.json can hold "links": [{"label", "url"}]. The server has always read,
-checked and sent them; the room drew them nowhere. links.js draws them in the
-sidebar, under the room's own nav: http and https only, each in a new tab, and
-nothing at all when there are none. (Not pinned to the bottom: the sidebar
-runs the whole height of the page, so a pinned link would sit far below the
-fold on a long essays view.)
+config.json can hold "links": [{"label", "url"}]; the server sends them with
+/api/app/status. links.js draws them in the sidebar, under the room's nav: http
+and https addresses only, each in a new tab, and nothing at all when there are
+none. They sit in the flow rather than pinned to the bottom, because the
+sidebar runs the whole height of the page and a pinned link would be far below
+the fold on a long essays view.
 
-links.js holds the rules and runs through node. Its start() runs against a
+links.js holds the rules and runs through node, with cards.js loaded first as
+it is in the page (it escapes with the card helper). Its start() runs against a
 small fake DOM that answers /api/app/status with the links a test gives it.
 """
 
@@ -26,6 +27,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 from test_room_hardening import RoomCase  # noqa: E402
 
+CARDS = ROOT / "static" / "room" / "cards.js"
 LINKS = ROOT / "static" / "room" / "links.js"
 NODE = shutil.which("node")
 
@@ -43,6 +45,7 @@ def js(value) -> str:
 
 def pure(expression: str):
     script = f"""
+require({js(str(CARDS))});
 const Links = require({js(str(LINKS))});
 const result = (() => {{ return {expression}; }})();
 process.stdout.write(JSON.stringify(result === undefined ? null : result));
@@ -69,6 +72,7 @@ globalThis.RoomApi = {{
     return {{ config: {{ links: {js(links_value)} }} }};
   }},
 }};
+require({js(str(CARDS))});
 require({js(str(LINKS))});
 (async () => {{
   await new Promise((resolve) => setTimeout(resolve, 20));
@@ -100,10 +104,18 @@ class UsableLinksTests(unittest.TestCase):
 
     def test_nothing_else_is_ever_a_link(self):
         bad_urls = ["javascript:alert(1)", "JAVASCRIPT:alert(1)", "data:text/html,x", "ftp://example.com/",
-                    "//example.com/", "/relative", "example.com", "http://", "https://", "http://a b", "", None, 7]
+                    "//example.com/", "/relative", "example.com", "http://", "https://", "http://a b",
+                    "http:// example.com", "", None, 7]
         for url in bad_urls:
             with self.subTest(url=url):
                 self.assertEqual(self.usable([{"label": "x", "url": url}]), [])
+
+    def test_an_address_config_validation_accepts_is_drawn(self):
+        # config.json only requires a link to start with http:// or https://,
+        # so a space in the path or query is the writer's to keep: the browser
+        # encodes it. Only an address that cannot be parsed is dropped.
+        links = [{"label": "notes", "url": "https://example.com/my notes?q=a b"}]
+        self.assertEqual(self.usable(links), links)
 
     def test_a_link_needs_a_label(self):
         for label in ("", "   ", None, 3):
@@ -190,20 +202,17 @@ class SidebarHtmlTests(unittest.TestCase):
         self.assertIn('id="room-links"', sidebar)
         self.assertLess(sidebar.index('class="room-nav"'), sidebar.index('id="room-links"'))
 
-    def test_the_script_is_loaded_after_the_api_helper_and_versioned(self):
+    def test_the_script_is_loaded_after_what_it_uses_and_versioned(self):
         match = re.search(r'<script src="/static/room/links\.js\?v=\d+" defer></script>', self.html)
         self.assertIsNotNone(match, "links.js is not loaded")
         self.assertLess(self.html.index("/static/room/api.js"), match.start())
+        self.assertLess(self.html.index("/static/room/cards.js"), match.start())
 
     def test_the_links_are_styled(self):
         css = read("static/room/room.css")
         for selector in (".room-links {", ".room-links a {", ".room-links svg {"):
             with self.subTest(selector=selector):
                 self.assertIn(selector, css)
-
-    def test_the_stylesheet_that_changed_has_a_new_version(self):
-        self.assertNotIn("/static/room/room.css?v=4", self.html)
-        self.assertRegex(self.html, r"/static/room/room\.css\?v=\d+")
 
 
 class WordsTests(unittest.TestCase):

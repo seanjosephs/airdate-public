@@ -98,13 +98,11 @@
     return terms.every((term) => hay.includes(term));
   }
 
+  // The pool's topic menu asks the same function, so the two list the same
+  // topics by construction.
   function distinctTopics(essays, presets) {
-    const names = new Set();
-    for (const essay of Array.isArray(essays) ? essays : []) {
-      const topic = topicOf(essay, presets);
-      if (topic && topic.name) names.add(topic.name);
-    }
-    return Array.from(names).sort();
+    const Cards = (typeof globalThis === 'object' && globalThis.AirdateCards) || (typeof window === 'object' && window.AirdateCards);
+    return Cards ? Cards.distinctTopics(essays, presets) : [];
   }
 
   function distinctYears(essays) {

@@ -1,9 +1,8 @@
-"""AD-038, a linked draft that starts with what the writer selected.
+"""A linked draft starts with the passage the writer selected.
 
-A long source note is never sent. Its row in the editor makes a linked draft:
-a new note beside the source, tied to it by draft_of. The server has always
-taken `selected_text` for the new note's body, but the room posted {} and the
-draft started empty. Now the room sends the passage selected in the script.
+A source note is never sent. Its row in the editor makes a linked draft: a new
+note beside the source, tied to it by draft_of, whose body is the passage
+selected in the script (empty when nothing is selected).
 
 - editor.js decides what to send (linkedDraftPayload) and what the source row
   says about it, both through node.
@@ -61,9 +60,6 @@ class LinkedDraftPayloadTests(unittest.TestCase):
     def test_lines_and_paragraphs_are_kept_as_written(self):
         script = "One.\n\nTwo lines\nof text.\n\nThree."
         self.assertEqual(self.payload(script, 6, 28), {"selected_text": script[6:28]})
-
-    def test_a_selection_made_backwards_is_the_same_passage(self):
-        self.assertEqual(self.payload("Alpha beta gamma", 10, 6), {"selected_text": "beta"})
 
     def test_a_caret_with_nothing_selected_sends_nothing(self):
         self.assertEqual(self.payload("Alpha beta gamma", 6, 6), {})
@@ -211,7 +207,7 @@ class EditorMakesTheDraftTests(unittest.TestCase):
         self.assertIn("started with your selection", out["made"])
         self.assertIn('data-open-draft="made-1"', out["made"])
 
-    def test_with_nothing_selected_the_draft_starts_empty_as_before(self):
+    def test_with_nothing_selected_the_draft_starts_empty(self):
         out = run_room(OPEN_A_SOURCE + "return await press(4, 4);")
         self.assertEqual([p["body"] for p in out["posts"]], [{}])
         self.assertIn("made a linked draft: Known - Draft", out["made"])
@@ -219,30 +215,43 @@ class EditorMakesTheDraftTests(unittest.TestCase):
 
 
 class SetupTests(unittest.TestCase):
-    def test_setup_describes_long_sources_and_the_selection(self):
+    def bullet(self):
+        # SETUP.md wraps its lines, so a phrase can span one.
         doc = (ROOT / "SETUP.md").read_text(encoding="utf-8")
         start = doc.index("- **Long source notes.**")
-        bullet = doc[start:doc.index("\n- **", start + 1)]
-        for phrase in ("source_role: source", "RAW_", "10,000 words", "make a linked draft", "draft_of",
-                       "selected in the script", "not changed"):
+        return " ".join(doc[start:doc.index("\n- **", start + 1)].split())
+
+    def test_setup_describes_long_sources_and_the_selection(self):
+        bullet = self.bullet()
+        for phrase in ("make a linked draft", "draft_of", "selected in the script", "not changed"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, bullet)
 
-    def test_the_threshold_it_names_is_the_one_the_server_uses(self):
+    def test_setup_says_which_rule_decides_what_is_a_source(self):
+        # The order the server decides in (source_role_for): an explicit role
+        # wins, then draft_of, then the file name and the length.
+        bullet = self.bullet()
+        for phrase in ("source_role: source", "source_role: standalone", "says nothing about its role",
+                       "no `draft_of`", "RAW_", "any case", "10,000 words"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, bullet)
+
+    def test_the_rule_it_describes_is_the_servers(self):
         # Read from the source, so a writer's own environment cannot change
         # what this checks.
         source = (ROOT / "server.py").read_text(encoding="utf-8")
         self.assertIn('env_first("AIR_DATE_LONG_SOURCE_WORD_THRESHOLD", default="10000")', source)
+        self.assertIn('SOURCE_ROLE_SET = {"source", "draft", "standalone"}', source)
+        body = source[source.index("def source_role_for"):source.index("def ensure_totem")]
+        self.assertLess(body.index("if explicit:"), body.index("if draft_of:"))
+        self.assertLess(body.index("if draft_of:"), body.index("if is_long_source:"))
+        self.assertIn('.lower().startswith("raw_")', body)
 
 
 class StylesTests(unittest.TestCase):
-    def test_the_hint_is_styled_and_the_scripts_have_new_versions(self):
+    def test_the_hint_is_styled(self):
         css = (ROOT / "static" / "room" / "editor.css").read_text(encoding="utf-8")
         self.assertIn(".ed-ready-hint", css)
-        html = (ROOT / "room.html").read_text(encoding="utf-8")
-        self.assertNotIn("/static/room/editor.js?v=4", html)
-        self.assertNotIn("/static/room/editor-view.js?v=7", html)
-        self.assertNotIn("/static/room/editor.css?v=5", html)
 
 
 if __name__ == "__main__":

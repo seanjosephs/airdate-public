@@ -12,20 +12,18 @@
   // An arrow leaving the page, so a link that opens another tab looks it.
   const EXTERNAL = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 17L17 7M9 7h8v8"/></svg>';
 
+  // Escapes with the card helper, loaded before this file.
   function escapeHtml(value) {
-    return String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    return globalThis.AirdateCards.escapeHtml(value);
   }
 
+  // config.json asks only that a link start with http:// or https://, so a
+  // space in the path is the writer's to keep: the browser encodes it. An
+  // address the browser could not parse is dropped.
   function isWebAddress(url) {
-    if (!/^https?:\/\/\S+$/i.test(url)) return false;
+    if (!/^https?:\/\//i.test(url)) return false;
     try {
-      const parsed = new URL(url);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      return Boolean(new URL(url));
     } catch (error) {
       return false;
     }

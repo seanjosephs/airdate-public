@@ -1,11 +1,13 @@
-"""AD-038, the pool's controls the room had not rebuilt.
+"""The pool's controls: needs attention, topic and sort.
 
 - needs attention: a pill that shows the essays missing details a draft needs,
-  or only their hero image. It stacks with the phase, totem and topic filters,
-  and while it is on each card says what is missing.
+  or only their hero image (long source notes are left out, and an essay that
+  needs a folder has the needs filing pill). It narrows whichever phase is
+  chosen, as the totem and topic filters do, and while it is on each card says
+  what is missing.
 - topic: a select beside sort, using the rule the card's topic line and the
-  shelf already use.
-- sort: closest to air (still the default), last touched, longest, title.
+  shelf use.
+- sort: closest to air (the default), last touched, longest, title.
 
 cards.js holds the rules and runs through node. pool.js runs in node against a
 small fake DOM, POOL_DOM below: element lookups by id return stand-ins that
@@ -22,7 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CARDS = ROOT / "static" / "room" / "cards.js"
-ROOM_HTML = ROOT / "room.html"
+SHELF = ROOT / "static" / "room" / "shelf.js"
 NODE = shutil.which("node")
 
 if NODE is None:  # pragma: no cover - depends on the machine
@@ -235,6 +237,24 @@ class DistinctTopicsTests(unittest.TestCase):
         card_topic = cards(f"Cards.topicFor({js(rows[0])}, {js(self.PRESETS)}).name")
         self.assertEqual(self.topics(rows), [card_topic])
 
+    def test_the_shelf_offers_the_same_topics_because_it_asks_the_same_function(self):
+        rows = [essay(id="a", tags=["film"]), essay(id="b", category="Philosophy & Meaning"),
+                essay(id="c", tags=["writing"]), essay(id="d")]
+        script = f"""
+const cards = require({js(str(CARDS))});
+globalThis.AirdateCards = cards;
+const shelf = require({js(str(SHELF))});
+let asked = 0;
+const original = cards.distinctTopics;
+cards.distinctTopics = (...args) => {{ asked += 1; return original(...args); }};
+const shelves = shelf.distinctTopics({js(rows)}, {js(self.PRESETS)});
+process.stdout.write(JSON.stringify({{ shelves, pool: original({js(rows)}, {js(self.PRESETS)}), asked }}));
+"""
+        completed = subprocess.run([NODE, "-e", script], cwd=ROOT, check=True, capture_output=True, text=True)
+        out = json.loads(completed.stdout)
+        self.assertEqual(out["shelves"], out["pool"])
+        self.assertEqual(out["asked"], 1, "the shelf keeps a rule of its own")
+
 
 # ---- room.html ------------------------------------------------------------------------
 
@@ -278,6 +298,26 @@ class RoomHtmlTests(unittest.TestCase):
             with self.subTest(selector=selector):
                 self.assertIn(selector, css)
 
+    def test_the_two_selects_share_one_style_named_for_what_it_is(self):
+        # A label and a select in the pool's toolbar: not "sort" twice.
+        wrappers = re.findall(r'<div class="([^"]*)"[^>]*>\s*<label for="pool-(?:topic|sort)">', self.html)
+        self.assertEqual(wrappers, ["pool-select", "pool-select"])
+        css = read("static/room/cards.css")
+        for selector in (".pool-select {", ".pool-select label {", ".pool-select select {"):
+            with self.subTest(selector=selector):
+                self.assertIn(selector, css)
+        self.assertNotIn(".pool-sort", css)
+        self.assertNotRegex(self.html, r'class="[^"]*\bpool-sort\b')
+
+    def test_the_star_and_the_two_needs_pills_share_their_amber(self):
+        css = read("static/room/cards.css")
+        shared = css[css.index(".pool-star,"):]
+        shared = shared[:shared.index("}")]
+        for selector in (".pool-star", ".pool-filing", ".pool-attention"):
+            with self.subTest(selector=selector):
+                self.assertIn(selector, shared)
+        self.assertEqual(css.count("padding: 0 12px 0 8px;"), 1, "the amber pills repeat their rule")
+
     def test_every_edited_script_still_has_a_version(self):
         for name in ("cards.js", "pool.js", "cards.css"):
             with self.subTest(name=name):
@@ -303,6 +343,17 @@ class WordsTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, block)
         self.assertNotIn("filters by phase and by totem", block)
+
+    def test_setup_says_which_filters_stack_and_which_are_one_choice(self):
+        # The phase pills, the star and needs filing share one slot (setPhase);
+        # needs attention, the totems, the topic and search narrow it.
+        doc = read("SETUP.md")
+        # SETUP.md wraps its lines, so a phrase can span one.
+        block = " ".join(doc[doc.index("The essays view filters"):doc.index("## Thumbnails")].split())
+        for phrase in ("one choice at a time", "narrow whichever phase", "leaves out long source notes"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, block)
+        self.assertNotIn("The filters stack", block)
 
 
 # ---- pool.js, against a fake DOM ------------------------------------------------------------

@@ -217,12 +217,15 @@ Reloading the app itself does not reload the plugin.
   the card shows its art. A value airdate does not recognize shows in the
   picker as "not one of your totems" and is left alone until you pick.
 - **Images you attach** are written to `<essays folder>/_assets/substack/`.
-- **Long source notes.** A note with `source_role: source`, a file name that
-  starts with `RAW_`, or 10,000 words or more is a source, and airdate never
-  sends a source. Open it in the editor and press "make a linked draft" in the
-  readiness list: airdate makes a new note beside it, tied back to it by
-  `draft_of`, and starts it with the passage you have selected in the script
-  (empty if you selected nothing). The source note is not changed.
+- **Long source notes.** A note is a source when its frontmatter says
+  `source_role: source`. A note that says nothing about its role and has no
+  `draft_of` is also a source when its file or folder name starts with `RAW_`
+  (in any case) or it runs 10,000 words or more; give such a note
+  `source_role: standalone` to send it as it is. airdate never sends a source.
+  Open one in the editor and press "make a linked draft" in the readiness list:
+  airdate makes a new note beside it, tied back to it by `draft_of`, and starts
+  it with the passage you have selected in the script (empty if you selected
+  nothing). The source note is not changed.
 - **Frontmatter.** airdate reads and writes these keys and keeps every other
   key you have exactly as it was: `title`, `subtitle`, `summary`, `status`,
   `totem`, `category`, `published_date`, `substack_url`, `substack_draft_id`,
@@ -269,13 +272,15 @@ writes their status: `Published` reads as live, and an old `Live` reads as
 live when it has a post link and as ready for air when it only has a draft.
 
 The essays view filters by phase, by totem and by topic, and the star pill
-shows only writers likey. Two more pills appear when they have something to
-show: a "needs attention" pill lists the essays missing details or a hero
-image, and writes what is missing on each card; a "needs filing" pill lists the
-essays that sit outside a topic folder. The filters stack, so writers likey
-plus needs attention is your starred essays that cannot go yet. The sort menu
-orders the essays by closest to air (the default), last touched, longest or
-title.
+shows only writers likey. The phase pills, the star and "needs filing" (the
+essays that sit outside a topic folder, shown when there are some) are one
+choice at a time. A "needs attention" pill, shown when there is something to
+show, lists the essays missing details or a hero image and writes what is
+missing on each card; it leaves out long source notes. Needs attention, the
+totems, the topic menu and search all narrow whichever phase is chosen, so
+writers likey plus needs attention is your starred essays that cannot go yet.
+The sort menu orders the essays by closest to air (the default), last touched,
+longest or title.
 
 ## Thumbnails
 

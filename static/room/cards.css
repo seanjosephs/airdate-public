@@ -158,7 +158,13 @@
   background: var(--dot, var(--muted));
 }
 
-.pool-star {
+/* The star pill and the two "needs" pills share one amber, a notch smaller
+   than the phase pills. Needs filing (essays with no category yet) is a phase
+   choice of its own; needs attention (missing details or a hero image) narrows
+   whichever phase is chosen, as the totems do. */
+.pool-star,
+.pool-filing,
+.pool-attention {
   padding: 0 12px 0 8px;
   border-width: 1px;
   color: var(--orange-soft);
@@ -167,34 +173,18 @@
 .pool-star svg { stroke-width: 3.6; }
 .pool-star[aria-pressed="true"] svg { fill: currentColor; }
 
-/* The needs-filing lane (slice 6): essays with no category yet. */
-.pool-filing {
-  padding: 0 12px 0 8px;
-  border-width: 1px;
-  color: var(--orange-soft);
-  font-size: 12px;
-}
-
-/* Needs attention: essays missing details or a hero image. The same amber as
-   needs filing; unlike it, this one stacks with the other filters. */
-.pool-attention {
-  padding: 0 12px 0 8px;
-  border-width: 1px;
-  color: var(--orange-soft);
-  font-size: 12px;
-}
-
-.pool-sort {
+/* A label and a select in the toolbar: topic, and sort. */
+.pool-select {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.pool-sort label {
+.pool-select label {
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
 }
-.pool-sort select {
+.pool-select select {
   height: 36px;
   padding: 0 10px;
   border-radius: var(--r-md);
