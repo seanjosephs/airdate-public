@@ -158,6 +158,23 @@ class WiringTests(unittest.TestCase):
         self.assertRegex(self.board_view, r"function weeksShown\(\) \{\s*return 2;")
         self.assertNotIn("set-weeks-shown", self.html)
 
+    def test_the_nav_is_four_icons_in_a_row_each_still_named(self):
+        nav = self.html[self.html.index('<nav class="room-nav"'):self.html.index("</nav>")]
+        for word in ("essays", "the shelf", "rainy day", "settings"):
+            self.assertIn(f'<span class="visually-hidden">{word}</span>', nav)
+            self.assertIn(f'title="{word}', nav)
+        self.assertRegex(self.room_css, r"\.room-nav \{ display: flex; justify-content: center;")
+
+    def test_the_three_slots_are_sized_to_fit_the_window(self):
+        self.assertRegex(self.room_css, r"\.room-sidebar \.slot-zone \{[^}]*height: clamp\(190px, calc\(\(100vh - ")
+        self.assertRegex(self.room_css, r"@media \(max-height: \d+px\) \{ \.room-sidebar \.board-cork \{ zoom: 0\.\d+; \} \}")
+
+    def test_the_live_button_pulses_red_once_the_air_date_has_come(self):
+        css = read("static/room/board.css")
+        self.assertRegex(css, r"\.slot\.kind-asking \.note-live-button,\s*\.slot\.kind-onair \.note-live-button \{[^}]*animation: live-due")
+        self.assertIn("@keyframes live-due", css)
+        self.assertNotIn("not marked live yet.'", read("static/room/board.js"))
+
     def test_the_essays_search_and_drop_downs_stay_at_the_top_of_the_essays(self):
         self.assertRegex(self.room_css, r"\.pool-head \{[^}]*position: sticky;[^}]*top: 0;")
 

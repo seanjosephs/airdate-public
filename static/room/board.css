@@ -424,6 +424,22 @@
   font: 700 12px/1 var(--font-ui);
   cursor: pointer;
 }
+/* Once the air date has come the live button's edge pulses red: the reminder
+   to paste the post link. With reduced motion the edge holds red. */
+.slot.kind-asking .note-live-button,
+.slot.kind-onair .note-live-button {
+  box-shadow: 0 0 0 2px #E0201B;
+  animation: live-due 1.6s ease-in-out infinite;
+}
+@keyframes live-due {
+  0%, 100% { box-shadow: 0 0 0 2px #E0201B, 0 0 0 0 rgba(224, 32, 27, 0.55); }
+  50% { box-shadow: 0 0 0 2px #E0201B, 0 0 0 7px rgba(224, 32, 27, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slot.kind-asking .note-live-button,
+  .slot.kind-onair .note-live-button { animation: none; }
+}
+
 /* Dark red on the orange and pink pads is 4.15 and 4.13:1, under AA; on a
    white strip it is 9.74:1. */
 .board-note-error {

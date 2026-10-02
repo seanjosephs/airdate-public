@@ -168,7 +168,9 @@
     } else {
       days = Dates.daysBetween(ctx.today, entry.air);
       if (days === 0) { kind = 'onair'; plaque = 'ON AIR'; }
-      else if (days < 0) { kind = 'asking'; plaque = 'aired. not marked live yet.'; }
+      // Aired and not marked live: no plaque. The note's live button pulses
+      // red as the reminder.
+      else if (days < 0) { kind = 'asking'; plaque = ''; }
       else { kind = 'scheduled'; plaque = countdown(days); }
     }
     const placing = ctx.placing || null;
@@ -405,7 +407,7 @@
     }
     const plaque = slot.kind === 'onair' && !context.placing
       ? '<span class="slot-onair" role="status">ON AIR</span>'
-      : `<span class="slot-plaque">${esc(slot.plaque)}</span>`;
+      : (slot.plaque ? `<span class="slot-plaque">${esc(slot.plaque)}</span>` : '');
     return `<li class="${classes.join(' ')}" data-monday="${monday}">`
       + `<span class="slot-date">${esc(slot.label)}</span>`
       + `<div class="slot-zone" tabindex="-1" role="group" data-monday="${monday}" aria-label="${esc(zoneLabel(slot))}">${zone}</div>`

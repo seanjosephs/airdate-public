@@ -219,7 +219,7 @@ class SlotTests(unittest.TestCase):
     def test_the_day_after_it_asks(self):
         slot = self.slot("2026-09-28", [essay(scheduled_at="2026-09-29")])
         self.assertEqual(slot["kind"], "asking")
-        self.assertEqual(slot["plaque"], "aired. not marked live yet.")
+        self.assertEqual(slot["plaque"], "")
 
     def test_live_is_on_the_shelf_dimmed_and_takes_no_drop(self):
         slot = self.slot("2026-09-14", [essay(status="Live", scheduled_at="2026-09-14")])
@@ -395,7 +395,10 @@ class NoteMarkupTests(unittest.TestCase):
         self.assertIn('data-action="live"', html)
         self.assertIn("aired tue sep 29", html)
         self.assertNotIn('data-action="unschedule"', html)
-        self.assertIn("aired. not marked live yet.", html)
+        # No plaque under the note: the live button pulses instead. The zone
+        # still says it to a screen reader.
+        self.assertNotIn("slot-plaque", html)
+        self.assertIn("aired, not marked live yet", html)
 
     def test_the_field_is_open_from_air_day_itself_under_the_on_air_sign(self):
         html = self.slot_html("2026-09-28", [essay(id="x2", scheduled_at="2026-09-30")])
