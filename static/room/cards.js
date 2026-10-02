@@ -184,10 +184,10 @@
     return parts ? `${MONTHS[parts.month - 1]} ${parts.day} ${parts.year}` : '';
   }
 
-  // "10/5/26": the brief form the card's air chip uses.
+  // "10.5.26": the brief form the card's air chip uses.
   function formatAirShort(value) {
     const parts = calendarParts(value);
-    return parts ? `${parts.month}/${parts.day}/${String(parts.year).slice(-2)}` : '';
+    return parts ? `${parts.month}.${parts.day}.${String(parts.year).slice(-2)}` : '';
   }
 
   function formatAirDay(value) {
@@ -633,7 +633,7 @@
     let meta = `<span class="card-meta-start">${topicMarkup}</span>`;
     if (phase === 'ready' && essay?.scheduled_at) {
       const short = formatAirShort(essay.scheduled_at);
-      meta += `<span class="card-air" title="airs ${escapeHtml(formatAirDay(essay.scheduled_at))}">${AIR_ICON}airs ${escapeHtml(short)}</span>`;
+      meta += `<span class="card-air" title="airs ${escapeHtml(formatAirDay(essay.scheduled_at))}">${AIR_ICON}airdate ${escapeHtml(short)}</span>`;
     } else if (phase === 'live' && isPostLink(essay?.substack_url)) {
       meta += `<a class="card-live" href="${escapeHtml(essay.substack_url)}" rel="noopener">${LIVE_ICON}live</a>`;
     }

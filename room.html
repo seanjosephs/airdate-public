@@ -6,7 +6,7 @@
   <title>airdate</title>
   <link rel="icon" href="/static/brand/airdate-icon-256.png?v=1" type="image/png">
   <link rel="stylesheet" href="/static/room/tokens.css?v=4">
-  <link rel="stylesheet" href="/static/room/room.css?v=13">
+  <link rel="stylesheet" href="/static/room/room.css?v=14">
   <link rel="stylesheet" href="/static/room/cards.css?v=10">
   <link rel="stylesheet" href="/static/room/board.css?v=5">
   <link rel="stylesheet" href="/static/room/editor.css?v=7">
@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/static/room/shelf.css?v=3">
   <link rel="stylesheet" href="/static/room/rainy-day.css?v=2">
   <script src="/static/room/api.js?v=1" defer></script>
-  <script src="/static/room/cards.js?v=11" defer></script>
+  <script src="/static/room/cards.js?v=12" defer></script>
   <script src="/static/room/keys.js?v=2" defer></script>
   <script src="/static/room/flight.js?v=2" defer></script>
   <script src="/static/room/feedback.js?v=2" defer></script>
@@ -52,8 +52,12 @@
       </a>
       <a href="/airdate#shelf" id="nav-shelf" title="the shelf">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M3 7h18"/><path d="M3 13h18"/><path d="M3 19h18"/>
-          <path d="M7 4v3"/><path d="M13 10v3"/><path d="M9 16v3"/>
+          <!-- a shelf with books on it: four spines, one leaning -->
+          <path d="M3 20h18"/>
+          <rect x="4" y="8" width="3.2" height="12"/>
+          <rect x="8.2" y="5" width="3.2" height="15"/>
+          <rect x="12.4" y="9" width="3.2" height="11"/>
+          <path d="M16.2 8.2l3.4-1 2.9 11.8-3.4 1z"/>
         </svg>
         <span class="visually-hidden">the shelf</span>
       </a>

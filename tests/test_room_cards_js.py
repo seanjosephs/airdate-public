@@ -389,7 +389,7 @@ class CardMarkupTests(unittest.TestCase):
     def test_the_air_chip_is_brief_and_sits_between_the_topic_and_the_bars(self):
         html = self.markup(status="Ready for Air", scheduled_at="2026-10-05")
         meta = html.split('<div class="card-meta">')[1].split("</div>")[0]
-        self.assertIn("airs 10/5/26", meta)
+        self.assertIn("airdate 10.5.26", meta)
         self.assertLess(meta.index("card-meta-start"), meta.index("card-air"))
         self.assertLess(meta.index("card-air"), meta.index("card-length"))
 
