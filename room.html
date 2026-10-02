@@ -6,7 +6,7 @@
   <title>airdate</title>
   <link rel="icon" href="/static/brand/airdate-icon-256.png?v=1" type="image/png">
   <link rel="stylesheet" href="/static/room/tokens.css?v=2">
-  <link rel="stylesheet" href="/static/room/room.css?v=4">
+  <link rel="stylesheet" href="/static/room/room.css?v=5">
   <link rel="stylesheet" href="/static/room/cards.css?v=4">
   <link rel="stylesheet" href="/static/room/board.css?v=1">
   <link rel="stylesheet" href="/static/room/editor.css?v=5">
@@ -31,6 +31,7 @@
   <script src="/static/room/shelf.js?v=5" defer></script>
   <script src="/static/room/shelf-view.js?v=1" defer></script>
   <script src="/static/room/rainy-day.js?v=3" defer></script>
+  <script src="/static/room/links.js?v=1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#room-main">skip to the essays</a>
@@ -70,6 +71,9 @@
         settings
       </a>
     </nav>
+
+    <!-- The writer's own links from config.json. links.js fills and shows it. -->
+    <nav class="room-links" id="room-links" aria-label="your links" hidden></nav>
   </aside>
 
   <main class="room-main" id="room-main" tabindex="-1">

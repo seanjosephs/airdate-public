@@ -410,8 +410,9 @@ says so there.
   none, for example `{"debate": 3}`. `totems.default`: the totem for essays
   that match nothing.
 - `categories.items`: category folders with keywords for filing suggestions.
-- `links`: a list of `{"label", "url"}` pairs. airdate still reads and
-  checks it, but the room does not draw these links anywhere yet.
+- `links`: a list of `{"label", "url"}` pairs, drawn in the sidebar under
+  essays, the shelf, rainy day and settings. Only http and https addresses are
+  shown, and each opens in a new tab.
 - `connector.port`: the port airdate expects before pairing. After
   pairing, airdate uses the port you chose in **Pair with airdate**.
 
