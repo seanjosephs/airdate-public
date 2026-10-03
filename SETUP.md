@@ -136,8 +136,10 @@ one exception noted in step 2.
    comments, SEO and social, thumbnail and internal notes). Change it later
    behind the gear in the editor.
 8. **Your board**: your publish day, with Monday preselected. One weekday
-   gives you a board with one slot per week on that day. "none" hides the
-   board, and with it the way to give an essay an air date.
+   gives you a board with one slot per week on that day: last week, this
+   week and next week sit in the sidebar, and the arrows page through the
+   rest. "none" hides the board, and with it the way to give an essay an air
+   date.
 9. **Connect Substack**: the three Obsidian steps from the next section, the
    folder the connector is copied to, and a live check of each step. "I'll do
    this later" is fine; sending stays blocked until it is done.
@@ -255,32 +257,37 @@ Four phases:
 - **writers room**: every essay starts here, just by being in the vault.
 - **writers likey**: you starred it, with the post-it on its card. Press the
   star again to send it back to the writers room.
-- **ready for air**: it has an air date. Drag a writers likey script onto a
-  week on the board, or use the keys listed under the board. A writers room
-  essay cannot go up; star it first. To move it, unschedule it on the board
-  and put it up again.
+- **ready for air**: it has an air date. Drag a writers likey script by its
+  grabber (the six dots on its card) onto a week on the board, or press the
+  grabber, or A, and place it with the keys ("keyboard keys", at the foot of
+  the sidebar, lists them). A writers room essay cannot go up; star it first.
+  To move it, unschedule it on the board and put it up again.
 - **live**: it is out. From its air date on, its note on the board asks
-  whether it is live; paste the Substack post link there and it moves to the
-  shelf. airdate checks the link's shape, never fetches it.
+  whether it is live, and its live button pulses red until you answer; paste
+  the Substack post link there and it moves to the shelf. airdate checks the
+  link's shape, never fetches it.
 
 Sending a draft to Substack does not change the phase. Rainy day sits outside
-the flow: a writers room or writers likey essay parked there waits, as it
-was, until you bring it back to the room.
+the flow: drag a writers room or writers likey script onto rainy day in the
+sidebar, or use the umbrella in the editor's header, and it waits there, as
+it was, until you bring it back to the room.
 
 Notes written before these four phases keep their words until airdate next
 writes their status: `Published` reads as live, and an old `Live` reads as
 live when it has a post link and as ready for air when it only has a draft.
 
-The essays view filters by phase, by totem and by topic, and the star pill
-shows only writers likey. The phase pills, the star and "needs filing" (the
-essays that sit outside a topic folder, shown when there are some) are one
-choice at a time. A "needs attention" pill, shown when there is something to
-show, lists the essays missing details or a hero image and writes what is
-missing on each card; it leaves out long source notes. Needs attention, the
-totems, the topic menu and search all narrow whichever phase is chosen, so
-writers likey plus needs attention is your starred essays that cannot go yet.
-The sort menu orders the essays by closest to air (the default), last touched,
-longest or title.
+The essays view filters with the drop-downs beside its title: "show" picks a
+phase, only writers likey, or "needs filing" (the essays that sit outside a
+topic folder, offered when there are some), one choice at a time; "totem"
+narrows it by totem and "topic" by topic. A "needs attention" pill, shown when there is
+something to show, lists the essays missing details or a hero image and
+writes what is missing on each card; it leaves out long source notes. Needs
+attention, the totems, the topic menu and search all narrow whichever phase
+is chosen, so writers likey plus needs attention is your starred essays that
+cannot go yet. The sort menu orders the essays by closest to air (the
+default), last touched, longest or title. A card's bars show its length:
+one under 500 words, two to 1,199, three to 2,499, four to 4,999, five from
+5,000; hover them for the exact count.
 
 ## Thumbnails
 
@@ -421,9 +428,10 @@ says so there.
   none, for example `{"debate": 3}`. `totems.default`: the totem for essays
   that match nothing.
 - `categories.items`: category folders with keywords for filing suggestions.
-- `links`: a list of `{"label", "url"}` pairs, drawn in the sidebar under
-  essays, the shelf, rainy day and settings. Only http and https addresses are
-  shown, and each opens in a new tab.
+- `links`: a list of `{"label", "url"}` pairs, drawn at the foot of the
+  sidebar, beside "keyboard keys". Only http and https addresses are shown,
+  and each opens in a new tab. Keep it to a link or two: the sidebar is sized
+  so the board fits the window without scrolling.
 - `connector.port`: the port airdate expects before pairing. After
   pairing, airdate uses the port you chose in **Pair with airdate**.
 

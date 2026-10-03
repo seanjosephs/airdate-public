@@ -43,9 +43,11 @@
   flex-wrap: wrap;
 }
 .pool-title-row { gap: 12px; }
-/* One row: the title, the drop-downs, then the search at the right. It wraps
-   only when the window is too narrow for them. */
-.pool-title-row .pool-filters { flex: 0 1 auto; }
+/* One row: the title, the drop-downs, then the search at the right. On a
+   narrower window the drop-downs wrap among themselves and the search
+   narrows, so the search stays at the top right. */
+.pool-title-row { flex-wrap: nowrap; }
+.pool-title-row .pool-filters { flex: 0 1 auto; min-width: 0; }
 
 .pool-title-row h1 {
   margin: 0;
@@ -70,6 +72,7 @@
   position: relative;
   flex: 0 1 240px;
   width: 240px;
+  min-width: 150px;
   max-width: 100%;
 }
 .pool-search svg {

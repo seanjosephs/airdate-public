@@ -5,9 +5,9 @@
 A local essay manager for writers who keep their essays in **Obsidian** and
 publish on **Substack**.
 
-![The writers room: a cork board of weekly air dates across the top, with a
-sticky note on one Monday, and essay cards below it, each stamped with its
-phase](docs/room.png)
+![The writers room: the sidebar holds the airdate sign, four nav icons and a
+cork board of last week, this week and next week, with sticky notes on the
+Mondays; essay cards fill the rest, each stamped with its phase](docs/room.png)
 
 *The writers room, running against a demo vault.*
 
