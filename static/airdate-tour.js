@@ -2,7 +2,7 @@
 // time. A stop whose element is not on screen is skipped.
 //
 // Two tours run on this module. The home tour is start() with no options:
-// its nine STOPS, seen/dismissed in this browser's localStorage, nothing sent
+// its ten STOPS, seen/dismissed in this browser's localStorage, nothing sent
 // to the server (tests/test_airdate_tour.py pins it). The essay editor's tour
 // passes options (EDITOR_STOPS, no browser key, a wider ring, a sticky beside
 // its anchor, arrow keys, focus back on the anchor) and records itself on the
@@ -22,7 +22,7 @@
   // Swallowed outside the callout while a tour runs. Wheel and scroll are
   // deliberately absent: the page may still scroll and the ring follows it.
   const BLOCKED_POINTER_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'dragstart'];
-  // The room's nine home stops. The keys and their order are pinned
+  // The room's ten home stops. The keys and their order are pinned
   // (tests/test_airdate_tour.py); the anchors are the room's. A stop whose
   // element is not showing is skipped: no publish day hides the board, and
   // nothing to file hides the filing pill.
@@ -33,16 +33,18 @@
       text: 'each essay is a card. the paper ages with it, the bars show how long it runs, and the stamp says where it stands.' },
     { key: 'lifecycle', anchor: '#pool .card .stamp', title: 'the stamp',
       text: 'four phases: writers room, writers likey, ready for air, live. star a script to make it writers likey, and put it on the board to make it ready for air. it goes live when you paste the post link on its note.' },
-    { key: 'calendar', anchor: '#board', title: 'the board',
-      text: 'one slot a week, on your publish day. drag a writers likey script onto a week, or use the keys listed under the board. a writers room script cannot go up until it has its star.' },
-    { key: 'filing', anchor: '#pool-filing', title: 'needs filing',
-      text: 'scripts sitting outside a topic folder are counted here. "file it" on the card suggests a folder and moves the note once you confirm.' },
+    { key: 'calendar', anchor: '#board .board-head', title: 'the board',
+      text: 'last week, this week and next week sit in the sidebar, one slot each, on your publish day. drag a writers likey script onto a week, or use the keys listed under the board. a writers room script cannot go up until it has its star.' },
+    { key: 'filing', anchor: '#pool-drop-show', title: 'needs filing',
+      text: 'scripts sitting outside a topic folder are counted under show, as needs filing. "file it" on the card suggests a folder and moves the note once you confirm.' },
     { key: 'filters', anchor: '.pool-filters', title: 'filters',
-      text: 'narrow the desk by phase, totem or topic, and sort it on the right. the star pill shows only your writers likey. when a script is missing details or a hero image, a needs attention pill shows just those.' },
+      text: 'narrow the desk with the drop-downs: show (phase, or only your writers likey), totem and topic, then sort it. when a script is missing details or a hero image, a needs attention pill shows just those.' },
     { key: 'editor', anchor: '#pool .card .card-link', title: 'the editor',
       text: 'click a title to open the essay: the script, everything substack needs, and send. send makes a draft in substack; airdate never publishes.' },
     { key: 'shelf', anchor: '#nav-shelf', title: 'the shelf',
       text: 'live essays go here, each with the link to its post. the essays are what you are working on; the shelf is what is already out.' },
+    { key: 'rainy', anchor: '#nav-rainy-day', title: 'rainy day',
+      text: 'not now, not never. drag a card here by its grabber to park it; it comes back to the room whenever you want it.' },
     { key: 'settings', anchor: '#nav-settings', title: 'settings',
       text: 'everything from setup can be changed here. you can replay this tour from settings too.' },
   ];

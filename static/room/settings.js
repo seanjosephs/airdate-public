@@ -167,7 +167,6 @@
     const padInput = els.view.querySelector(`input[name="set-board-pad"][value="${CSS.escape(pad)}"]`);
     if (padInput) padInput.checked = true;
     renderBoardColors(values.board_default_color || 'canary');
-    els.weeksShown.value = values.board_weeks_shown || 3;
 
     els.redPenEnabled.checked = values.red_pen_enabled !== false;
     els.redPenLines.value = values.red_pen_lines || '';
@@ -205,7 +204,6 @@
       tag_presets: window.AirdatePresets ? window.AirdatePresets.read(els.tagPresets) : undefined,
       board_default_pad: padInput ? padInput.value : 'sticky',
       board_default_color: selectedBoardColor(),
-      board_weeks_shown: Number(els.weeksShown.value) || 3,
       red_pen_enabled: els.redPenEnabled.checked,
       red_pen_lines: els.redPenLines.value,
       paper_fresh_on_promotion: els.paperFresh.checked,
@@ -301,7 +299,6 @@
     els.categoryMode = $('set-category-mode');
     els.boardColors = $('set-board-colors');
     els.publishDay = $('set-publish-day');
-    els.weeksShown = $('set-weeks-shown');
     els.redPenEnabled = $('set-red-pen-enabled');
     els.redPenLines = $('set-red-pen-lines');
     els.paperFresh = $('set-paper-fresh');

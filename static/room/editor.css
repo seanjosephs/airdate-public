@@ -65,9 +65,9 @@ body.editor-open { overflow: hidden; }
 
 /* Save for a rainy day (slice 6): writers room and writers likey only, and a
    parked essay opened from rainy day, where it reads "back to the room". */
-.ed-umbrella { padding: 0 10px; width: 40px; color: var(--muted); }
-.ed-umbrella:hover { color: var(--orange-soft); }
-.ed-umbrella[data-parked="true"] { border-color: var(--orange-soft); color: var(--orange-soft); background: rgba(255, 178, 77, 0.12); }
+.ed-umbrella { padding: 0 10px; width: 40px; color: var(--umbrella); }
+.ed-umbrella:hover { border-color: var(--umbrella); }
+.ed-umbrella[data-parked="true"] { border-color: var(--umbrella); color: var(--umbrella); background: rgba(217, 80, 10, 0.14); }
 
 /* The status, the obsidian link, the gear and save, in one box the tour can
    ring. It lays its children out exactly as the header did. */

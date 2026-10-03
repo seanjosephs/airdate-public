@@ -129,7 +129,7 @@ class CardShowsWhyTests(unittest.TestCase):
         html = self.markup({"publish_readiness": NO_TAGS})
         self.assertIn('<p class="card-attention">missing: tags, hero image</p>', html)
         self.assertGreater(html.index("card-attention"), html.index("</h3>"))
-        self.assertLess(html.index("card-attention"), html.index('class="card-actions"'))
+        self.assertLess(html.index("card-attention"), html.index('class="card-feedback"'))
 
     def test_no_line_when_the_filter_is_off(self):
         self.assertNotIn("card-attention", self.markup({"publish_readiness": NO_TAGS}, attention=False))
@@ -368,6 +368,7 @@ function makeEl(id) {
   const el = {
     id, hidden: false, textContent: '', innerHTML: '', value: '', className: '', dataset: {}, style: {},
     clientWidth: 400, isConnected: true, disabled: false,
+    classList: { add() {}, remove() {}, toggle() {} },
     setAttribute(k, v) { attrs[k] = String(v); }, getAttribute(k) { return k in attrs ? attrs[k] : null; },
     removeAttribute(k) { delete attrs[k]; },
     addEventListener(type, fn) { listeners.push({ type, fn }); },
@@ -625,8 +626,9 @@ return byId('pool-results').textContent;
         out = run_pool(self.THREE + """
 by('title');
 globalThis.__post = () => ({ row: { id: 'x', title: 'Banana', status: 'Archived' }, new_id: 'x' });
-byId('pool').fire('click', { target: { closest: (sel) => (sel === '[data-action="park"]'
+byId('pool').fire('dragstart', { target: { closest: (sel) => (sel === '.card-handle'
   ? { closest: () => ({ dataset: { essayId: 'x' } }) } : null) } });
+byId('nav-rainy-day').fire('drop');
 await settle();
 return record.afterLeaving[0];
 """)

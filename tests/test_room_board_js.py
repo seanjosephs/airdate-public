@@ -219,7 +219,7 @@ class SlotTests(unittest.TestCase):
     def test_the_day_after_it_asks(self):
         slot = self.slot("2026-09-28", [essay(scheduled_at="2026-09-29")])
         self.assertEqual(slot["kind"], "asking")
-        self.assertEqual(slot["plaque"], "aired. not marked live yet.")
+        self.assertEqual(slot["plaque"], "")
 
     def test_live_is_on_the_shelf_dimmed_and_takes_no_drop(self):
         slot = self.slot("2026-09-14", [essay(status="Live", scheduled_at="2026-09-14")])
@@ -395,7 +395,10 @@ class NoteMarkupTests(unittest.TestCase):
         self.assertIn('data-action="live"', html)
         self.assertIn("aired tue sep 29", html)
         self.assertNotIn('data-action="unschedule"', html)
-        self.assertIn("aired. not marked live yet.", html)
+        # No plaque under the note: the live button pulses instead. The zone
+        # still says it to a screen reader.
+        self.assertNotIn("slot-plaque", html)
+        self.assertIn("aired, not marked live yet", html)
 
     def test_the_field_is_open_from_air_day_itself_under_the_on_air_sign(self):
         html = self.slot_html("2026-09-28", [essay(id="x2", scheduled_at="2026-09-30")])
@@ -464,18 +467,20 @@ class CardHandleTests(unittest.TestCase):
 
     def test_a_likey_card_has_the_handle(self):
         html = self.markup()
-        self.assertIn('class="card-handle" data-action="place" draggable="true" aria-pressed="false" aria-label="place on the board"', html)
+        self.assertIn('class="card-handle" data-action="place" draggable="true" aria-label="place on the board"', html)
 
-    def test_room_and_scheduled_cards_have_none(self):
-        self.assertNotIn("card-handle", self.markup(status="Writers Room"))
+    def test_a_room_card_has_one_for_rainy_day_and_a_scheduled_card_none(self):
+        self.assertIn("move to rainy day", self.markup(status="Writers Room"))
         self.assertNotIn("card-handle", self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
 
-    def test_placing_presses_the_handle_and_leaves_a_dashed_spot(self):
+    def test_the_card_has_no_placing_state(self):
+        """A lifted card leaves the pool (flight.js hides it); it is never drawn
+        half-there with a dashed spot, so the markup has nothing for it."""
         html = self.markup({"now": "2026-09-30T12:00:00-07:00", "placing": True})
-        self.assertIn('aria-pressed="true" aria-label="place on the board"', html)
-        self.assertIn("card-postit-spot", html)
-        self.assertNotIn("card-postit note", html)
-        self.assertIn("is-placing", html)
+        self.assertNotIn("card-postit-spot", html)
+        self.assertNotIn("is-placing", html)
+        self.assertNotIn("aria-pressed", html.split('class="card-handle"')[1].split(">")[0])
+        self.assertIn("card-postit note", html)
 
     def test_each_card_has_a_place_for_its_plaque(self):
         self.assertIn('<div class="card-feedback"></div>', self.markup())

@@ -112,12 +112,15 @@
     0 14px 30px rgba(0, 0, 0, 0.55);
 }
 
+/* The board is in the sidebar: last week, this week and next week, top to
+   bottom. */
 .board-slots {
   margin: 0;
   padding: 10px 6px 6px;
   list-style: none;
   display: flex;
-  gap: 20px;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .board-message {
@@ -133,8 +136,8 @@
 
 .slot {
   position: relative;
-  flex: 1 1 0;
-  min-width: 236px;
+  flex: none;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -416,11 +419,29 @@
   padding: 0 10px;
   border: 0;
   border-radius: var(--r-sm);
-  background: var(--ink);
-  color: var(--pad);
+  /* The date labels' off-white, with red lettering (#B3140F on cream is
+     5.6:1). */
+  background: var(--cream);
+  color: #B3140F;
   font: 700 12px/1 var(--font-ui);
   cursor: pointer;
 }
+/* Once the air date has come the live button's edge pulses red: the reminder
+   to paste the post link. With reduced motion the edge holds red. */
+.slot.kind-asking .note-live-button,
+.slot.kind-onair .note-live-button {
+  box-shadow: 0 0 0 2px #E0201B;
+  animation: live-due 1.6s ease-in-out infinite;
+}
+@keyframes live-due {
+  0%, 100% { box-shadow: 0 0 0 2px #E0201B, 0 0 0 0 rgba(224, 32, 27, 0.55); }
+  50% { box-shadow: 0 0 0 2px #E0201B, 0 0 0 7px rgba(224, 32, 27, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slot.kind-asking .note-live-button,
+  .slot.kind-onair .note-live-button { animation: none; }
+}
+
 /* Dark red on the orange and pink pads is 4.15 and 4.13:1, under AA; on a
    white strip it is 9.74:1. */
 .board-note-error {
@@ -547,8 +568,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px 18px;
-  padding: 10px 16px;
+  gap: 6px 18px;
+  padding: 6px 16px;
   border: 1px solid var(--b2);
   border-radius: var(--r-md);
   background: var(--s1);

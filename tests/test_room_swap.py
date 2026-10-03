@@ -8,7 +8,7 @@ What this pins:
 - every room link spells /airdate, and the two places that read the path
   back still work: a plain click on a card opens the editor in place (not a
   full page load), and the sidebar's aria-current follows the hash;
-- the home tour on the room: nine stops anchored in room.html, styled by the
+- the home tour on the room: ten stops anchored in room.html, styled by the
   room, started once after first-run setup and replayable from settings;
 - the send fields the editor now draws (social title, description and image,
   thumbnail alt text, free unlock date) and their save round trip.
@@ -389,18 +389,19 @@ return navLinks.filter((l) => l.getAttribute('aria-current') === 'page').map((l)
 
 
 class HomeTourAnchorTests(unittest.TestCase):
-    """The nine keys stay pinned in test_airdate_tour.py; these are the room's
+    """The ten keys stay pinned in test_airdate_tour.py; these are the room's
     anchors for them."""
 
     EXPECTED = {
         "essays": ".pool-title-row, #pool-heading",
         "card": "#pool .card",
         "lifecycle": "#pool .card .stamp",
-        "calendar": "#board",
-        "filing": "#pool-filing",
+        "calendar": "#board .board-head",
+        "filing": "#pool-drop-show",
         "filters": ".pool-filters",
         "editor": "#pool .card .card-link",
         "shelf": "#nav-shelf",
+        "rainy": "#nav-rainy-day",
         "settings": "#nav-settings",
     }
 
@@ -489,7 +490,7 @@ return {{ tour: record.tour, flag: sessionStorage.getItem('airdate.tour.after-se
         self.assertEqual(out["tour"], ["start"])
         self.assertIsNone(out["flag"], "the flag must be one-shot")
         # The home tour, sitting beside its anchors: no other option, so its
-        # nine stops and its key in this browser are the defaults.
+        # ten stops and its key in this browser are the defaults.
         self.assertEqual(out["options"], {"keys": ["place"], "beside": True})
 
     def test_a_tour_already_seen_is_not_started_again(self):

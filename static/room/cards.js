@@ -52,13 +52,11 @@
 
   const STAR_PATH = 'M20 4.5 L24.6 15.2 L36.5 16 L27.4 23.8 L30.6 35.5 L20 29 L9.8 35.8 L12.8 23.6 L3.5 16.4 L15.3 15.3 Z';
   // The gem for "open in obsidian", at the card's 26px.
-  const OBSIDIAN_GEM = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 4 9l3 13h10l3-13z"/><path d="M12 2 7 22"/><path d="M12 2 17 22"/><path d="M4 9h16"/></svg>';
+  const OBSIDIAN_GEM = '<img class="obsidian-logo" src="/static/brand/obsidian-logo.png" alt="" width="22" height="22">';
   const AIR_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.5 6.5 0 0 0 0 9M16.5 7.5a6.5 6.5 0 0 1 0 9M4.5 4.5a10.5 10.5 0 0 0 0 15M19.5 4.5a10.5 10.5 0 0 1 0 15"/></svg>';
-  const HANDLE_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M5 7h14M5 12h14M5 17h14"/></svg>';
   const LIVE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>';
-  // The umbrella: save for a rainy day. On writers room and writers likey
-  // cards (and the editor header) only - §15.2, slice 6.
-  const UMBRELLA_ICON = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9z"/><path d="M12 12v6a2 2 0 0 0 4 0"/><path d="M12 2v1"/></svg>';
+  // The six-dot grip on the grabber.
+  const GRIP_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="9" cy="6" r="1.9"/><circle cx="15" cy="6" r="1.9"/><circle cx="9" cy="12" r="1.9"/><circle cx="15" cy="12" r="1.9"/><circle cx="9" cy="18" r="1.9"/><circle cx="15" cy="18" r="1.9"/></svg>';
   // Back to the room: a parked card's umbrella becomes this.
   const BACK_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>';
 
@@ -114,14 +112,14 @@
     };
   }
 
-  // Length as signal bars: under 800 words one, to 1,499 two, to 2,999
-  // three, 3,000 and up four.
+  // Length as five signal bars, with no number beside them on a card:
+  // under 500 words one, to 1,199 two, to 2,499 three, to 4,999 four, 5,000
+  // and up five. The exact count is the bars' tooltip.
+  const BAR_STEPS = [500, 1200, 2500, 5000];
+  const BAR_NAMES = ['a note', 'short', 'essay length', 'long', 'very long'];
   function barCount(words) {
     const n = Number(words) || 0;
-    if (n >= 3000) return 4;
-    if (n >= 1500) return 3;
-    if (n >= 800) return 2;
-    return 1;
+    return 1 + BAR_STEPS.filter((step) => n >= step).length;
   }
 
   function formatWords(words) {
@@ -184,6 +182,12 @@
   function formatStampDate(value, kind) {
     const parts = kind === 'calendar' ? calendarParts(value) : instantParts(value);
     return parts ? `${MONTHS[parts.month - 1]} ${parts.day} ${parts.year}` : '';
+  }
+
+  // "10.5.26": the brief form the card's air chip uses.
+  function formatAirShort(value) {
+    const parts = calendarParts(value);
+    return parts ? `${parts.month}.${parts.day}.${String(parts.year).slice(-2)}` : '';
   }
 
   function formatAirDay(value) {
@@ -498,11 +502,12 @@
   // category, through the existing intake-suggest/intake-apply routes.
   // `intake` is the last suggestion pool.js has for this essay, or undefined
   // before the writer has asked for one.
+  // The first "file it" is in the card's meta row; once a topic is suggested
+  // the picker and the confirm button need the width, so they sit under the
+  // title.
   function filingMarkup(essay, intake) {
     if (!essay?.needs_intake) return '';
-    if (!intake) {
-      return '<div class="card-filing"><button type="button" class="card-file-btn" data-action="intake-suggest">file it</button></div>';
-    }
+    if (!intake) return '';
     const categories = Array.isArray(intake.categories) ? intake.categories : [];
     const categoriesOff = intake.category_mode === 'off';
     const picker = (categoriesOff || !categories.length) ? '' : (
@@ -530,7 +535,7 @@
   function barsMarkup(words) {
     const filled = barCount(words);
     let bars = '';
-    for (let i = 1; i <= 4; i += 1) {
+    for (let i = 1; i <= 5; i += 1) {
       bars += `<span class="bar${i <= filled ? ' is-filled' : ''}"></span>`;
     }
     return `<span class="bars bars-${filled}" aria-hidden="true">${bars}</span>`;
@@ -548,27 +553,26 @@
     return `<button type="button" class="card-postit note pad-${pad} pad-${color}" data-action="star" aria-pressed="${starred}" aria-label="star for writers likey">${pin}${star}</button>`;
   }
 
-  // The three-bar handle: drag it to the board, or press it (or A) for
-  // placing mode. Only a writers likey card has one - a writers room essay
-  // cannot be scheduled, and a scheduled card's note is already up.
-  // Save for a rainy day. Writers room and writers likey cards only (slice
-  // 2 deliberately left it out until slice 6 wired it).
-  function umbrellaMarkup() {
-    return `<button type="button" class="card-umbrella" data-action="park" aria-label="save for a rainy day" title="save for a rainy day">${UMBRELLA_ICON}</button>`;
-  }
-
   // A parked card's handle slot: when it was parked, and the way back.
   function unparkMarkup(sinceLabel) {
     return `<span class="card-rain-since">${escapeHtml(sinceLabel)}</span>`
       + `<button type="button" class="card-unpark" data-action="unpark">${BACK_ICON}back to the room</button>`;
   }
 
-  function handleMarkup(placing) {
-    return `<button type="button" class="card-handle" data-action="place" draggable="true" aria-pressed="${placing ? 'true' : 'false'}" aria-label="place on the board" title="drag to the board, or press to place it with the keyboard">${HANDLE_ICON}</button>`;
+  // The grabber: a six-dot grip, the card's one way to move. On a writers
+  // likey card it drags to a Monday on the board (or presses, or A, for
+  // placing mode) and to rainy day in the sidebar. A writers room card can
+  // only go to rainy day: it cannot go up on the board until it has its star.
+  // A scheduled card's note is already up, so it has none.
+  function handleMarkup(phase) {
+    if (phase === 'room') {
+      return `<button type="button" class="card-handle" data-action="place" draggable="true" aria-label="move to rainy day" title="drag to rainy day in the sidebar">${GRIP_ICON}</button>`;
+    }
+    return `<button type="button" class="card-handle" data-action="place" draggable="true" aria-label="place on the board" title="drag to the board or to rainy day, or press to place it with the keyboard">${GRIP_ICON}</button>`;
   }
 
   // ctx: { now, totems: {key: {label, image}}, redPen: {enabled, lines},
-  //        presets: [...], error: '', placing: false, intake: {},
+  //        presets: [...], error: '', intake: {},
   //        attention: false }
   function cardMarkup(essay, ctx) {
     const context = ctx || {};
@@ -589,18 +593,14 @@
     // gone up to the board and the page is done with.
     const showTool = phase === 'room' || phase === 'likey';
     const titleId = `card-title-${escapeHtml(id)}`;
-    // Placing mode: the note is up on the board, and a dashed spot marks where
-    // it was. Only a likey card can be placing - never a parked one.
-    const placing = !isParked && Boolean(context.placing) && phase === 'likey';
-
     const classes = ['card', `size-${size.key}`, `phase-${phase}`, `age-${tier}`];
     if (isParked) classes.push('is-parked');
-    if (placing) classes.push('is-placing');
     let cover = '';
     if (totem) {
       cover += `<img class="card-totem" src="${escapeHtml(totem.image)}" alt="${escapeHtml(totem.label)} totem" decoding="async" loading="lazy">`;
     }
-    for (let k = 0; k < bars - 1; k += 1) {
+    // The stack of sheets behind the page tops out at three.
+    for (let k = 0; k < Math.min(bars, 4) - 1; k += 1) {
       cover += `<div class="card-sheet card-sheet-${k}" aria-hidden="true"></div>`;
     }
     let lineMarkup = '';
@@ -617,40 +617,43 @@
       + '<span class="card-page-gap" aria-hidden="true"></span>'
       + stampMarkup(stamp)
       + '</div>';
-    if (placing) cover += '<div class="card-postit-spot" aria-hidden="true">note is<br>up</div>';
-    else if (showPostit) cover += postitMarkup(shown);
+    if (showPostit) cover += postitMarkup(shown);
 
-    let meta = '';
+    // One line above the title, left to right: the topic, the air chip, "file
+    // it" (while nothing is suggested yet), the length bars, obsidian, and the
+    // grabber. The topic takes what is left and is cut short before it can
+    // push the rest off the card.
+    let topicMarkup = '';
     if (topic) {
       // A preset colour is the writer's own setting, so it is shape-checked
       // before it reaches a style attribute.
       const dot = /^#[0-9a-f]{3,8}$/i.test(topic.color) ? ` style="--topic:${topic.color}"` : '';
-      meta += `<span class="card-topic-dot"${dot} aria-hidden="true"></span><span class="card-topic">${escapeHtml(topic.name)}</span>`;
+      topicMarkup = `<span class="card-topic-dot"${dot} aria-hidden="true"></span><span class="card-topic">${escapeHtml(topic.name)}</span>`;
+    }
+    let meta = `<span class="card-meta-start">${topicMarkup}</span>`;
+    if (phase === 'ready' && essay?.scheduled_at) {
+      const short = formatAirShort(essay.scheduled_at);
+      meta += `<span class="card-air" title="airs ${escapeHtml(formatAirDay(essay.scheduled_at))}">${AIR_ICON}airdate ${escapeHtml(short)}</span>`;
+    } else if (phase === 'live' && isPostLink(essay?.substack_url)) {
+      meta += `<a class="card-live" href="${escapeHtml(essay.substack_url)}" rel="noopener">${LIVE_ICON}live</a>`;
+    }
+    if (essay?.needs_intake && !(context.intake && context.intake[id])) {
+      meta += '<button type="button" class="card-file-btn" data-action="intake-suggest">file it</button>';
     }
     const words = Number(essay?.word_count) || 0;
-    meta += '<span class="card-spacer"></span>'
-      + `<span class="card-length" title="${escapeHtml(words.toLocaleString('en-US'))} words">${barsMarkup(words)}${escapeHtml(formatWords(words))}<span class="visually-hidden"> words</span></span>`;
+    const count = words.toLocaleString('en-US');
+    meta += `<span class="card-length" title="${escapeHtml(count)} words · ${BAR_NAMES[barCount(words) - 1]}">${barsMarkup(words)}<span class="visually-hidden">${escapeHtml(count)} words</span></span>`;
+    if (essay?.obsidian_url) {
+      meta += `<a class="card-obsidian" href="${escapeHtml(essay.obsidian_url)}" aria-label="open in obsidian" title="open in obsidian">${OBSIDIAN_GEM}</a>`;
+    }
+    if (!isParked && (phase === 'likey' || phase === 'room')) meta += handleMarkup(phase);
 
+    // A parked card has one more row: when it was parked, and the way back.
+    // An essay parked by an older airdate has no archived_at, so no date.
     let actions = '';
     if (isParked) {
-      // No drag handle (it cannot go on the board from here); in its place,
-      // when it was parked. The umbrella becomes "back to the room". An essay
-      // parked by an older airdate has no archived_at, so no date to give.
       const since = formatStampDate(essay?.archived_at, 'instant');
-      actions += unparkMarkup(since ? `in the rain since ${since}` : 'in the rain');
-    } else if (phase === 'likey') {
-      actions += handleMarkup(placing);
-    } else if (phase === 'ready' && essay?.scheduled_at) {
-      actions += `<span class="card-air">${AIR_ICON}airs ${escapeHtml(formatAirDay(essay.scheduled_at))}</span>`;
-    } else if (phase === 'live' && isPostLink(essay?.substack_url)) {
-      actions += `<a class="card-live" href="${escapeHtml(essay.substack_url)}" rel="noopener">${LIVE_ICON}live on substack</a>`;
-    }
-    actions += '<span class="card-spacer"></span>';
-    if (!isParked && (phase === 'room' || phase === 'likey')) {
-      actions += umbrellaMarkup();
-    }
-    if (essay?.obsidian_url) {
-      actions += `<a class="card-obsidian" href="${escapeHtml(essay.obsidian_url)}" aria-label="open in obsidian" title="open in obsidian">${OBSIDIAN_GEM}</a>`;
+      actions = unparkMarkup(since ? `in the rain since ${since}` : 'in the rain');
     }
 
     const error = context.error
@@ -666,7 +669,7 @@
       + filingMarkup(essay, context.intake && context.intake[id])
       + error
       + '<div class="card-feedback"></div>'
-      + `<div class="card-actions">${actions}</div>`
+      + (actions ? `<div class="card-actions">${actions}</div>` : '')
       + '</div></article>';
   }
 
@@ -677,6 +680,7 @@
     ageTier,
     toolFor,
     barCount,
+    BAR_STEPS,
     barsMarkup,
     formatWords,
     phaseOf,
@@ -684,6 +688,7 @@
     sizeTier,
     formatStampDate,
     formatAirDay,
+    formatAirShort,
     stampFor,
     hashString,
     jabFor,

@@ -118,13 +118,23 @@ class ToolTests(unittest.TestCase):
 
 class SignalBarTests(unittest.TestCase):
     def test_the_thresholds(self):
-        for words, bars in [(0, 1), (799, 1), (800, 2), (1499, 2), (1500, 3), (2999, 3), (3000, 4), (17400, 4)]:
+        for words, bars in [(0, 1), (499, 1), (500, 2), (1199, 2), (1200, 3), (2499, 3), (2500, 4), (4999, 4),
+                            (5000, 5), (17400, 5)]:
             with self.subTest(words=words):
                 self.assertEqual(run(f"cards.barCount({words})"), bars)
 
     def test_every_artboard_example_fits(self):
-        # 251 words one bar, 954 and 1.3k two, 1.6k three, 13.3k and 17.4k four.
-        self.assertEqual(run("[251, 954, 1300, 1600, 13300, 17400].map(cards.barCount)"), [1, 2, 2, 3, 4, 4])
+        # 251 words one bar, 954 two, 1.3k and 1.6k three, 13.3k and 17.4k five.
+        self.assertEqual(run("[251, 954, 1300, 1600, 13300, 17400].map(cards.barCount)"), [1, 2, 3, 3, 5, 5])
+
+    def test_there_are_five_bars_and_the_card_shows_no_number(self):
+        html = run(f"cards.cardMarkup({js(essay(word_count=1300))}, {js({'now': '2026-09-30T12:00:00-07:00'})})")
+        length = html.split('class="card-length"')[1].split("</span></span>")[0]
+        self.assertEqual(length.count('class="bar'), 6)  # the .bars wrapper and five bars
+        self.assertEqual(length.count("is-filled"), 3)
+        self.assertIn('title="1,300 words', html)
+        self.assertIn('<span class="visually-hidden">1,300 words</span>', html)
+        self.assertNotIn("1.3k", html)
 
     def test_word_counts_read_short(self):
         self.assertEqual(run("[251, 954, 1300, 1000, 17400].map(cards.formatWords)"),
@@ -350,20 +360,47 @@ class CardMarkupTests(unittest.TestCase):
         self.assertNotIn("card-postit", html)
         self.assertIn("airs mon oct 5", html)
 
-    def test_a_room_card_has_no_handle_but_has_the_umbrella(self):
-        # A writers room essay cannot go on the board, so it has no handle
-        # (tests/test_room_board_js.py covers the likey card's). The umbrella
-        # (slice 6) is on both room and likey cards.
+    def test_a_room_card_has_the_grabber_for_rainy_day_only(self):
+        """A writers room essay cannot go on the board, but its grabber drags it
+        to rainy day in the sidebar. There is no umbrella on any card."""
         html = self.markup()
-        self.assertNotIn("drag", html)
-        self.assertIn('data-action="park"', html)
-        self.assertIn("rainy", html)
-        self.assertEqual(html.count("<button"), 2, "the post-it and the umbrella")
+        self.assertIn('class="card-handle"', html)
+        self.assertIn('aria-label="move to rainy day"', html)
+        self.assertNotIn("card-umbrella", html)
+        self.assertNotIn('data-action="park"', html)
 
-    def test_the_umbrella_is_on_likey_too_but_not_on_scheduled_or_live(self):
-        self.assertIn('data-action="park"', self.markup(status="Writers Likey"))
-        self.assertNotIn('data-action="park"', self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
-        self.assertNotIn('data-action="park"', self.markup(status="Live", published_date="2026-09-21"))
+    def test_the_grabber_is_a_six_dot_grip_on_room_and_likey_cards_only(self):
+        for status in ("Writers Room", "Writers Likey"):
+            html = self.markup(status=status)
+            self.assertEqual(html.split('class="card-handle"')[1].split("</button>")[0].count("<circle"), 6, status)
+        self.assertNotIn("card-handle", self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
+        self.assertNotIn("card-handle", self.markup(status="Live", published_date="2026-09-21"))
+
+    def test_one_line_above_the_title_holds_everything_in_order(self):
+        html = self.markup(status="Writers Likey", needs_intake=True, category="Craft",
+                           obsidian_url="obsidian://open?vault=v&file=A")
+        meta = html.split('<div class="card-meta">')[1].split("</div>")[0]
+        order = [meta.index(part) for part in ("card-topic", 'data-action="intake-suggest"', "card-length",
+                                               "card-obsidian", "card-handle")]
+        self.assertEqual(order, sorted(order))
+        self.assertLess(html.index("card-meta"), html.index('class="card-title"'))
+        self.assertNotIn("card-actions", html)
+
+    def test_the_air_chip_is_brief_and_sits_between_the_topic_and_the_bars(self):
+        html = self.markup(status="Ready for Air", scheduled_at="2026-10-05")
+        meta = html.split('<div class="card-meta">')[1].split("</div>")[0]
+        self.assertIn("airdate 10.5.26", meta)
+        self.assertLess(meta.index("card-meta-start"), meta.index("card-air"))
+        self.assertLess(meta.index("card-air"), meta.index("card-length"))
+
+    def test_only_a_parked_card_has_a_row_under_the_title(self):
+        self.assertNotIn("card-actions", self.markup(status="Ready for Air", scheduled_at="2026-10-05"))
+        self.assertIn("card-actions", self.markup(status="Archived", previous_status="Writers Room"))
+
+    def test_once_a_topic_is_suggested_the_picker_moves_under_the_title(self):
+        html = self.markup({**self.CTX, 'intake': {'abc': {'category': 'x', 'categories': ['x', 'y']}}}, id='abc', needs_intake=True)
+        self.assertIn("data-action=\"intake-apply\"", html)
+        self.assertNotIn("data-action=\"intake-suggest\"", html)
 
     def test_a_parked_card_shows_its_previous_phase(self):
         html = self.markup(status="Archived", previous_status="Writers Likey", archived_at="2026-05-12T18:00:00Z",
@@ -417,7 +454,8 @@ class CardMarkupTests(unittest.TestCase):
         self.assertIn("phase-room", self.markup())
 
     def test_stacked_sheets_follow_the_length(self):
-        self.assertEqual(self.markup(word_count=500).count("card-sheet-"), 0)
+        self.assertEqual(self.markup(word_count=400).count("card-sheet-"), 0)
+        self.assertEqual(self.markup(word_count=1300).count("card-sheet-"), 2)
         self.assertEqual(self.markup(word_count=5000).count("card-sheet-"), 3)
 
     def test_the_stamp_is_one_image_with_its_date(self):

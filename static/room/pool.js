@@ -36,8 +36,13 @@
     busy: new Set(),
     errors: new Map(),
     loaded: false,
-    // The card whose note is up on the board in placing mode.
-    placing: '',
+    // Cards whose note has gone up to the board (lifted with the grabber, or
+    // dragged): they leave the pool's layout until the note is set or put back.
+    up: new Set(),
+    // The card being dragged by its grabber, and the cards dropped on rainy
+    // day whose save is still on its way (they stay out of the layout).
+    dragId: '',
+    parking: new Set(),
     // The needs-filing lane (slice 6): the last /intake-suggest answer for an
     // essay, keyed by id. Undefined until the writer asks ("file it").
     intake: {},
@@ -74,7 +79,6 @@
       redPen: cfg.red_pen || { enabled: true, lines: [] },
       presets: presets(),
       error: essay ? state.errors.get(String(essay.id)) || '' : '',
-      placing: Boolean(essay && state.placing && state.placing === String(essay.id)),
       intake: state.intake,
       attention: state.attention,
     };
@@ -152,6 +156,55 @@
     for (const button of els.totemGroup.querySelectorAll('button[data-totem]')) {
       button.setAttribute('aria-pressed', String(state.totems.has(button.dataset.totem)));
     }
+    renderDropLabels();
+  }
+
+  // The drop-downs say what they are set to, so a closed one still reads.
+  const SHOW_LABELS = {
+    all: 'all',
+    'writers-room': 'writers room',
+    'writers-likey': 'writers likey',
+    'ready-for-air': 'ready for air',
+  };
+  function renderDropLabels() {
+    if (els.showLabel) els.showLabel.textContent = state.phase === NEEDS_FILING ? 'needs filing' : (SHOW_LABELS[state.phase] || 'all');
+    if (els.totemLabel) {
+      const picked = Array.from(els.totemGroup.querySelectorAll('button[data-totem]'))
+        .filter((button) => state.totems.has(button.dataset.totem));
+      els.totemLabel.textContent = !picked.length ? 'any' : (picked.length === 1 ? picked[0].textContent.trim() : `${picked.length} picked`);
+    }
+  }
+
+  // A drop-down closes when something outside it is pressed, on Escape (focus
+  // goes back to its label), and, for "show", once a choice is made. The totem
+  // menu stays open while totems are ticked, since more than one can be.
+  function bindDrops() {
+    const drops = Array.from(document.querySelectorAll('.pool-drop'));
+    document.addEventListener('click', (event) => {
+      for (const drop of drops) if (drop.open && !drop.contains(event.target)) drop.open = false;
+    });
+    for (const drop of drops) {
+      drop.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || !drop.open) return;
+        event.stopPropagation();
+        drop.open = false;
+        const summary = drop.querySelector('summary');
+        if (summary) summary.focus();
+      });
+      drop.addEventListener('toggle', () => {
+        if (!drop.open) return;
+        for (const other of drops) if (other !== drop) other.open = false;
+      });
+    }
+    const show = document.getElementById('pool-drop-show');
+    const menu = show && show.querySelector('.pool-drop-menu');
+    if (menu) {
+      menu.addEventListener('click', (event) => {
+        if (!event.target.closest('button')) return;
+        show.open = false;
+        show.querySelector('summary').focus();
+      });
+    }
   }
 
   // The topic menu offers the topics the essays in the room carry. A topic no
@@ -176,7 +229,7 @@
     const cfg = state.config || {};
     const items = cfg.totems && cfg.totems.enabled && Array.isArray(cfg.totems.items) ? cfg.totems.items : [];
     els.totemGroup.hidden = !items.length;
-    els.totemDivider.hidden = !items.length;
+    els.totemDrop.hidden = !items.length;
     els.totemGroup.innerHTML = items.map((item) => {
       const key = Cards.escapeHtml(String(item.key).toLowerCase());
       const label = Cards.escapeHtml(String(item.label || item.key).toLowerCase());
@@ -222,6 +275,7 @@
       const card = cardElement(id);
       if (card) card.setAttribute('aria-busy', 'true');
     }
+    for (const id of state.up) cardElement(id)?.classList.add('is-up');
     roving.refresh();
   }
 
@@ -237,6 +291,7 @@
     holder.innerHTML = cardHtml(essay);
     const next = holder.firstElementChild;
     if (state.busy.has(String(essay.id))) next.setAttribute('aria-busy', 'true');
+    if (state.up.has(String(oldId)) || state.up.has(String(essay.id))) next.classList.add('is-up');
     card.replaceWith(next);
     roving.refresh(String(essay.id));
     if (focusStar) {
@@ -311,7 +366,8 @@
       replaceCard(oldId, row, card.contains(document.activeElement));
       return;
     }
-    render(false);
+    // A card that leaves (or one that arrives) moves the rest: let them glide.
+    flight(() => render(false));
   }
 
   // ---- the umbrella: save for a rainy day (slice 6) ------------------------
@@ -366,7 +422,11 @@
   // the slip, with an undo - the umbrella's own promise (§15.2).
   async function parkEssay(id) {
     const index = state.essays.findIndex((essay) => String(essay.id) === id);
-    if (index < 0 || state.busy.has(id)) return;
+    if (index < 0 || state.busy.has(id)) {
+      state.parking.delete(id);
+      untuck(id);
+      return;
+    }
     const essay = state.essays[index];
     const card = cardElement(id);
     state.busy.add(id);
@@ -374,6 +434,8 @@
     try {
       const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/archive`, {});
       state.busy.delete(id);
+      state.parking.delete(id);
+      state.up.delete(id);
       const fresh = result && result.row;
       const neighbourId = Keys.afterLeaving(shownEssays().map((row) => row.id), id);
       const at = state.essays.findIndex((row) => String(row.id) === id);
@@ -397,11 +459,49 @@
     } catch (error) {
       state.busy.delete(id);
       if (card) card.removeAttribute('aria-busy');
+      // The card comes back before it says why.
+      state.parking.delete(id);
+      untuck(id);
       const host = cardElement(id)?.querySelector('.card-feedback');
       if (host) {
         Feedback.plaque(host, { tone: error && error.kind === 'refused' ? 'amber' : 'red', text: parkFailure(error) });
       }
     }
+  }
+
+  // Rainy day, in the sidebar, takes a card dropped on it: the grabber's way
+  // of saving an essay for later.
+  function bindRainyDrop() {
+    const target = document.getElementById('nav-rainy-day');
+    if (!target) return;
+    els.pool.addEventListener('dragstart', (event) => {
+      const handle = event.target.closest && event.target.closest('.card-handle');
+      const card = handle && handle.closest('.card');
+      const essay = card && state.essays.find((row) => String(row.id) === card.dataset.essayId);
+      state.dragId = essay && (essay.status === 'Writers Room' || essay.status === 'Writers Likey') ? String(essay.id) : '';
+    });
+    document.addEventListener('dragend', () => {
+      state.dragId = '';
+      target.classList.remove('is-drop-target');
+    });
+    target.addEventListener('dragover', (event) => {
+      if (!state.dragId) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+      target.classList.add('is-drop-target');
+    });
+    target.addEventListener('dragleave', (event) => {
+      if (!target.contains(event.relatedTarget)) target.classList.remove('is-drop-target');
+    });
+    target.addEventListener('drop', (event) => {
+      const id = state.dragId;
+      if (!id) return;
+      event.preventDefault();
+      state.dragId = '';
+      target.classList.remove('is-drop-target');
+      state.parking.add(id);
+      parkEssay(id);
+    });
   }
 
   // ---- the needs-filing lane (slice 6) --------------------------------------
@@ -477,14 +577,76 @@
     }
   }
 
-  function setPlacing(id) {
-    const before = state.placing;
-    state.placing = id ? String(id) : '';
-    for (const key of new Set([before, state.placing])) {
-      if (!key) continue;
-      const essay = state.essays.find((row) => String(row.id) === key);
-      if (essay && cardElement(key)) replaceCard(key, essay, false);
+  // ---- the grabber: a card's note goes up to the board and comes back ------
+
+  function flight(change) {
+    const Flight = window.RoomFlight;
+    return Flight ? Flight.flip(els.pool, change) : change();
+  }
+
+  // The card's note goes up: the card shrinks into its post-it and the cards
+  // below slide up into the space. Returns what a flight needs (where the
+  // post-it was, and a copy of it to fly), or null when the card is not showing.
+  // options.collapse: false hides it at once, for a drag, where the browser is
+  // already carrying the note.
+  function tuck(id, options) {
+    const key = String(id);
+    if (state.up.has(key)) return null;
+    const card = cardElement(key);
+    state.up.add(key);
+    if (!card) return null;
+    const postit = card.querySelector('.card-postit');
+    const rect = (postit || card).getBoundingClientRect();
+    const note = postit ? postit.cloneNode(true) : null;
+    const Flight = window.RoomFlight;
+    const hide = () => {
+      card.classList.add('is-up');
+      roving.refresh();
+    };
+    if (!Flight) {
+      hide();
+    } else if (options && options.collapse === false) {
+      Flight.flip(els.pool, hide);
+    } else {
+      // The slide waits for the card to be gone, or the cards below would
+      // move under it.
+      Flight.collapse(card, rect).then(() => {
+        if (state.up.has(key)) Flight.flip(els.pool, hide);
+      });
     }
+    return { rect, note };
+  }
+
+  // The note comes back (put back, or set and done): the card takes its place
+  // again, the cards around it make room, and the card settles in.
+  // options.from: a rectangle to fly the note back from (the board's ghost);
+  // the card waits for it to land.
+  function untuck(id, options) {
+    const key = String(id);
+    // A card dropped on rainy day stays out until its save has an answer.
+    if (state.parking.has(key)) return Promise.resolve();
+    if (!state.up.delete(key)) return Promise.resolve();
+    const card = cardElement(key);
+    if (!card) return Promise.resolve();
+    const Flight = window.RoomFlight;
+    const show = () => {
+      card.classList.remove('is-up');
+      roving.refresh();
+    };
+    if (!Flight) {
+      show();
+      return Promise.resolve();
+    }
+    // Hidden (opacity 0) but laid out, so the cards around it make room now.
+    card.style.opacity = '0';
+    Flight.flip(els.pool, show);
+    const postit = card.querySelector('.card-postit');
+    const from = options && options.from;
+    if (from && postit && !Flight.reducedMotion()) {
+      return Flight.fly(postit, from, postit.getBoundingClientRect(), { turnFrom: 0, turnTo: -7 })
+        .then(() => Flight.arrive(card));
+    }
+    return Flight.arrive(card);
   }
 
   function setPhase(phase) {
@@ -499,13 +661,6 @@
         event.preventDefault();
         const card = star.closest('.card');
         if (card) toggleStar(card);
-        return;
-      }
-      const park = event.target.closest('[data-action="park"]');
-      if (park) {
-        event.preventDefault();
-        const card = park.closest('.card');
-        if (card) parkEssay(card.dataset.essayId);
         return;
       }
       const suggest = event.target.closest('[data-action="intake-suggest"]');
@@ -635,15 +790,19 @@
     els.topic = $('pool-topic');
     els.sort = $('pool-sort');
     els.totemGroup = $('pool-totems');
-    els.totemDivider = $('pool-totem-divider');
+    els.totemDrop = $('pool-totem-drop');
+    els.showLabel = $('pool-show-label');
+    els.totemLabel = $('pool-totem-label');
     if (!els.pool || !Cards || !Api || !Keys || !Feedback) return;
     roving = Keys.createRoving({
       container: els.pool,
-      itemSelector: '.card',
+      itemSelector: '.card:not(.is-up)',
       primarySelector: '.card-link',
       columnSelector: '.pool-column',
     });
     bind();
+    bindDrops();
+    bindRainyDrop();
     document.addEventListener('room:essay', (event) => {
       const detail = event.detail || {};
       if (detail.source === 'pool' || !state.loaded) return;
@@ -654,7 +813,8 @@
       onKey: (handler) => roving.onKey(handler),
       card: (id) => cardElement(id),
       feedbackHost: (id) => cardElement(id)?.querySelector('.card-feedback') || null,
-      setPlacing,
+      tuck,
+      untuck,
       isLoaded: () => state.loaded,
     };
     load();

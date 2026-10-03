@@ -43,6 +43,9 @@
   flex-wrap: wrap;
 }
 .pool-title-row { gap: 12px; }
+/* One row: the title, the drop-downs, then the search at the right. It wraps
+   only when the window is too narrow for them. */
+.pool-title-row .pool-filters { flex: 0 1 auto; }
 
 .pool-title-row h1 {
   margin: 0;
@@ -65,7 +68,8 @@
 
 .pool-search {
   position: relative;
-  width: 300px;
+  flex: 0 1 240px;
+  width: 240px;
   max-width: 100%;
 }
 .pool-search svg {
@@ -133,6 +137,59 @@
   background: rgba(255, 106, 0, 0.14);
   color: var(--orange-soft);
 }
+
+/* A drop-down in the toolbar: "show" and "totem". The label says what it is
+   set to; the menu opens under it. */
+.pool-drop { position: relative; }
+.pool-drop[hidden] { display: none; }
+.pool-drop > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r-md);
+  background: var(--s2);
+  color: var(--text);
+  font: 600 13px/1 var(--font-ui);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.pool-drop > summary::-webkit-details-marker { display: none; }
+.pool-drop > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 4px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.pool-drop[open] > summary { border-color: var(--orange-soft); }
+.pool-drop-name { color: var(--muted); font-size: 12px; }
+.pool-drop-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(320px, 80vw);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r-md);
+  background: var(--s1);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.55);
+}
+.pool-drop-menu .pool-phases { display: flex; flex-direction: column; gap: 6px; }
+.pool-drop-menu .pool-pill,
+.pool-drop-menu .pool-totem { width: 100%; justify-content: flex-start; }
+.pool-drop-menu .pool-totems { display: flex; flex-direction: column; gap: 6px; }
 
 .pool-divider {
   width: 1px;
@@ -678,20 +735,36 @@
 /* ---- the footer ---- */
 
 .card-foot {
-  padding: 14px 18px 16px;
+  padding: 10px 14px 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* One line above the title: the topic (it takes what is left), then the air
+   chip, "file it", the length bars, obsidian and the grabber at the right. */
 .card-meta {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 32px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
 }
+.card-meta-start {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* Controls on the line sit above the title's stretched link. */
+.card-meta .card-file-btn,
+.card-meta .card-live { position: relative; z-index: 2; flex-shrink: 0; }
+.card-meta .card-air { flex-shrink: 0; }
+.card-meta .card-obsidian,
+.card-meta .card-handle { width: 32px; height: 32px; }
 .card-topic-dot {
   width: 9px;
   height: 9px;
@@ -720,10 +793,12 @@
 .bar:nth-child(2) { height: 8px; }
 .bar:nth-child(3) { height: 11px; }
 .bar:nth-child(4) { height: 14px; }
+.bar:nth-child(5) { height: 17px; }
 .bars-1 .bar.is-filled { background: var(--bar-1); }
 .bars-2 .bar.is-filled { background: var(--bar-2); }
 .bars-3 .bar.is-filled { background: var(--bar-3); }
 .bars-4 .bar.is-filled { background: var(--bar-4); }
+.bars-5 .bar.is-filled { background: var(--bar-5); }
 
 .card-title {
   margin: 0;
@@ -772,9 +847,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 51px;
-  padding-top: 10px;
-  border-top: 1px solid var(--b1);
 }
 
 /* Controls in the footer sit above the stretched link. */
@@ -800,14 +872,14 @@
 .card-air {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 12px;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
   border-radius: var(--r-pill);
   border: 1.5px solid var(--orange);
   background: rgba(255, 106, 0, 0.10);
   color: var(--orange-soft);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -847,35 +919,30 @@
 }
 .card-handle:hover { border-color: var(--muted); }
 .card-handle:active { cursor: grabbing; }
-.card-handle[aria-pressed="true"] {
-  border-color: var(--orange-soft);
-  background: rgba(255, 178, 77, 0.14);
-  color: var(--orange-soft);
-}
 
-/* The note is up on the board: a dashed spot marks where it was. The card
-   keeps full strength. */
-.card-postit-spot {
-  position: absolute;
-  left: 6px;
-  top: 6px;
-  z-index: 2;
-  width: 84px;
-  height: 76px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed rgba(243, 234, 211, 0.75);
-  border-radius: 2px 2px 9px 2px;
-  transform: rotate(-7deg);
-  color: var(--cream);
-  font: 700 11px/1.2 var(--font-ui);
-  text-align: center;
-}
+/* The card's note is up on the board (lifted with the grabber, or being
+   dragged): the card leaves the pool's layout, and the cards below slide up
+   into the space (flight.js). */
+.card.is-up { display: none; }
 
-/* While the note rides the cursor the card stays in the pool at half
-   strength. */
-.card.is-lifted { opacity: 0.5; }
+/* The post-it that flies from the card to the board and back. flight.js puts
+   a copy of the card's post-it in a box that rides above the page. */
+.flying-note {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 70;
+  margin: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+}
+.flying-note .card-postit.flying-note-face {
+  position: static;
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
 
 /* After a schedule the card pulses once: its note is gone and the dater is on. */
 .card.is-pulsing { animation: card-pulse 900ms ease-out 1; }
@@ -887,26 +954,6 @@
 @media (prefers-reduced-motion: reduce) {
   .card.is-pulsing { animation: none; }
 }
-
-/* ---- the umbrella: save for a rainy day (slice 6) ---- */
-
-.card-umbrella {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  padding: 0;
-  border-radius: var(--r-md);
-  border: 1.5px solid var(--b2);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-.card-umbrella:hover { border-color: var(--muted); color: var(--orange-soft); }
 
 /* ---- a parked card's footer: no handle, "in the rain since", and the way
    back (rainy day, slice 6) ---- */
@@ -974,5 +1021,6 @@
   white-space: nowrap;
   cursor: pointer;
 }
+.card-meta .card-file-btn { height: 26px; padding: 0 10px; }
 .card-file-btn:hover { background: rgba(255, 178, 77, 0.20); }
 .card-file-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
