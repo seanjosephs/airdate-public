@@ -6,7 +6,7 @@
   <title>airdate</title>
   <link rel="icon" href="/static/brand/airdate-icon-256.png?v=1" type="image/png">
   <link rel="stylesheet" href="/static/room/tokens.css?v=4">
-  <link rel="stylesheet" href="/static/room/room.css?v=14">
+  <link rel="stylesheet" href="/static/room/room.css?v=15">
   <link rel="stylesheet" href="/static/room/cards.css?v=10">
   <link rel="stylesheet" href="/static/room/board.css?v=5">
   <link rel="stylesheet" href="/static/room/editor.css?v=7">
@@ -24,7 +24,7 @@
   <script src="/static/room/board-view.js?v=6" defer></script>
   <script src="/static/room/placing.js?v=4" defer></script>
   <script src="/static/room/editor.js?v=5" defer></script>
-  <script src="/static/airdate-tour.js?v=8" defer></script>
+  <script src="/static/airdate-tour.js?v=9" defer></script>
   <script src="/static/room/editor-view.js?v=8" defer></script>
   <script src="/static/airdate-presets.js?v=1" defer></script>
   <script src="/static/airdate-wizard.js?v=5" defer></script>
@@ -33,6 +33,7 @@
   <script src="/static/room/shelf-view.js?v=1" defer></script>
   <script src="/static/room/rainy-day.js?v=3" defer></script>
   <script src="/static/room/links.js?v=1" defer></script>
+  <script src="/static/room/keys-help.js?v=1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#room-main">skip to the essays</a>
@@ -108,9 +109,32 @@
         </div>
       </section>
 
-    <!-- The writer's own links from config.json. links.js fills and shows it. -->
-    <nav class="room-links" id="room-links" aria-label="your links" hidden></nav>
+    <!-- The sidebar's foot: the board's keyboard keys (a button: they open in
+         the middle of the screen) and the writer's own links from config.json,
+         which links.js fills and shows. -->
+    <div class="room-foot">
+      <button type="button" class="room-keys-button" id="keys-open" aria-haspopup="dialog" aria-controls="keys-dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
+        keyboard keys
+      </button>
+      <nav class="room-links" id="room-links" aria-label="your links" hidden></nav>
+    </div>
   </aside>
+
+  <!-- The board's keys, for placing a note without a mouse. keys-help.js
+       opens it from the sidebar's foot. -->
+  <dialog class="keys-dialog" id="keys-dialog" aria-labelledby="keys-title">
+    <h2 id="keys-title">keyboard keys</h2>
+    <p class="keys-sub">put a writers likey essay on the board without a mouse.</p>
+    <dl class="keys-list">
+      <div><dt><kbd>tab</kbd></dt><dd>reach a card, then <kbd aria-label="arrow keys">&larr; &uarr; &darr; &rarr;</kbd> move between cards</dd></div>
+      <div><dt><kbd>A</kbd></dt><dd>lifts the card's note onto the board</dd></div>
+      <div><dt><kbd aria-label="left arrow">&larr;</kbd> <kbd aria-label="right arrow">&rarr;</kbd></dt><dd>move between open days</dd></div>
+      <div><dt><kbd>enter</kbd> or <kbd>S</kbd></dt><dd>sets it on that day</dd></div>
+      <div><dt><kbd>esc</kbd></dt><dd>puts it back on its card</dd></div>
+    </dl>
+    <form method="dialog"><button type="submit" class="keys-close">close</button></form>
+  </dialog>
 
   <main class="room-main" id="room-main" tabindex="-1">
     <section class="pool" id="pool-section" aria-labelledby="pool-heading">

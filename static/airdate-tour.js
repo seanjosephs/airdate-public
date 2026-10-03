@@ -2,7 +2,7 @@
 // time. A stop whose element is not on screen is skipped.
 //
 // Two tours run on this module. The home tour is start() with no options:
-// its nine STOPS, seen/dismissed in this browser's localStorage, nothing sent
+// its ten STOPS, seen/dismissed in this browser's localStorage, nothing sent
 // to the server (tests/test_airdate_tour.py pins it). The essay editor's tour
 // passes options (EDITOR_STOPS, no browser key, a wider ring, a sticky beside
 // its anchor, arrow keys, focus back on the anchor) and records itself on the
@@ -22,7 +22,7 @@
   // Swallowed outside the callout while a tour runs. Wheel and scroll are
   // deliberately absent: the page may still scroll and the ring follows it.
   const BLOCKED_POINTER_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'dragstart'];
-  // The room's nine home stops. The keys and their order are pinned
+  // The room's ten home stops. The keys and their order are pinned
   // (tests/test_airdate_tour.py); the anchors are the room's. A stop whose
   // element is not showing is skipped: no publish day hides the board, and
   // nothing to file hides the filing pill.
@@ -43,6 +43,8 @@
       text: 'click a title to open the essay: the script, everything substack needs, and send. send makes a draft in substack; airdate never publishes.' },
     { key: 'shelf', anchor: '#nav-shelf', title: 'the shelf',
       text: 'live essays go here, each with the link to its post. the essays are what you are working on; the shelf is what is already out.' },
+    { key: 'rainy', anchor: '#nav-rainy-day', title: 'rainy day',
+      text: 'not now, not never. drag a card here by its grabber to park it; it comes back to the room whenever you want it.' },
     { key: 'settings', anchor: '#nav-settings', title: 'settings',
       text: 'everything from setup can be changed here. you can replay this tour from settings too.' },
   ];

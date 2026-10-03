@@ -175,6 +175,16 @@ class WiringTests(unittest.TestCase):
         self.assertIn("@keyframes live-due", css)
         self.assertNotIn("not marked live yet.'", read("static/room/board.js"))
 
+    def test_the_board_keys_open_in_a_dialog_from_the_sidebar_foot(self):
+        side = self.html.split('<aside class="room-sidebar">')[1].split("</aside>")[0]
+        self.assertIn('id="keys-open"', side)
+        self.assertLess(side.index('id="board"'), side.index('id="keys-open"'))
+        dialog = self.html.split('<dialog class="keys-dialog" id="keys-dialog"')[1].split("</dialog>")[0]
+        for words in ("lifts the card", "move between open days", "sets it", "puts it back"):
+            self.assertIn(words, dialog)
+        self.assertIn("showModal()", read("static/room/keys-help.js"))
+        self.assertIn("keys-help", self.script_order())
+
     def test_the_essays_search_and_drop_downs_stay_at_the_top_of_the_essays(self):
         self.assertRegex(self.room_css, r"\.pool-head \{[^}]*position: sticky;[^}]*top: 0;")
 

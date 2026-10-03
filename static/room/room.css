@@ -144,14 +144,87 @@ body {
 /* The writer's own links (config.json "links"), in one quiet row at the foot
    of the sidebar, under the board. The board's slots give up the row's height
    (--side-links) so the sidebar still fits the window. */
-.room-links {
+.room-foot {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
   gap: 2px 6px;
   padding-top: 8px;
   border-top: 1px solid var(--b1);
 }
+.room-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 6px;
+}
+.room-keys-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--muted);
+  font: 600 12px/1.25 var(--font-ui);
+  cursor: pointer;
+}
+.room-keys-button:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); }
+.room-keys-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The keys dialog: in the middle of the screen, over a dim. */
+.keys-dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 22px 24px 20px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r-lg);
+  background: var(--s1);
+  color: var(--text);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.keys-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
+.keys-dialog h2 { margin: 0 0 4px; font: 700 20px/1.2 var(--font-ui); }
+.keys-sub { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+.keys-list { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.keys-list > div { display: grid; grid-template-columns: 130px 1fr; gap: 12px; align-items: center; }
+.keys-list dt, .keys-list dd { margin: 0; font-size: 13px; }
+.keys-list dd { color: var(--muted); }
+.keys-dialog kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--b2);
+  border-bottom-width: 3px;
+  background: var(--s2);
+  color: var(--text);
+  font: 700 12px/1 var(--font-ui);
+  white-space: nowrap;
+}
+.keys-dialog form { margin: 18px 0 0; display: flex; justify-content: flex-end; }
+.keys-close {
+  height: 36px;
+  padding: 0 16px;
+  border: 1.5px solid var(--b2);
+  border-radius: var(--r-md);
+  background: var(--s2);
+  color: var(--text);
+  font: 700 13px/1 var(--font-ui);
+  cursor: pointer;
+}
+.keys-close:hover { border-color: var(--muted); }
 .room-links a {
   display: flex;
   align-items: center;
@@ -175,7 +248,7 @@ body {
   stroke-linejoin: round;
   fill: none;
 }
-.room-sidebar:has(#room-links:not([hidden])) { --side-links: 50px; }
+.room-sidebar { --side-links: 46px; }
 
 /* ---- main ------------------------------------------------------------- */
 

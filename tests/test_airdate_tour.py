@@ -155,9 +155,9 @@ class TourCalloutStaysOnScreenTests(unittest.TestCase):
 
 
 class TourStopTests(unittest.TestCase):
-    ALL = ["essays", "card", "lifecycle", "calendar", "filing", "filters", "editor", "shelf", "settings"]
+    ALL = ["essays", "card", "lifecycle", "calendar", "filing", "filters", "editor", "shelf", "rainy", "settings"]
 
-    def test_the_nine_stops_in_spec_order(self):
+    def test_the_ten_stops_in_spec_order(self):
         self.assertEqual(stops_without(), self.ALL)
 
     def test_every_stop_has_a_short_callout(self):
@@ -170,7 +170,7 @@ class TourStopTests(unittest.TestCase):
         # Folders off: nothing to file. No publish day: no calendar.
         self.assertEqual(stops_without("filing", "calendar"), [k for k in self.ALL if k not in ("filing", "calendar")])
         # An empty catalog has no card to point at.
-        self.assertEqual(stops_without("card", "lifecycle", "editor", "filing"), ["essays", "calendar", "filters", "shelf", "settings"])
+        self.assertEqual(stops_without("card", "lifecycle", "editor", "filing"), ["essays", "calendar", "filters", "shelf", "rainy", "settings"])
 
     def test_state_is_browser_only(self):
         self.assertEqual(run_tour("tour.TOUR_KEY"), "airdate.tour")

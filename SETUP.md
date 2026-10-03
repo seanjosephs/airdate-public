@@ -144,7 +144,7 @@ one exception noted in step 2.
 10. **Finish**: a summary of your choices. Finish writes
     `.airdate-data/config.json` and opens your essays.
 
-A short tour follows, once, on the essays view: up to nine stops, each
+A short tour follows, once, on the essays view: up to ten stops, each
 pointing at one part of the room. A stop with nothing to point at is skipped
 (no publish day, no board stop). Skip it whenever you like, and replay it with
 "replay the tour" under "under the hood" in settings. The essay editor has a

@@ -5,7 +5,7 @@ Two halves:
 - the server remembers that the editor tour has been shown, once per vault,
   as `editor.tour_done` in config.json, set through POST /api/settings/editor;
 - static/airdate-tour.js gained an options argument for the editor's five
-  steps. With no options it is the home tour exactly as it was: the same nine
+  steps. With no options it is the home tour exactly as it was: the same ten
   stops, the same key in this browser's localStorage, the same 6px ring and
   the same callout markup. tests/test_airdate_tour.py pins that tour and is
   not edited; the tests here pin the parts it does not reach and the options.
@@ -207,9 +207,9 @@ EDITOR_OPTIONS = """{ stops: tour.EDITOR_STOPS, key: null, pad: 12, place: tour.
 class HomeTourIsUnchangedTests(unittest.TestCase):
     """start() with no arguments is the old home tour."""
 
-    def test_the_nine_stops_and_the_key_are_unchanged(self):
+    def test_the_ten_stops_and_the_key_are_unchanged(self):
         self.assertEqual([s["key"] for s in run_plain("tour.STOPS")],
-                         ["essays", "card", "lifecycle", "calendar", "filing", "filters", "editor", "shelf", "settings"])
+                         ["essays", "card", "lifecycle", "calendar", "filing", "filters", "editor", "shelf", "rainy", "settings"])
         self.assertEqual(run_plain("tour.TOUR_KEY"), "airdate.tour")
 
     def test_the_callout_markup_is_unchanged(self):
@@ -227,7 +227,7 @@ class HomeTourIsUnchangedTests(unittest.TestCase):
 
     def test_the_count_reads_as_before(self):
         self.assertEqual(run_dom("(() => { tour.start(); return callout().querySelector('#tour-count').textContent; })()"),
-                         "1 of 9")
+                         "1 of 10")
 
     def test_its_state_stays_in_this_browser(self):
         stored = run_dom("(() => { tour.start(); tour.end('dismissed'); return localStorage._d; })()")
@@ -282,7 +282,7 @@ class EditorTourTests(unittest.TestCase):
         self.assertEqual(sides, {"stamp": "below", "script": "right", "save": "below", "send": "left", "board": "left"})
 
     def test_the_home_stops_are_not_the_editor_stops(self):
-        self.assertTrue(run_plain("tour.STOPS !== tour.EDITOR_STOPS && tour.STOPS.length === 9"))
+        self.assertTrue(run_plain("tour.STOPS !== tour.EDITOR_STOPS && tour.STOPS.length === 10"))
 
     def test_nothing_is_written_to_this_browser(self):
         stored = run_editor(f"tour.start({EDITOR_OPTIONS}); tour.end('seen'); return localStorage._d;")
