@@ -22,7 +22,6 @@
   const UNSCHEDULE_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 14l-4-4 4-4M5 10h9a5 5 0 0 1 0 10h-3"/></svg>';
   const SENT_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg>';
   const PLUS_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
-  const SHELF_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 20h18M6 20V9h4v11M10 20V5h4v15M15 20l2-12 3.5 1L18 20"/></svg>';
   const WARN_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></svg>';
 
   function lower(value) {
@@ -143,8 +142,7 @@
     return `airs in ${days} days`;
   }
 
-  // ctx: { today, index, placing: {essay, candidate} | null, shown: Map,
-  //        settling: Set of mondays whose live plaque is still green }
+  // ctx: { today, index, placing: {essay, candidate} | null, shown: Map }
   function slotModel(monday, ctx) {
     const entries = ctx.index.get(monday) || [];
     const past = isPast(monday, ctx.today);
@@ -164,7 +162,7 @@
       plaque = past ? 'past' : 'open';
     } else if (entry.phase === 'live') {
       kind = 'shelf';
-      plaque = `aired ${Dates.formatDay(entry.air)} · on the shelf`;
+      plaque = 'on the shelf';
     } else {
       days = Dates.daysBetween(ctx.today, entry.air);
       if (days === 0) { kind = 'onair'; plaque = 'ON AIR'; }
@@ -175,7 +173,8 @@
     }
     const placing = ctx.placing || null;
     const candidate = Boolean(placing && placing.candidate === monday);
-    let dim = kind === 'shelf' && !(ctx.settling && ctx.settling.has(monday));
+    // A live note stays at full strength: its LIVE stamp says it is done.
+    let dim = false;
     if (placing && !candidate && !open) {
       dim = true;
       plaque = past && !entry ? 'past' : 'taken';
@@ -315,8 +314,9 @@
     return TILTS[Cards.hashString(monday) % TILTS.length];
   }
 
-  // A note on the cork. ctx: { asking, aired, error, ghost, value }. From air
-  // day on the note asks "is it live?"; once the day has passed it says aired.
+  // A note on the cork. ctx: { asking, aired, error, ghost, value, live }. From
+  // air day on the note asks "is it live?"; once the day has passed it says
+  // aired. A live note keeps its place, stamped LIVE, with nothing left to do.
   function noteMarkup(entry, monday, ctx) {
     const context = ctx || {};
     const essay = entry.essay;
@@ -326,6 +326,7 @@
     const asking = Boolean(context.asking);
     const classes = ['board-note', 'note', `pad-${pad}`, `pad-${color}`];
     if (asking) classes.push('is-asking');
+    if (context.live) classes.push('is-live');
     if (context.error) classes.push('has-error');
     if (context.ghost) classes.push('is-ghost');
     const tilt = context.ghost ? 0 : tiltFor(monday);
@@ -336,6 +337,10 @@
     html += `<p class="board-note-date">${esc(dateText)}</p>`;
     html += '<span class="board-note-grow"></span>';
     if (context.ghost) return `${html}</div>`;
+    if (context.live) {
+      // The same rubber stamp the essay's card wears on the shelf.
+      return `${html}${Cards.stampMarkup(Cards.stampFor(essay))}</div>`;
+    }
     if (asking) {
       const field = `live-${id}`;
       const errorId = `live-error-${id}`;
@@ -380,7 +385,7 @@
         + `<div class="slot-ghost-frame">${noteMarkup({ essay: context.lifted, air: slot.monday }, slot.monday, { ghost: true })}</div>`
         + '</div>';
     } else if (slot.entry && slot.kind === 'shelf') {
-      zone = `<span class="slot-chip">${SHELF_ICON}on the shelf</span>`;
+      zone = noteMarkup(slot.entry, slot.monday, { aired: true, live: true });
     } else if (slot.entry) {
       const id = String(slot.entry.essay.id || '');
       const errors = context.errors || new Map();

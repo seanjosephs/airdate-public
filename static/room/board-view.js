@@ -13,7 +13,6 @@
   const Feedback = window.RoomFeedback;
   if (!Dates || !Board || !Api || !Feedback) return;
 
-  const LEAVE_MS = 240;
   const HOLD_RING_MS = 2000;
 
   const state = {
@@ -25,7 +24,6 @@
     offset: 0,
     index: new Map(),
     shown: new Map(),
-    settling: new Set(),
     errors: new Map(),
     values: new Map(),
     busy: new Set(),
@@ -45,10 +43,6 @@
 
   function reducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  }
-
-  function wait(ms) {
-    return new Promise((resolve) => { window.setTimeout(resolve, ms); });
   }
 
   // The board lives in the sidebar and holds three weeks: last week, this
@@ -177,7 +171,6 @@
       index: state.index,
       placing: state.placing ? { candidate: state.placing.candidate } : null,
       shown: state.shown,
-      settling: state.settling,
     };
     const markupCtx = {
       lifted: state.placing ? state.placing.essay : null,
@@ -395,26 +388,20 @@
       const result = await Api.postJson(`/api/essays/${encodeURIComponent(id)}/publish`, { substack_url: value });
       state.busy.delete(String(id));
       const row = (result && result.row) || { ...essay, status: 'Live', substack_url: value };
-      const note = slotEl(monday)?.querySelector('.board-note');
-      if (note && !reducedMotion()) {
-        note.classList.add('is-leaving');
-        await wait(LEAVE_MS);
-      }
       state.values.delete(String(id));
       replaceEssay(id, row);
-      // The slot keeps full strength while the green plaque is up, then dims.
-      // A week that still holds another note shows that one, undimmed.
-      state.settling.add(monday);
+      // The note stays where it is; the week's other note, if it has one, is
+      // the one shown now only when the writer asks for it.
       state.shown.delete(monday);
       render();
+      // The LIVE stamp comes down on the note.
+      const stamp = slotEl(monday)?.querySelector('.board-note.is-live .stamp-live');
+      if (stamp && !reducedMotion()) {
+        stamp.classList.add('is-stamping');
+        stamp.addEventListener('animationend', () => stamp.classList.remove('is-stamping'), { once: true });
+      }
       zoneEl(monday)?.focus();
-      report(monday, 'green', Board.say.live(essay.title), {
-        onGone: () => {
-          state.settling.delete(monday);
-          const slot = slotEl(monday);
-          if (slot && slot.classList.contains('kind-shelf')) slot.classList.add('is-dim');
-        },
-      });
+      report(monday, 'green', Board.say.live(essay.title));
     } catch (error) {
       state.busy.delete(String(id));
       if (error && error.status === 400) {
