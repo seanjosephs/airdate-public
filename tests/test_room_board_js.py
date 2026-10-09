@@ -198,7 +198,7 @@ class SlotTests(unittest.TestCase):
     def slot(self, monday, rows, today=TODAY, **ctx):
         extra = ", ".join(f"{k}: {js(v)}" for k, v in ctx.items())
         return run(
-            f"(() => {{ const s = board.slotModel({js(monday)}, {{ today: {js(today)}, index: board.weekIndex({js(rows)}), shown: new Map(), settling: new Set(){', ' + extra if extra else ''} }});"
+            f"(() => {{ const s = board.slotModel({js(monday)}, {{ today: {js(today)}, index: board.weekIndex({js(rows)}), shown: new Map(){', ' + extra if extra else ''} }});"
             " return { kind: s.kind, plaque: s.plaque, open: s.open, dim: s.dim, takesDrop: s.takesDrop, candidate: s.candidate }; })()"
         )
 
@@ -221,16 +221,11 @@ class SlotTests(unittest.TestCase):
         self.assertEqual(slot["kind"], "asking")
         self.assertEqual(slot["plaque"], "")
 
-    def test_live_is_on_the_shelf_dimmed_and_takes_no_drop(self):
+    def test_live_says_it_is_on_the_shelf_keeps_full_strength_and_takes_no_drop(self):
         slot = self.slot("2026-09-14", [essay(status="Live", scheduled_at="2026-09-14")])
-        self.assertEqual(slot["plaque"], "aired mon sep 14 · on the shelf")
-        self.assertTrue(slot["dim"])
+        self.assertEqual(slot["plaque"], "on the shelf")
+        self.assertFalse(slot["dim"])
         self.assertFalse(slot["takesDrop"])
-
-    def test_live_stays_full_strength_while_its_plaque_is_green(self):
-        rows = [essay(status="Live", scheduled_at="2026-09-14")]
-        dim = run(f"board.slotModel('2026-09-14', {{ today: {js(TODAY)}, index: board.weekIndex({js(rows)}), shown: new Map(), settling: new Set(['2026-09-14']) }}).dim")
-        self.assertFalse(dim)
 
     def test_a_past_empty_monday_takes_no_drop(self):
         slot = self.slot("2026-09-21", [])
@@ -366,8 +361,24 @@ class NoteMarkupTests(unittest.TestCase):
     def slot_html(self, monday, rows, today=TODAY, markup_ctx=None, **ctx):
         extra = ", ".join(f"{k}: {js(v)}" for k, v in ctx.items())
         return run(
-            f"board.slotMarkup(board.slotModel({js(monday)}, {{ today: {js(today)}, index: board.weekIndex({js(rows)}), shown: new Map(), settling: new Set(){', ' + extra if extra else ''} }}), {js(markup_ctx or {})})"
+            f"board.slotMarkup(board.slotModel({js(monday)}, {{ today: {js(today)}, index: board.weekIndex({js(rows)}), shown: new Map(){', ' + extra if extra else ''} }}), {js(markup_ctx or {})})"
         )
+
+    def test_a_live_note_stays_on_the_board_stamped_live(self):
+        rows = [essay(id="v1", title="Hey Guys", status="Live", scheduled_at="2026-09-14",
+                      published_date="2026-09-14", substack_url="https://x.substack.com/p/hey-guys")]
+        html = self.slot_html("2026-09-14", rows)
+        self.assertIn('class="board-note note', html)
+        self.assertIn("is-live", html)
+        self.assertIn("Hey Guys", html)
+        self.assertIn("stamp stamp-live", html)
+        self.assertIn(">LIVE<", html)
+        self.assertIn('<span class="slot-plaque">on the shelf</span>', html)
+        self.assertNotIn("slot-chip", html)
+        # Done: no field, no unschedule.
+        self.assertNotIn('data-action="unschedule"', html)
+        self.assertNotIn('data-action="live"', html)
+        self.assertNotIn("<input", html)
 
     def test_a_scheduled_note_carries_the_only_unschedule(self):
         html = self.slot_html("2026-10-05", [essay(title="Take <Care>", scheduled_at="2026-10-06")])
@@ -409,7 +420,7 @@ class NoteMarkupTests(unittest.TestCase):
         rows = [essay(id="x3", scheduled_at="2026-09-29")]
         html = run(
             "board.slotMarkup(board.slotModel('2026-09-28', { today: '2026-09-30', index: board.weekIndex("
-            + js(rows) + "), shown: new Map(), settling: new Set() }), { errors: new Map([['x3', 'that is not a substack post link.']]) })"
+            + js(rows) + "), shown: new Map() }), { errors: new Map([['x3', 'that is not a substack post link.']]) })"
         )
         self.assertIn('aria-invalid="true" aria-describedby="live-error-x3"', html)
         self.assertIn('id="live-error-x3" role="alert"', html)
