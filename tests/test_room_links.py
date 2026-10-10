@@ -71,6 +71,7 @@ globalThis.RoomApi = {{
     if ({js(fail)}) {{ const error = new Error('no'); error.kind = {js(fail)}; throw error; }}
     return {{ config: {{ links: {js(links_value)} }} }};
   }},
+  appStatus() {{ return this.getJson('/api/app/status'); }},
 }};
 require({js(str(CARDS))});
 require({js(str(LINKS))});
