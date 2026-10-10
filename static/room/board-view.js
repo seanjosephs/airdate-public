@@ -619,7 +619,7 @@
 
   async function fetchAll() {
     const [status, catalog] = await Promise.all([
-      Api.getJson('/api/app/status'),
+      Api.appStatus(),
       Api.getJson('/api/essays?scope=all'),
     ]);
     state.config = (status && status.config) || {};

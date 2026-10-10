@@ -270,10 +270,13 @@
     });
   }
 
+  // Settings shows the connection and the index as they are now, and every
+  // save, connect and reload ends here, so it always reads fresh; the views
+  // that load after it share what it read.
   async function load() {
     els.loaded = true;
     try {
-      const appStatus = await getJson('/api/app/status');
+      const appStatus = await window.RoomApi.appStatus({ fresh: true });
       fillForm(appStatus);
     } catch (error) {
       setMessage(`could not load settings: ${error.message}`, 'bad');
@@ -419,7 +422,7 @@
   async function maybeOpenWizard() {
     let appStatus;
     try {
-      appStatus = await getJson('/api/app/status');
+      appStatus = await window.RoomApi.appStatus();
     } catch (error) {
       return;
     }

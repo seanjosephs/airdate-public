@@ -64,11 +64,14 @@
 
   // ---- config ---------------------------------------------------------------
 
+  // The editor writes its own settings (the script height, the gear, the tour)
+  // into this config as the server confirms them, so it keeps a copy of the
+  // room's shared answer rather than the answer itself.
   function loadConfig() {
     if (!configPromise) {
-      configPromise = Api.getJson('/api/app/status')
+      configPromise = Api.appStatus()
         .then((status) => {
-          config = (status && status.config) || {};
+          config = { ...((status && status.config) || {}) };
           return config;
         })
         .catch((error) => {
