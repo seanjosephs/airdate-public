@@ -68,5 +68,23 @@
     });
   }
 
-  return { RoomApiError, classify, getJson, postJson };
+  // The room's one read of /api/app/status. Every read asks the obsidian
+  // connector how it is, which can take five seconds, and every view wants the
+  // same answer, so the room reads it once and the views share it. A write that
+  // changes the answer reads again with { fresh: true }; the views that ask
+  // after it get the new one. A failed read is not kept: the next ask tries
+  // again. The answer is shared, so a view that changes it keeps its own copy.
+  let statusRead = null;
+
+  function appStatus(options) {
+    if (statusRead && !(options && options.fresh)) return statusRead;
+    const read = getJson('/api/app/status');
+    statusRead = read;
+    read.catch(() => {
+      if (statusRead === read) statusRead = null;
+    });
+    return read;
+  }
+
+  return { RoomApiError, classify, getJson, postJson, appStatus };
 });

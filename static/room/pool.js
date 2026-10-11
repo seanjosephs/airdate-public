@@ -753,7 +753,7 @@
     renderMessage('<p>loading the essays…</p>', 'status');
     try {
       const [status, catalog] = await Promise.all([
-        Api.getJson('/api/app/status'),
+        Api.appStatus(),
         Api.getJson('/api/essays'),
       ]);
       state.config = (status && status.config) || {};

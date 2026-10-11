@@ -1,9 +1,10 @@
 // The writer's own links, drawn in the sidebar under the room's nav.
 //
 // They come from config.json ("links": [{ "label", "url" }]) by way of
-// /api/app/status. There is no settings page for them: a hand edit and a
-// restart is how they change. Only http and https addresses are drawn, and
-// each opens in a new tab so the room, and anything unsaved in it, stays put.
+// /api/app/status, read once for the whole room (RoomApi.appStatus). There is
+// no settings page for them: a hand edit and a restart is how they change.
+// Only http and https addresses are drawn, and each opens in a new tab so the
+// room, and anything unsaved in it, stays put.
 (function installRoomLinks(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -52,7 +53,7 @@
     const Api = globalThis.RoomApi;
     if (!nav || !Api) return;
     try {
-      const status = await Api.getJson('/api/app/status');
+      const status = await Api.appStatus();
       const html = markup(status && status.config && status.config.links);
       nav.innerHTML = html;
       nav.hidden = !html;

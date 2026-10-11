@@ -135,7 +135,7 @@
     els.body.innerHTML = '<p class="shelf-empty">loading the shelf…</p>';
     try {
       const [status, catalog] = await Promise.all([
-        Api.getJson('/api/app/status'),
+        Api.appStatus(),
         Api.getJson('/api/essays?scope=shelf'),
       ]);
       state.config = (status && status.config) || {};

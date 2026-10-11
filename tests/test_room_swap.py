@@ -136,7 +136,7 @@ const ESSAYS = {
 globalThis.RoomApi = {
   async getJson(url) {
     record.calls.push(url);
-    if (url === '/api/app/status') return { config: {} };
+    if (url === '/api/app/status') return globalThis.__status;
     const m = url.match(/^\/api\/essays\/([^/?]+)$/);
     if (m) {
       const essay = ESSAYS[decodeURIComponent(m[1])];
@@ -147,9 +147,11 @@ globalThis.RoomApi = {
     }
     return {};
   },
+  appStatus() { return this.getJson('/api/app/status'); },
   async postJson(url) { record.calls.push(url); return {}; },
 };
-// settings.js has its own fetch wrappers.
+// The status every view reads through RoomApi.appStatus. settings.js has its
+// own fetch wrappers for the rest, and the wizard reads with them.
 globalThis.__status = { setup: {}, config: {} };
 globalThis.fetch = async (url) => {
   record.fetched.push(url);

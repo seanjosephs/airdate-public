@@ -160,7 +160,7 @@
     els.columns.innerHTML = '<div class="rainy-empty-wrap"><p class="rainy-loading">loading the rain…</p></div>';
     try {
       const [status, catalog] = await Promise.all([
-        Api.getJson('/api/app/status'),
+        Api.appStatus(),
         Api.getJson('/api/essays?scope=archived'),
       ]);
       state.config = (status && status.config) || {};

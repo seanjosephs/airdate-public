@@ -413,6 +413,7 @@ globalThis.RoomApi = {
     if (url === '/api/essays') return { essays: globalThis.__essays };
     return {};
   },
+  appStatus() { return this.getJson('/api/app/status'); },
   async postJson(url, body) {
     record.posts.push({ url, body });
     return globalThis.__post ? globalThis.__post(url, body) : {};
